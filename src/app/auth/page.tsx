@@ -34,13 +34,21 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      // Supabase phone-OTP flow handles the actual sending; our /api/send-otp does the VOIP check first
+      // VOIP / rate limit pre-check on our server
       const checkRes = await fetch('/api/send-otp', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: e164 })
       });
       const checkData = await checkRes.json();
       if (!checkRes.ok) { setError(checkData.error || 'Could not send code'); setLoading(false); return; }
+
+      // Supabase sends the OTP via its configured Twilio Verify provider
+      const { error: otpErr } = await supabase.auth.signInWithOtp({ phone: e164 });
+      if (otpErr) {
+        setError(otpErr.message || 'Could not send code');
+        setLoading(false);
+        return;
+      }
 
       setPhoneE164(e164);
       setStep('otp');
@@ -57,33 +65,29 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/check-otp', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneE164, code })
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Invalid code'); setLoading(false); return; }
-
-      // Sign in via Supabase phone auth (which will validate the same OTP)
-      const { error: signInErr } = await supabase.auth.verifyOtp({
+      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
         phone: phoneE164,
         token: code,
         type: 'sms'
       });
 
-      if (signInErr) {
-        // Twilio Verify already succeeded; if Supabase didn't have the user yet,
-        // we sign in differently — for MVP we use Supabase's own phone OTP.
-        // In production, decide on ONE source of truth for OTP.
-        setError('Could not complete sign in. Try again.');
+      if (verifyErr || !data?.user) {
+        setError(verifyErr?.message || 'Invalid or expired code');
         setLoading(false);
         return;
       }
 
-      if (data.needsProfile) {
-        setStep('profile');
-      } else {
+      // Check if profile already exists for this user
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (profile) {
         router.push('/feed');
+      } else {
+        setStep('profile');
       }
     } catch (e) {
       setError('Network error. Try again.');
@@ -102,7 +106,6 @@ export default function AuthPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError('Session expired. Sign in again.'); return; }
 
-      // Find city + neighborhood IDs
       const { data: cityRow } = await supabase.from('cities').select('id').eq('slug', city).single();
       if (!cityRow) throw new Error('City not found');
       const { data: nb } = await supabase.from('neighborhoods')

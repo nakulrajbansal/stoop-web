@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { lookupNumber, sendVerification } from '@/lib/twilio';
+import { lookupNumber } from '@/lib/twilio';
 import { checkOtpRateLimit, logOtpAttempt } from '@/lib/rate-limit';
 import { isValidE164 } from '@/lib/utils';
 
@@ -12,13 +12,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 });
     }
 
-    // Rate limit check
     const rl = await checkOtpRateLimit(phone, ip);
     if (!rl.ok) {
       return NextResponse.json({ error: rl.reason }, { status: 429 });
     }
 
-    // VOIP / Google Voice check
     const lookup = await lookupNumber(phone);
     if (!lookup.valid) {
       const messages = {
@@ -26,23 +24,10 @@ export async function POST(req: NextRequest) {
         invalid_number: 'That number does not appear to be valid.',
         lookup_failed: 'We could not verify that number. Try again or use a different one.'
       };
-      return NextResponse.json(
-        { error: messages[lookup.reason] },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: messages[lookup.reason] }, { status: 400 });
     }
 
-    // Send OTP via Twilio Verify
-    const sent = await sendVerification(phone);
     await logOtpAttempt(phone, ip, false);
-
-    if (!sent) {
-      return NextResponse.json(
-        { error: 'Could not send code. Try again in a moment.' },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('send-otp error:', e);
