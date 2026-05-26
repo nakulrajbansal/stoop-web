@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
 
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
     ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
     : [];
 
-  const { data: profile } = await supabase
+  const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('city_id, neighborhood_id')
     .eq('id', user.id)
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   let neighborhoodId = profile.neighborhood_id;
   if (neighborhoodSlug) {
-    const { data: nb } = await supabase
+    const { data: nb } = await supabaseAdmin
       .from('neighborhoods')
       .select('id')
       .eq('city_id', profile.city_id)
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
   if (!neighborhoodId) return NextResponse.json({ error: 'Neighborhood required' }, { status: 400 });
 
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
+  const { count } = await supabaseAdmin
     .from('plans')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
@@ -103,12 +104,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'You can post up to 10 plans per week.' }, { status: 429 });
   }
 
-  // Generate slug, retry once if collision
   let slug = slugify(text);
-  const { data: existing } = await supabase.from('plans').select('id').eq('slug', slug).maybeSingle();
+  const { data: existing } = await supabaseAdmin.from('plans').select('id').eq('slug', slug).maybeSingle();
   if (existing) slug = slugify(text);
 
-  const { data: plan, error } = await supabase
+  const { data: plan, error } = await supabaseAdmin
     .from('plans')
     .insert({
       slug,
@@ -141,6 +141,17 @@ export async function PATCH(req: NextRequest) {
   const { planId, text, whenDay, whenTime, whenTimeSpecific, intentTags } = await req.json();
   if (!planId) return NextResponse.json({ error: 'planId required' }, { status: 400 });
 
+  // Verify ownership BEFORE updating, using admin client
+  const { data: plan } = await supabaseAdmin
+    .from('plans')
+    .select('user_id')
+    .eq('id', planId)
+    .single();
+
+  if (!plan || plan.user_id !== user.id) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
+
   const cleanTags: string[] | undefined = Array.isArray(intentTags)
     ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
     : undefined;
@@ -152,11 +163,10 @@ export async function PATCH(req: NextRequest) {
   if (typeof whenTimeSpecific === 'string') updates.when_time_specific = whenTimeSpecific || null;
   if (cleanTags !== undefined) updates.intent_tags = cleanTags;
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('plans')
     .update(updates)
-    .eq('id', planId)
-    .eq('user_id', user.id);
+    .eq('id', planId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -171,11 +181,21 @@ export async function DELETE(req: NextRequest) {
   const planId = searchParams.get('planId');
   if (!planId) return NextResponse.json({ error: 'planId required' }, { status: 400 });
 
-  const { error } = await supabase
+  // Verify ownership BEFORE deleting, using admin client
+  const { data: plan } = await supabaseAdmin
+    .from('plans')
+    .select('user_id')
+    .eq('id', planId)
+    .single();
+
+  if (!plan || plan.user_id !== user.id) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
+
+  const { error } = await supabaseAdmin
     .from('plans')
     .update({ status: 'removed' })
-    .eq('id', planId)
-    .eq('user_id', user.id);
+    .eq('id', planId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
