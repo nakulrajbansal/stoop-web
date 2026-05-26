@@ -1,79 +1,75 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
+import { createClient } from '@/lib/supabase/client';
+import { intentTagLabel } from '@/lib/utils';
 
-function PlanDetailContent() {
+export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const planId = params.id as string;
+  const supabase = createClient();
   const justPosted = searchParams.get('posted') === '1';
 
-  const supabase = createClient();
-  const [plan, setPlan] = useState<any>(null);
+  const [plan] = useState<any>(initialPlan);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [existingConv, setExistingConv] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [messaging, setMessaging] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
+  const [showShareToast, setShowShareToast] = useState(false);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user?.id ?? null);
-
-      const { data } = await supabase
-        .from('plans')
-        .select(`*, poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member), neighborhood:neighborhoods(name)`)
-        .eq('id', planId)
-        .single();
-
-      setPlan(data);
-
-      if (user && data && data.user_id !== user.id) {
+      if (user && plan && plan.user_id !== user.id) {
         const { data: conv } = await supabase
           .from('conversations')
           .select('id')
-          .eq('plan_id', planId)
+          .eq('plan_id', plan.id)
           .eq('joiner_id', user.id)
           .maybeSingle();
         if (conv) setExistingConv(conv.id);
       }
-
-      setLoading(false);
     }
     load();
-  }, [planId]);
+  }, []);
 
   async function sendOpener() {
     setError('');
     if (messageText.length < 5) { setError('Write a bit more — at least 5 characters'); return; }
     setMessaging(true);
-
     const res = await fetch('/api/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planId, firstMessage: messageText })
+      body: JSON.stringify({ planId: plan.id, firstMessage: messageText })
     });
     const data = await res.json();
     setMessaging(false);
-
     if (!res.ok) { setError(data.error || 'Could not send'); return; }
     router.push(`/inbox/${data.conversationId}`);
   }
 
-  if (loading) {
-    return (
-      <>
-        <Nav />
-        <div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>
-      </>
-    );
+  async function deletePlan() {
+    if (!confirm('Delete this plan? This cannot be undone.')) return;
+    setDeleting(true);
+    const res = await fetch(`/api/plans?planId=${plan.id}`, { method: 'DELETE' });
+    if (res.ok) router.push('/my-plans');
+    else { setError('Could not delete'); setDeleting(false); }
+  }
+
+  async function share() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Stoop', text: plan.text, url }); return; } catch {}
+    }
+    await navigator.clipboard.writeText(url);
+    setShowShareToast(true);
+    setTimeout(() => setShowShareToast(false), 2500);
   }
 
   if (!plan) {
@@ -91,6 +87,7 @@ function PlanDetailContent() {
   const isOwn = currentUser === plan.user_id;
   const isFull = plan.spots_left === 0 || plan.status === 'full';
   const u = plan.poster;
+  const tags = plan.intent_tags ?? [];
 
   return (
     <>
@@ -102,9 +99,21 @@ function PlanDetailContent() {
           </div>
         )}
 
-        <Link href="/feed" className="text-[13px] text-muted hover:text-ink inline-block mb-8">← Back to plans</Link>
+        <div className="flex items-center justify-between mb-8">
+          <Link href="/feed" className="text-[13px] text-muted hover:text-ink">← Back to plans</Link>
+          <button onClick={share} className="text-[12px] text-muted hover:text-ink flex items-center gap-1.5">
+            <span>↗</span> Share
+          </button>
+        </div>
 
-        <span className={`tag tag-${plan.category} mb-4 inline-block`}>{plan.category}</span>
+        <div className="flex items-center gap-1.5 flex-wrap mb-4">
+          <span className={`tag tag-${plan.category}`}>{plan.category}</span>
+          {tags.map((t: string) => (
+            <span key={t} className="text-[10px] font-medium tracking-wide text-ink-2 bg-cream-2 px-2 py-[3px] rounded-full">
+              {intentTagLabel(t)}
+            </span>
+          ))}
+        </div>
 
         <h1 className="font-serif text-[clamp(22px,3.5vw,32px)] font-normal italic leading-snug mb-8">
           {plan.text}
@@ -112,7 +121,9 @@ function PlanDetailContent() {
 
         <div className="flex gap-2.5 flex-wrap mb-7">
           <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-            <span>📅</span>{plan.when_day}{plan.when_time && ` · ${plan.when_time}`}
+            <span>📅</span>
+            {plan.when_day}
+            {plan.when_time_specific ? ` · ${plan.when_time_specific}` : plan.when_time ? ` · ${plan.when_time}` : ''}
           </div>
           {plan.spot && (
             <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
@@ -146,10 +157,21 @@ function PlanDetailContent() {
           </div>
         </div>
 
+        {error && <div className="bg-accent/10 border border-accent/25 text-accent text-[13px] rounded-xl px-4 py-3 mb-4">{error}</div>}
+
         {isOwn ? (
-          <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted flex items-center gap-2">
-            <span>📋</span>
-            <span>This is your plan. Wait for someone to message.</span>
+          <div className="flex flex-col gap-2.5">
+            <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted flex items-center gap-2">
+              <span>📋</span>
+              <span>This is your plan. Wait for someone to message.</span>
+            </div>
+            <div className="flex gap-2">
+              <Link href={`/plan/${plan.slug}/edit`} className="btn btn-ghost flex-1">Edit plan</Link>
+              <button onClick={deletePlan} disabled={deleting}
+                className="flex-1 px-4 py-2 rounded-full border border-accent/30 text-accent text-[13px] hover:bg-accent/5">
+                {deleting ? 'Deleting…' : 'Delete plan'}
+              </button>
+            </div>
           </div>
         ) : isFull ? (
           <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted">
@@ -164,7 +186,6 @@ function PlanDetailContent() {
             <textarea value={messageText} onChange={e => setMessageText(e.target.value)}
               rows={4} maxLength={2000} placeholder={`Send ${u.name} a short message about the plan…`}
               className="input resize-none" autoFocus />
-            {error && <p className="text-[12px] text-accent">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setShowMessageBox(false)} className="btn btn-ghost flex-1">Cancel</button>
               <button onClick={sendOpener} disabled={messaging} className="btn btn-accent flex-1">
@@ -182,14 +203,7 @@ function PlanDetailContent() {
           </>
         )}
       </div>
+      {showShareToast && <div className="toast show">Link copied</div>}
     </>
-  );
-}
-
-export default function PlanDetailPage() {
-  return (
-    <Suspense fallback={<div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
-      <PlanDetailContent />
-    </Suspense>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
+import { INTENT_TAGS } from '@/lib/utils';
 
 const CATEGORIES = [
   { id: 'coffee', label: 'Coffee', emoji: '☕' },
@@ -25,47 +26,42 @@ export default function PostPage() {
   const [category, setCategory] = useState('coffee');
   const [day, setDay] = useState('');
   const [time, setTime] = useState('');
+  const [specificTime, setSpecificTime] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [hoods, setHoods] = useState<{ slug: string; name: string }[]>([]);
   const [spot, setSpot] = useState('');
   const [spots, setSpots] = useState<number | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     document.body.classList.add('dark-mode');
-
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth'); return; }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('city_id, neighborhood_id')
-        .eq('id', user.id)
-        .single();
+      const { data: profile } = await supabase.from('profiles').select('city_id, neighborhood_id').eq('id', user.id).single();
       if (!profile) { router.push('/auth'); return; }
-
-      const { data: nb } = await supabase
-        .from('neighborhoods')
-        .select('slug, name')
-        .eq('city_id', profile.city_id);
+      const { data: nb } = await supabase.from('neighborhoods').select('slug, name').eq('city_id', profile.city_id);
       setHoods(nb || []);
-
       if (profile.neighborhood_id) {
-        const { data: own } = await supabase
-          .from('neighborhoods')
-          .select('slug')
-          .eq('id', profile.neighborhood_id)
-          .single();
+        const { data: own } = await supabase.from('neighborhoods').select('slug').eq('id', profile.neighborhood_id).single();
         if (own) setNeighborhood(own.slug);
       }
     }
-
     load();
     return () => { document.body.classList.remove('dark-mode'); };
   }, []);
 
   const ready = text.length >= 25 && day && neighborhood && spots;
+
+  function toggleTag(id: string) {
+    setSelectedTags(prev => {
+      if (prev.includes(id)) return prev.filter(t => t !== id);
+      if (prev.length >= 2) return prev; // max 2
+      return [...prev, id];
+    });
+  }
 
   async function submit() {
     if (!ready) return;
@@ -76,14 +72,14 @@ export default function PostPage() {
       body: JSON.stringify({
         text, category, spot: spot || null,
         whenDay: day, whenTime: time || null,
-        spots, neighborhoodSlug: neighborhood
+        whenTimeSpecific: specificTime || null,
+        spots, neighborhoodSlug: neighborhood,
+        intentTags: selectedTags
       })
     });
-
     const data = await res.json();
     if (!res.ok) { setError(data.error || 'Could not post plan'); setSubmitting(false); return; }
-
-    router.push(`/plan/${data.plan.id}?posted=1`);
+    router.push(`/plan/${data.plan.slug}?posted=1`);
   }
 
   return (
@@ -91,7 +87,6 @@ export default function PostPage() {
       <Nav />
       <div className="max-w-[700px] mx-auto px-6 py-10">
         <div className="space-y-9">
-          {/* Plan text */}
           <div>
             <h2 className="font-serif text-[clamp(20px,2.8vw,28px)] font-bold tracking-tight mb-1.5">What&apos;s the plan?</h2>
             <p className="text-[12px] text-cream/40 mb-3">Write it like you&apos;d text a friend.</p>
@@ -106,16 +101,13 @@ export default function PostPage() {
             </div>
           </div>
 
-          {/* Category */}
           <div>
             <h2 className="font-serif text-[18px] font-bold mb-3">What kind of plan?</h2>
             <div className="flex gap-1.5 flex-wrap">
               {CATEGORIES.map(c => (
                 <button key={c.id} onClick={() => setCategory(c.id)}
                   className={`px-4 py-2 rounded-full border text-[13px] ${
-                    category === c.id
-                      ? 'bg-accent border-accent text-white font-medium'
-                      : 'bg-dark-s1 border-cream/15 text-cream/60 hover:border-accent/40 hover:text-cream'
+                    category === c.id ? 'bg-accent border-accent text-white font-medium' : 'bg-dark-s1 border-cream/15 text-cream/60 hover:border-accent/40 hover:text-cream'
                   }`}>
                   {c.emoji} {c.label}
                 </button>
@@ -123,7 +115,6 @@ export default function PostPage() {
             </div>
           </div>
 
-          {/* When */}
           <div>
             <h2 className="font-serif text-[18px] font-bold mb-3">When?</h2>
             <div className="flex gap-1.5 flex-wrap mb-2.5">
@@ -133,16 +124,20 @@ export default function PostPage() {
                 }`}>{d}</button>
               ))}
             </div>
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="flex gap-1.5 flex-wrap mb-3">
               {TIMES.map(t => (
                 <button key={t} onClick={() => setTime(t)} className={`px-4 py-2 rounded-full border text-[13px] ${
                   time === t ? 'bg-accent border-accent text-white font-medium' : 'bg-dark-s1 border-cream/15 text-cream/60'
                 }`}>{t}</button>
               ))}
             </div>
+            <input type="text" value={specificTime} onChange={e => setSpecificTime(e.target.value)}
+              placeholder="Specific time (optional) — e.g. 2:30 PM"
+              maxLength={30}
+              className="w-full bg-dark-s1 border border-cream/15 rounded-xl px-4 py-3 text-[14px] text-cream placeholder:text-cream/30 outline-none focus:border-accent/50" />
+            <p className="text-[11px] text-cream/30 mt-1.5">Leave blank to keep it loose. Fill in if it matters (concert start time, reservation, etc.)</p>
           </div>
 
-          {/* Where */}
           <div>
             <h2 className="font-serif text-[18px] font-bold mb-1.5">Where exactly?</h2>
             <p className="text-[12px] text-cream/40 mb-3">Be specific. The neighborhood alone isn&apos;t enough.</p>
@@ -156,7 +151,27 @@ export default function PostPage() {
               className="w-full bg-dark-s1 border border-cream/15 rounded-xl px-4 py-3 text-[14px] text-cream placeholder:text-cream/30 outline-none focus:border-accent/50" />
           </div>
 
-          {/* Spots */}
+          <div>
+            <h2 className="font-serif text-[18px] font-bold mb-1.5">Vibe tags <span className="text-[12px] font-normal text-cream/40">(optional, max 2)</span></h2>
+            <p className="text-[12px] text-cream/40 mb-3">Set expectations.</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {INTENT_TAGS.map(t => {
+                const active = selectedTags.includes(t.id);
+                const disabled = !active && selectedTags.length >= 2;
+                return (
+                  <button key={t.id} onClick={() => toggleTag(t.id)} disabled={disabled}
+                    className={`px-3.5 py-1.5 rounded-full border text-[12.5px] ${
+                      active ? 'bg-accent border-accent text-white font-medium'
+                        : disabled ? 'bg-dark-s1 border-cream/10 text-cream/20 cursor-not-allowed'
+                        : 'bg-dark-s1 border-cream/15 text-cream/60 hover:border-accent/40 hover:text-cream'
+                    }`}>
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div>
             <h2 className="font-serif text-[18px] font-bold mb-1.5">How many can join?</h2>
             <p className="text-[12px] text-cream/40 mb-3">Keep it small.</p>
@@ -174,7 +189,6 @@ export default function PostPage() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-cream/30 italic mt-2.5">Most plans work best with just one other person.</p>
           </div>
 
           {error && (
@@ -183,7 +197,6 @@ export default function PostPage() {
             </div>
           )}
 
-          {/* Submit */}
           <div className="pt-2 pb-12 sticky bottom-0 bg-gradient-to-t from-dark-bg via-dark-bg to-transparent">
             <button onClick={submit} disabled={!ready || submitting}
               className={`w-full py-4 rounded-2xl font-serif font-bold italic text-[19px] ${

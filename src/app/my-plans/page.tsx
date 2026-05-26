@@ -78,7 +78,7 @@ export default function MyPlansPage() {
                   : 'bg-[rgba(200,71,42,0.09)] text-accent';
                 const statusTxt = p.status === 'full' ? 'Full' : p.status === 'expired' ? 'Expired' : 'Open';
                 return (
-                  <Link key={p.id} href={`/plan/${p.id}`}
+                  <Link key={p.id} href={`/plan/${p.slug}`}
                     className="bg-card border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-accent/25 hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="text-[14px] italic text-ink leading-snug flex-1">

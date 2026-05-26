@@ -56,7 +56,6 @@ export default function Nav() {
         St<em className="not-italic text-accent italic">oo</em>p
       </Link>
 
-      {/* City picker pill */}
       <div className="relative">
         <button
           onClick={() => setPickerOpen(v => !v)}
@@ -87,6 +86,7 @@ export default function Nav() {
       </div>
 
       <div className="flex-1" />
+
       {profile ? (
         <>
           <Link href="/feed" className="text-sm text-ink-2 hover:text-ink hidden sm:block">Browse</Link>
@@ -96,6 +96,10 @@ export default function Nav() {
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-3 w-4 h-4 rounded-full bg-accent text-white text-[9px] font-mono flex items-center justify-center">{unreadCount}</span>
             )}
+          </Link>
+          <Link href="/post" className="btn btn-accent btn-sm">
+            <span className="hidden sm:inline">+ Post a plan</span>
+            <span className="sm:hidden">+</span>
           </Link>
           <Link
             href="/profile"

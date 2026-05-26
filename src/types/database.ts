@@ -1,7 +1,3 @@
-// Auto-generate from Supabase later with:
-// npx supabase gen types typescript --project-id <ID> > src/types/database.ts
-// This is a hand-written subset for the MVP.
-
 export type Database = {
   public: {
     Tables: {
@@ -40,38 +36,35 @@ export type Database = {
       };
       plans: {
         Row: {
-          id: string; user_id: string; city_id: string; neighborhood_id: string;
+          id: string; slug: string; user_id: string; city_id: string; neighborhood_id: string;
           text: string; category: string; spot: string | null;
-          when_day: string; when_time: string | null;
+          when_day: string; when_time: string | null; when_time_specific: string | null;
           spots_total: number; spots_left: number;
+          intent_tags: string[];
           status: 'open' | 'full' | 'expired' | 'removed';
           expires_at: string; created_at: string;
         };
         Insert: {
-          id?: string; user_id: string; city_id: string; neighborhood_id: string;
+          id?: string; slug: string; user_id: string; city_id: string; neighborhood_id: string;
           text: string; category: string; spot?: string | null;
-          when_day: string; when_time?: string | null;
+          when_day: string; when_time?: string | null; when_time_specific?: string | null;
           spots_total: number; spots_left: number;
+          intent_tags?: string[];
           status?: 'open' | 'full' | 'expired' | 'removed';
           expires_at: string;
         };
         Update: {
           text?: string; category?: string; spot?: string | null;
-          when_day?: string; when_time?: string | null;
+          when_day?: string; when_time?: string | null; when_time_specific?: string | null;
           spots_total?: number; spots_left?: number;
+          intent_tags?: string[];
           status?: 'open' | 'full' | 'expired' | 'removed';
           expires_at?: string;
         };
       };
       conversations: {
-        Row: {
-          id: string; plan_id: string; poster_id: string; joiner_id: string;
-          status: 'pending' | 'confirmed' | 'declined'; created_at: string;
-        };
-        Insert: {
-          id?: string; plan_id: string; poster_id: string; joiner_id: string;
-          status?: 'pending' | 'confirmed' | 'declined';
-        };
+        Row: { id: string; plan_id: string; poster_id: string; joiner_id: string; status: 'pending' | 'confirmed' | 'declined'; created_at: string };
+        Insert: { id?: string; plan_id: string; poster_id: string; joiner_id: string; status?: 'pending' | 'confirmed' | 'declined' };
         Update: { status?: 'pending' | 'confirmed' | 'declined' };
       };
       messages: {
@@ -80,15 +73,8 @@ export type Database = {
         Update: { text?: string };
       };
       reports: {
-        Row: {
-          id: string; reporter_id: string; reported_user_id: string;
-          reason: string; details: string | null;
-          status: 'open' | 'reviewed' | 'actioned' | 'dismissed'; created_at: string;
-        };
-        Insert: {
-          reporter_id: string; reported_user_id: string;
-          reason: string; details?: string | null;
-        };
+        Row: { id: string; reporter_id: string; reported_user_id: string; reason: string; details: string | null; status: 'open' | 'reviewed' | 'actioned' | 'dismissed'; created_at: string };
+        Insert: { reporter_id: string; reported_user_id: string; reason: string; details?: string | null };
         Update: { status?: 'open' | 'reviewed' | 'actioned' | 'dismissed' };
       };
       otp_attempts: {

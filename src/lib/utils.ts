@@ -61,3 +61,29 @@ export function timeAgo(iso: string): string {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+export const INTENT_TAGS = [
+  { id: 'just-social', label: 'Just social' },
+  { id: 'dog-friendly', label: 'Dog-friendly' },
+  { id: 'bring-something', label: 'Bring something' },
+  { id: 'quiet', label: 'Quiet vibe' },
+  { id: 'loud', label: 'Loud vibe' },
+  { id: 'free', label: 'Free' },
+  { id: 'paid', label: 'Costs money' }
+] as const;
+
+export type IntentTagId = typeof INTENT_TAGS[number]['id'];
+
+export function slugify(text: string, fallbackId?: string): string {
+  const base = text
+    .substring(0, 50)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  const suffix = (fallbackId ?? Math.random().toString(36)).replace(/-/g, '').substring(0, 4);
+  return base ? `${base}-${suffix}` : `plan-${suffix}`;
+}
+
+export function intentTagLabel(id: string): string {
+  return INTENT_TAGS.find(t => t.id === id)?.label ?? id;
+}
