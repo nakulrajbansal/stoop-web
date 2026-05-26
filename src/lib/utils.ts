@@ -38,17 +38,37 @@ export function pickAvatarColors(seed: string): { bg: string; fg: string } {
   return { bg, fg };
 }
 
-/** Calculate plan expiry (24 hours after the scheduled day, conservatively). */
 export function calculateExpiry(whenDay: string): string {
-  // Simple heuristic — production should parse the actual date.
   const now = new Date();
-  const daysAhead: Record<string, number> = {
-    'Today': 1, 'Tomorrow': 2,
-    'This Saturday': 7, 'This Sunday': 7,
-    'Next week': 14
-  };
-  const days = daysAhead[whenDay] ?? 7;
-  return new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let target = new Date(today);
+
+  switch (whenDay) {
+    case 'Today':
+      // expire at end of today
+      target = today;
+      break;
+    case 'Tomorrow':
+      target.setDate(today.getDate() + 1);
+      break;
+    case 'This Saturday':
+      // 6 = Saturday in JS (0=Sunday)
+      target.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7 || 7));
+      break;
+    case 'This Sunday':
+      target.setDate(today.getDate() + ((0 - today.getDay() + 7) % 7 || 7));
+      break;
+    case 'Next week':
+      // 7 days out, falls on whatever weekday it lands on
+      target.setDate(today.getDate() + 7);
+      break;
+    default:
+      target.setDate(today.getDate() + 7);
+  }
+
+  // Expire at end of the target day (23:59:59 local, then convert)
+  target.setHours(23, 59, 59, 999);
+  return target.toISOString();
 }
 
 export function timeAgo(iso: string): string {
