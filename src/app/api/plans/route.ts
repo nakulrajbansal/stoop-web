@@ -5,38 +5,41 @@ import { calculateExpiry } from '@/lib/utils';
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { searchParams } = new URL(req.url);
-  const citySlug = searchParams.get('city') ?? 'nyc';
+  const citySlug = searchParams.get('city'); // null = all cities
   const neighborhoodSlug = searchParams.get('neighborhood');
   const category = searchParams.get('category');
 
-  // Get city ID
-  const { data: city } = await supabase
-    .from('cities')
-    .select('id')
-    .eq('slug', citySlug)
-    .single();
-
-  if (!city) return NextResponse.json({ plans: [] });
+  let cityId: string | null = null;
+  if (citySlug) {
+    const { data: city } = await supabase
+      .from('cities')
+      .select('id')
+      .eq('slug', citySlug)
+      .single();
+    if (!city) return NextResponse.json({ plans: [] });
+    cityId = city.id;
+  }
 
   let query = supabase
     .from('plans')
     .select(`
       *,
       poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member),
-      neighborhood:neighborhoods(id, slug, name)
+      neighborhood:neighborhoods(id, slug, name),
+      city:cities(slug, name)
     `)
-    .eq('city_id', city.id)
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .limit(60);
 
+  if (cityId) query = query.eq('city_id', cityId);
   if (category) query = query.eq('category', category);
 
-  if (neighborhoodSlug) {
+  if (neighborhoodSlug && cityId) {
     const { data: nb } = await supabase
       .from('neighborhoods')
       .select('id')
-      .eq('city_id', city.id)
+      .eq('city_id', cityId)
       .eq('slug', neighborhoodSlug)
       .single();
     if (nb) query = query.eq('neighborhood_id', nb.id);
@@ -56,7 +59,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { text, category, spot, whenDay, whenTime, spots, neighborhoodSlug } = body;
 
-  // Validation
   if (!text || typeof text !== 'string' || text.length < 25 || text.length > 220) {
     return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
   }
@@ -70,7 +72,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Day is required' }, { status: 400 });
   }
 
-  // Get user's city and neighborhood
   const { data: profile } = await supabase
     .from('profiles')
     .select('city_id, neighborhood_id')
@@ -96,7 +97,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neighborhood required' }, { status: 400 });
   }
 
-  // Rate limit: max 10 plans per user per week
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { count } = await supabase
     .from('plans')

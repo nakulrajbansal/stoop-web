@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
 import PlanCard from '@/components/PlanCard';
+import { useCityPreference, setCityPreference } from '@/lib/city-preference';
 
 const NYC_HOODS = ['williamsburg', 'west-village', 'park-slope', 'lower-east-side', 'astoria', 'bushwick', 'greenpoint', 'harlem'];
 const AUSTIN_HOODS = ['east-austin', 'south-congress', 'mueller', 'hyde-park', 'east-cesar-chavez', 'clarksville'];
@@ -12,7 +13,11 @@ const CATEGORIES = ['coffee', 'outdoors', 'arts', 'food', 'books', 'music'];
 function FeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const city = searchParams.get('city') ?? 'nyc';
+  const [cityPref] = useCityPreference();
+
+  // URL param wins, otherwise use preference, otherwise show both
+  const cityParam = searchParams.get('city');
+  const activeCity = cityParam ?? cityPref ?? 'all';
   const hood = searchParams.get('neighborhood');
   const cat = searchParams.get('category');
 
@@ -21,7 +26,8 @@ function FeedContent() {
 
   useEffect(() => {
     setLoading(true);
-    const params = new URLSearchParams({ city });
+    const params = new URLSearchParams();
+    if (activeCity !== 'all') params.set('city', activeCity);
     if (hood) params.set('neighborhood', hood);
     if (cat) params.set('category', cat);
 
@@ -29,7 +35,7 @@ function FeedContent() {
       .then(r => r.json())
       .then(d => { setPlans(d.plans || []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [city, hood, cat]);
+  }, [activeCity, hood, cat]);
 
   function setFilter(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -37,12 +43,28 @@ function FeedContent() {
     router.push(`/feed?${params.toString()}`);
   }
 
-  const hoods = city === 'austin' ? AUSTIN_HOODS : NYC_HOODS;
-  const cityName = city === 'austin' ? 'Austin' : 'New York';
+  function pickCity(c: 'nyc' | 'austin' | 'all') {
+    if (c === 'all') {
+      setCityPreference(null);
+      setFilter('city', null);
+    } else {
+      setCityPreference(c);
+      setFilter('city', c);
+    }
+    // Clear neighborhood when changing city
+    const params = new URLSearchParams(searchParams.toString());
+    if (c === 'all') params.delete('city'); else params.set('city', c);
+    params.delete('neighborhood');
+    router.push(`/feed?${params.toString()}`);
+  }
+
+  const hoods = activeCity === 'austin' ? AUSTIN_HOODS : activeCity === 'nyc' ? NYC_HOODS : [];
+  const cityName = activeCity === 'austin' ? 'Austin' : activeCity === 'nyc' ? 'New York' : 'both cities';
+  const showNeighborhoodFilter = activeCity !== 'all';
 
   return (
     <>
-      <Nav city={cityName} />
+      <Nav />
       <div className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-6">
         <div className="text-[11px] uppercase tracking-wider text-muted font-medium mb-1">This week in {cityName}</div>
         <h2 className="font-serif text-[clamp(28px,4vw,42px)] font-bold tracking-tight mb-1.5">Browse plans</h2>
@@ -50,20 +72,26 @@ function FeedContent() {
           {loading ? 'Loading…' : `${plans.length} plan${plans.length !== 1 ? 's' : ''} this week`}
         </p>
 
+        {/* City switcher */}
         <div className="flex gap-2 mb-4">
-          <button onClick={() => setFilter('city', 'nyc')} className={`btn ${city === 'nyc' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>New York</button>
-          <button onClick={() => setFilter('city', 'austin')} className={`btn ${city === 'austin' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Austin</button>
+          <button onClick={() => pickCity('all')} className={`btn ${activeCity === 'all' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Both cities</button>
+          <button onClick={() => pickCity('nyc')} className={`btn ${activeCity === 'nyc' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>New York</button>
+          <button onClick={() => pickCity('austin')} className={`btn ${activeCity === 'austin' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Austin</button>
         </div>
 
-        <div className="flex gap-1.5 flex-wrap mb-3">
-          <button onClick={() => setFilter('neighborhood', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!hood ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All areas</button>
-          {hoods.map(h => (
-            <button key={h} onClick={() => setFilter('neighborhood', h)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border capitalize ${hood === h ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>
-              {h.replace(/-/g, ' ')}
-            </button>
-          ))}
-        </div>
+        {/* Neighborhood filter — only shown when a single city is selected */}
+        {showNeighborhoodFilter && (
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            <button onClick={() => setFilter('neighborhood', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!hood ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All areas</button>
+            {hoods.map(h => (
+              <button key={h} onClick={() => setFilter('neighborhood', h)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border capitalize ${hood === h ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>
+                {h.replace(/-/g, ' ')}
+              </button>
+            ))}
+          </div>
+        )}
 
+        {/* Category filter */}
         <div className="flex gap-1.5 flex-wrap mb-7">
           <button onClick={() => setFilter('category', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!cat ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All</button>
           {CATEGORIES.map(c => (

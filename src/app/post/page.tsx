@@ -145,7 +145,7 @@ export default function PostPage() {
           {/* Where */}
           <div>
             <h2 className="font-serif text-[18px] font-bold mb-1.5">Where exactly?</h2>
-            <p className="text-[12px] text-cream/40 mb-3">Be specific. &quot;Brooklyn&quot; is not a location.</p>
+            <p className="text-[12px] text-cream/40 mb-3">Be specific. The neighborhood alone isn&apos;t enough.</p>
             <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
               className="w-full bg-dark-s1 border border-cream/15 rounded-xl px-4 py-3 text-[14px] text-cream outline-none focus:border-accent/50 mb-2.5">
               <option value="">Neighborhood…</option>

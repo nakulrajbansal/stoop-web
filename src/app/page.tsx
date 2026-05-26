@@ -7,29 +7,30 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const supabase = await createClient();
-  const { data: city } = await supabase.from('cities').select('id').eq('slug', 'nyc').single();
+
+  // Fetch plans from BOTH cities, mixed
   const { data: plans } = await supabase
     .from('plans')
     .select(`
       *,
       poster:profiles!plans_user_id_fkey(name, initials, avatar_bg, avatar_fg),
-      neighborhood:neighborhoods(name)
+      neighborhood:neighborhoods(name),
+      city:cities(slug, name)
     `)
-    .eq('city_id', city?.id ?? '')
     .eq('status', 'open')
     .order('created_at', { ascending: false })
-    .limit(3);
+    .limit(6);
 
   return (
     <>
-      <Nav city="New York" />
+      <Nav />
 
       {/* Hero */}
       <section className="max-w-[1080px] mx-auto px-6 sm:px-9 py-16 sm:py-20 grid sm:grid-cols-2 gap-16 items-center">
         <div>
           <div className="flex items-center gap-2.5 mb-6 text-[11px] uppercase tracking-wider text-accent font-medium">
             <span className="w-5 h-px bg-accent"></span>
-            <span>New York City · This week</span>
+            <span>New York + Austin · This week</span>
           </div>
           <h1 className="font-serif text-[clamp(54px,6vw,84px)] font-bold leading-[0.95] tracking-[-2.5px] mb-7">
             Plans,<br />not <em className="italic text-accent">profiles.</em>
@@ -40,7 +41,7 @@ export default async function HomePage() {
             No swiping, no algorithm, no awkward intros.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/feed" className="btn btn-primary btn-lg">See what&apos;s near you</Link>
+            <Link href="/feed" className="btn btn-primary btn-lg">See what&apos;s out there</Link>
             <Link href="/post" className="btn btn-ghost btn-lg">Post a plan →</Link>
           </div>
           <p className="text-[11.5px] text-muted mt-4 flex items-center gap-1.5">
@@ -100,7 +101,7 @@ export default async function HomePage() {
       <section className="py-16 sm:py-20">
         <div className="max-w-[1080px] mx-auto px-6 sm:px-9">
           <div className="text-[11px] uppercase tracking-wider text-muted font-medium mb-2">Happening this week</div>
-          <h2 className="font-serif text-[clamp(24px,3vw,36px)] font-bold tracking-tight mb-5">Near you in New York</h2>
+          <h2 className="font-serif text-[clamp(24px,3vw,36px)] font-bold tracking-tight mb-5">Across both cities</h2>
           <div className="grid sm:grid-cols-3 gap-2.5">
             {plans?.slice(0, 3).map(plan => <PlanCard key={plan.id} plan={plan as any} />)}
           </div>
@@ -130,7 +131,7 @@ export default async function HomePage() {
           <Link href="/feed" className="text-xs text-muted hover:text-ink">Browse</Link>
           <Link href="/post" className="text-xs text-muted hover:text-ink">Post a plan</Link>
         </div>
-        <div className="text-[11px] text-muted">New York · 2026</div>
+        <div className="text-[11px] text-muted">NYC + Austin · 2026</div>
       </footer>
     </>
   );

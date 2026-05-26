@@ -133,7 +133,7 @@ function PlanDetailContent() {
               {u.name}
               {u.is_founding_member && <span className="text-[10px] font-mono uppercase tracking-wider bg-accent text-white px-2 py-0.5 rounded-full">Founding</span>}
             </div>
-            <div className="text-[13px] text-muted">{u.about || 'New Yorker'}</div>
+            <div className="text-[13px] text-muted">{u.about || 'Neighbor'}</div>
           </div>
         </div>
 
