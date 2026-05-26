@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       city:cities(slug, name)
     `)
     .eq('status', 'open')
+    .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
     .limit(60);
 
