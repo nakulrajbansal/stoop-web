@@ -17,6 +17,11 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
 
+  // Delete account state
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -93,6 +98,24 @@ export default function ProfilePage() {
     router.push('/');
   }
 
+  async function deleteAccount() {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      setToast('Type DELETE to confirm');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+    setDeleting(true);
+    const res = await fetch('/api/account', { method: 'DELETE' });
+    if (res.ok) {
+      await supabase.auth.signOut();
+      router.push('/');
+    } else {
+      setDeleting(false);
+      setToast('Could not delete account');
+      setTimeout(() => setToast(''), 2500);
+    }
+  }
+
   if (!profile) {
     return (
       <>
@@ -150,12 +173,43 @@ export default function ProfilePage() {
           <button onClick={save} disabled={saving} className="btn btn-primary btn-full mt-2">
             {saving ? <span className="spinner" /> : 'Save changes'}
           </button>
-          <button onClick={signOut}
-            className="mt-3 w-full py-3 rounded-xl bg-transparent border border-accent/25 text-accent text-[13px] hover:bg-accent/5">
-            Sign out
-          </button>
+
+          <div className="mt-3 space-y-2">
+            <button onClick={signOut}
+              className="w-full py-3 rounded-xl bg-transparent border border-[var(--border2)] text-ink-2 text-[13px] hover:bg-cream-2">
+              Sign out
+            </button>
+            <button onClick={() => setShowDeleteConfirm(true)}
+              className="w-full py-3 rounded-xl bg-transparent border border-accent/30 text-accent text-[13px] hover:bg-accent/5">
+              Delete account
+            </button>
+          </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-card rounded-2xl max-w-[440px] w-full p-7 border border-[var(--border)]">
+            <h3 className="font-serif text-[22px] font-bold text-ink mb-3">Delete your account?</h3>
+            <p className="text-[13.5px] text-ink-2 leading-relaxed mb-5">
+              This permanently removes your profile, every plan you&apos;ve posted, every conversation you&apos;ve started, and every message you&apos;ve sent. Cannot be undone.
+            </p>
+            <p className="text-[12px] text-muted mb-2">Type <strong className="text-ink font-mono">DELETE</strong> to confirm:</p>
+            <input type="text" value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              className="input mb-5" autoFocus />
+            <div className="flex gap-2">
+              <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+                className="btn btn-ghost flex-1">Cancel</button>
+              <button onClick={deleteAccount} disabled={deleting}
+                className="flex-1 py-2.5 px-4 rounded-full bg-accent text-white text-[13px] font-medium hover:bg-acc2 disabled:opacity-50">
+                {deleting ? <span className="spinner" /> : 'Delete forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </>
   );

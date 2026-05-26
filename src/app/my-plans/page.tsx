@@ -35,6 +35,80 @@ export default function MyPlansPage() {
     load();
   }, []);
 
+  // Split posted plans by status
+  const postedActive = posted.filter(p => p.status === 'open' || p.status === 'full');
+  const postedPast = posted.filter(p => p.status === 'expired' || p.status === 'removed');
+
+  // Split joined conversations: past = plan ended OR conversation declined
+  const joinedActive = joined.filter((c: any) =>
+    (c.plan?.status === 'open' || c.plan?.status === 'full') && c.status !== 'declined'
+  );
+  const joinedPast = joined.filter((c: any) =>
+    c.plan?.status === 'expired' || c.plan?.status === 'removed' || c.status === 'declined'
+  );
+
+  function sectionHeader(label: string, count: number) {
+    return (
+      <div className="flex items-center gap-3 mb-3 mt-7 first:mt-0">
+        <h3 className="text-[11px] font-mono uppercase tracking-wider text-muted">{label}</h3>
+        <div className="flex-1 h-px bg-[var(--border)]"></div>
+        <span className="text-[11px] text-muted font-mono">{count}</span>
+      </div>
+    );
+  }
+
+  function renderPostedCard(p: any, isPast: boolean) {
+    const statusCls = isPast
+      ? 'bg-[rgba(20,17,13,0.07)] text-muted'
+      : p.status === 'full'
+        ? 'bg-[rgba(20,17,13,0.07)] text-muted'
+        : 'bg-[rgba(200,71,42,0.09)] text-accent';
+    const statusTxt =
+      p.status === 'open' ? 'Open' :
+      p.status === 'full' ? 'Full' :
+      p.status === 'expired' ? 'Expired' :
+      p.status === 'removed' ? 'Removed' : p.status;
+
+    return (
+      <Link key={p.id} href={`/plan/${p.slug}`}
+        className={`bg-card border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-accent/25 hover:shadow-sm transition-all ${isPast ? 'opacity-65' : ''}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="text-[14px] italic text-ink leading-snug flex-1">
+            {p.text.substring(0, 90)}{p.text.length > 90 ? '…' : ''}
+          </div>
+          <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${statusCls}`}>{statusTxt}</span>
+        </div>
+        <div className="text-[11.5px] text-muted flex items-center gap-1.5">
+          <span>{p.when_day}{p.when_time_specific ? ` · ${p.when_time_specific}` : p.when_time ? ` · ${p.when_time}` : ''}</span>
+          <span className="opacity-30">·</span>
+          <span>{p.neighborhood?.name}</span>
+        </div>
+      </Link>
+    );
+  }
+
+  function renderJoinedCard(c: any, isPast: boolean) {
+    const statusCls = c.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.09)] text-sage'
+      : c.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
+      : 'bg-[rgba(200,71,42,0.09)] text-accent';
+    const statusTxt = c.status === 'confirmed' ? 'Confirmed' : c.status === 'declined' ? 'Declined' : 'Pending';
+
+    return (
+      <Link key={c.id} href={`/inbox/${c.id}`}
+        className={`bg-card border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-accent/25 hover:shadow-sm transition-all ${isPast ? 'opacity-65' : ''}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="text-[14px] italic text-ink leading-snug flex-1">
+            {c.plan?.text?.substring(0, 90)}{c.plan?.text?.length > 90 ? '…' : ''}
+          </div>
+          <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${statusCls}`}>{statusTxt}</span>
+        </div>
+        <div className="text-[11.5px] text-muted">
+          with {c.poster?.name} · {c.plan?.when_day}
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <>
       <Nav />
@@ -72,29 +146,30 @@ export default function MyPlansPage() {
               <Link href="/post" className="btn btn-accent btn-sm">Post your first plan</Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {posted.map(p => {
-                const statusCls = p.status === 'full' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
-                  : 'bg-[rgba(200,71,42,0.09)] text-accent';
-                const statusTxt = p.status === 'full' ? 'Full' : p.status === 'expired' ? 'Expired' : 'Open';
-                return (
-                  <Link key={p.id} href={`/plan/${p.slug}`}
-                    className="bg-card border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-accent/25 hover:shadow-sm transition-all">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="text-[14px] italic text-ink leading-snug flex-1">
-                        {p.text.substring(0, 90)}{p.text.length > 90 ? '…' : ''}
-                      </div>
-                      <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${statusCls}`}>{statusTxt}</span>
-                    </div>
-                    <div className="text-[11.5px] text-muted flex items-center gap-1.5">
-                      <span>{p.when_day}{p.when_time && ` · ${p.when_time}`}</span>
-                      <span className="opacity-30">·</span>
-                      <span>{p.neighborhood?.name}</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+            <>
+              {postedActive.length > 0 && (
+                <>
+                  {sectionHeader('Active', postedActive.length)}
+                  <div className="flex flex-col gap-2">
+                    {postedActive.map(p => renderPostedCard(p, false))}
+                  </div>
+                </>
+              )}
+              {postedPast.length > 0 && (
+                <>
+                  {sectionHeader('Past', postedPast.length)}
+                  <div className="flex flex-col gap-2">
+                    {postedPast.map(p => renderPostedCard(p, true))}
+                  </div>
+                </>
+              )}
+              {postedActive.length === 0 && postedPast.length > 0 && (
+                <div className="text-center py-6 text-muted mt-4">
+                  <p className="text-[13px]">No active plans right now.</p>
+                  <Link href="/post" className="btn btn-accent btn-sm mt-3 inline-flex">Post a new plan</Link>
+                </div>
+              )}
+            </>
           )
         ) : (
           joined.length === 0 ? (
@@ -104,28 +179,24 @@ export default function MyPlansPage() {
               <Link href="/feed" className="btn btn-accent btn-sm">Browse plans</Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {joined.map((c: any) => {
-                const statusCls = c.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.09)] text-sage'
-                  : c.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
-                  : 'bg-[rgba(200,71,42,0.09)] text-accent';
-                const statusTxt = c.status === 'confirmed' ? 'Confirmed' : c.status === 'declined' ? 'Declined' : 'Pending';
-                return (
-                  <Link key={c.id} href={`/inbox/${c.id}`}
-                    className="bg-card border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-accent/25 hover:shadow-sm transition-all">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="text-[14px] italic text-ink leading-snug flex-1">
-                        {c.plan?.text?.substring(0, 90)}{c.plan?.text?.length > 90 ? '…' : ''}
-                      </div>
-                      <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full flex-shrink-0 ${statusCls}`}>{statusTxt}</span>
-                    </div>
-                    <div className="text-[11.5px] text-muted">
-                      with {c.poster?.name} · {c.plan?.when_day}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+            <>
+              {joinedActive.length > 0 && (
+                <>
+                  {sectionHeader('Active', joinedActive.length)}
+                  <div className="flex flex-col gap-2">
+                    {joinedActive.map((c: any) => renderJoinedCard(c, false))}
+                  </div>
+                </>
+              )}
+              {joinedPast.length > 0 && (
+                <>
+                  {sectionHeader('Past', joinedPast.length)}
+                  <div className="flex flex-col gap-2">
+                    {joinedPast.map((c: any) => renderJoinedCard(c, true))}
+                  </div>
+                </>
+              )}
+            </>
           )
         )}
       </div>

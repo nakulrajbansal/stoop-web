@@ -26,49 +26,76 @@ type Plan = {
   } | null;
 };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  coffee: 'Coffee',
+  outdoors: 'Outdoors',
+  arts: 'Arts',
+  food: 'Food',
+  books: 'Books',
+  music: 'Music'
+};
+
 export default function PlanCard({ plan }: { plan: Plan }) {
   const isFull = plan.spots_left === 0 || plan.status === 'full';
-  const tagClass = `tag tag-${plan.category}`;
   const tags = plan.intent_tags ?? [];
+
+  // Build the time/location line: "Today, 9–11am · South Congress"
+  let timeLine = plan.when_day;
+  if (plan.when_time_specific) {
+    timeLine += `, ${plan.when_time_specific}`;
+  } else if (plan.when_time) {
+    timeLine += `, ${plan.when_time.toLowerCase()}`;
+  }
 
   return (
     <Link href={`/plan/${plan.slug}`} className="plan-card block no-underline">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className={tagClass}>{plan.category}</span>
+      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+        <span className="text-[11px] font-medium text-accent bg-[rgba(200,71,42,0.09)] px-2.5 py-[3px] rounded-full">
+          {CATEGORY_LABEL[plan.category] ?? plan.category}
+        </span>
         {tags.slice(0, 2).map(t => (
-          <span key={t} className="text-[10px] font-medium tracking-wide text-ink-2 bg-cream-2 px-2 py-[3px] rounded-full">
+          <span key={t} className="text-[11px] font-medium text-ink-2 bg-cream-2 px-2.5 py-[3px] rounded-full">
             {intentTagLabel(t)}
           </span>
         ))}
       </div>
 
-      <p className="text-[14px] leading-[1.6] text-ink mt-3 mb-3 italic">
-        {plan.text.length > 120 ? plan.text.substring(0, 120) + '…' : plan.text}
+      <p className="font-serif text-[17px] leading-[1.35] text-ink font-bold mb-3 tracking-[-0.2px]">
+        {plan.text.length > 90 ? plan.text.substring(0, 90) + '…' : plan.text}
       </p>
 
-      <div className="flex items-center gap-1.5 text-[11.5px] text-muted mb-3 flex-wrap">
-        <span>{plan.when_day}</span>
-        {plan.when_time_specific && (<><span className="opacity-30">·</span><span>{plan.when_time_specific}</span></>)}
-        {!plan.when_time_specific && plan.when_time && (<><span className="opacity-30">·</span><span>{plan.when_time}</span></>)}
-        {plan.neighborhood?.name && (<><span className="opacity-30">·</span><span>{plan.neighborhood.name}</span></>)}
+      <div className="text-[12px] text-muted mb-4">
+        {timeLine}
+        {plan.neighborhood?.name && (
+          <>
+            <span className="opacity-40 mx-1.5">·</span>
+            {plan.neighborhood.name}
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span
-            className="w-[26px] h-[26px] rounded-[8px] flex items-center justify-center text-[10px] font-semibold"
+            className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-semibold"
             style={{ background: plan.poster?.avatar_bg ?? '#eee', color: plan.poster?.avatar_fg ?? '#666' }}
           >
             {plan.poster?.initials || '?'}
           </span>
-          <span className="text-[12px] font-medium text-ink-2">{plan.poster?.name ?? '—'}</span>
+          <div>
+            <div className="text-[12.5px] font-semibold text-ink leading-tight">{plan.poster?.name ?? '—'}</div>
+            <div className="text-[10.5px] text-muted leading-tight">hosting</div>
+          </div>
         </div>
         <span
-          className={`text-[10px] font-medium px-2 py-[3px] rounded-full ${
-            isFull ? 'text-muted bg-[rgba(20,17,13,0.05)]' : 'text-accent bg-[rgba(200,71,42,0.09)]'
+          className={`text-[11px] font-medium px-2.5 py-[3px] rounded-full flex items-center gap-1.5 ${
+            isFull
+              ? 'text-muted bg-[rgba(20,17,13,0.05)]'
+              : 'text-sage bg-[rgba(42,66,50,0.08)]'
           }`}
         >
-          {isFull ? 'Full' : `${plan.spots_left} spot${plan.spots_left > 1 ? 's' : ''}`}
+          {!isFull && <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block"></span>}
+          {isFull ? 'Full' : `${plan.spots_left} ${plan.spots_left === 1 ? 'spot' : 'spots'} open`}
         </span>
       </div>
     </Link>
