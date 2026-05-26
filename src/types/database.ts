@@ -8,12 +8,12 @@ export type Database = {
       cities: {
         Row: { id: string; slug: string; name: string; state: string; active: boolean; created_at: string };
         Insert: { id?: string; slug: string; name: string; state: string; active?: boolean };
-        Update: Partial<Database['public']['Tables']['cities']['Insert']>;
+        Update: { id?: string; slug?: string; name?: string; state?: string; active?: boolean };
       };
       neighborhoods: {
         Row: { id: string; city_id: string; slug: string; name: string; active: boolean };
         Insert: { id?: string; city_id: string; slug: string; name: string; active?: boolean };
-        Update: Partial<Database['public']['Tables']['neighborhoods']['Insert']>;
+        Update: { id?: string; city_id?: string; slug?: string; name?: string; active?: boolean };
       };
       profiles: {
         Row: {
@@ -30,7 +30,13 @@ export type Database = {
           avatar_bg?: string; avatar_fg?: string; initials?: string | null;
           is_founding_member?: boolean;
         };
-        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Update: {
+          name?: string; phone_e164?: string;
+          phone_verified_at?: string | null; city_id?: string;
+          neighborhood_id?: string | null; about?: string | null;
+          avatar_bg?: string; avatar_fg?: string; initials?: string | null;
+          is_founding_member?: boolean; blocked_at?: string | null;
+        };
       };
       plans: {
         Row: {
@@ -49,7 +55,13 @@ export type Database = {
           status?: 'open' | 'full' | 'expired' | 'removed';
           expires_at: string;
         };
-        Update: Partial<Database['public']['Tables']['plans']['Insert']>;
+        Update: {
+          text?: string; category?: string; spot?: string | null;
+          when_day?: string; when_time?: string | null;
+          spots_total?: number; spots_left?: number;
+          status?: 'open' | 'full' | 'expired' | 'removed';
+          expires_at?: string;
+        };
       };
       conversations: {
         Row: {
@@ -60,12 +72,12 @@ export type Database = {
           id?: string; plan_id: string; poster_id: string; joiner_id: string;
           status?: 'pending' | 'confirmed' | 'declined';
         };
-        Update: Partial<Database['public']['Tables']['conversations']['Insert']>;
+        Update: { status?: 'pending' | 'confirmed' | 'declined' };
       };
       messages: {
         Row: { id: string; conversation_id: string; from_user_id: string; text: string; created_at: string };
         Insert: { id?: string; conversation_id: string; from_user_id: string; text: string };
-        Update: Partial<Database['public']['Tables']['messages']['Insert']>;
+        Update: { text?: string };
       };
       reports: {
         Row: {
@@ -77,13 +89,17 @@ export type Database = {
           reporter_id: string; reported_user_id: string;
           reason: string; details?: string | null;
         };
-        Update: Partial<Database['public']['Tables']['reports']['Insert']>;
+        Update: { status?: 'open' | 'reviewed' | 'actioned' | 'dismissed' };
       };
       otp_attempts: {
         Row: { id: string; phone_e164: string; ip_address: string | null; succeeded: boolean; created_at: string };
         Insert: { phone_e164: string; ip_address?: string | null; succeeded?: boolean };
-        Update: Partial<Database['public']['Tables']['otp_attempts']['Insert']>;
+        Update: { succeeded?: boolean };
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };
