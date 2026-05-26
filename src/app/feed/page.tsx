@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
 import PlanCard from '@/components/PlanCard';
@@ -9,7 +9,7 @@ const NYC_HOODS = ['williamsburg', 'west-village', 'park-slope', 'lower-east-sid
 const AUSTIN_HOODS = ['east-austin', 'south-congress', 'mueller', 'hyde-park', 'east-cesar-chavez', 'clarksville'];
 const CATEGORIES = ['coffee', 'outdoors', 'arts', 'food', 'books', 'music'];
 
-export default function FeedPage() {
+function FeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const city = searchParams.get('city') ?? 'nyc';
@@ -50,13 +50,11 @@ export default function FeedPage() {
           {loading ? 'Loading…' : `${plans.length} plan${plans.length !== 1 ? 's' : ''} this week`}
         </p>
 
-        {/* City switcher */}
         <div className="flex gap-2 mb-4">
           <button onClick={() => setFilter('city', 'nyc')} className={`btn ${city === 'nyc' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>New York</button>
           <button onClick={() => setFilter('city', 'austin')} className={`btn ${city === 'austin' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Austin</button>
         </div>
 
-        {/* Neighborhood filter */}
         <div className="flex gap-1.5 flex-wrap mb-3">
           <button onClick={() => setFilter('neighborhood', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!hood ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All areas</button>
           {hoods.map(h => (
@@ -66,7 +64,6 @@ export default function FeedPage() {
           ))}
         </div>
 
-        {/* Category filter */}
         <div className="flex gap-1.5 flex-wrap mb-7">
           <button onClick={() => setFilter('category', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!cat ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All</button>
           {CATEGORIES.map(c => (
@@ -88,5 +85,13 @@ export default function FeedPage() {
         )}
       </div>
     </>
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense fallback={<div className="max-w-[1080px] mx-auto px-6 py-20 text-center text-muted">Loading…</div>}>
+      <FeedContent />
+    </Suspense>
   );
 }

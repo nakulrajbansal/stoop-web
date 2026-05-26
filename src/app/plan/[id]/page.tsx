@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
 
-export default function PlanDetailPage() {
+function PlanDetailContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -30,11 +30,7 @@ export default function PlanDetailPage() {
 
       const { data } = await supabase
         .from('plans')
-        .select(`
-          *,
-          poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member),
-          neighborhood:neighborhoods(name)
-        `)
+        .select(`*, poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member), neighborhood:neighborhoods(name)`)
         .eq('id', planId)
         .single();
 
@@ -127,10 +123,8 @@ export default function PlanDetailPage() {
 
         <div className="h-px bg-[var(--border)] my-7"></div>
 
-        {/* Poster */}
         <div className="flex items-center gap-3.5 mb-7">
-          <div
-            className="w-11 h-11 rounded-[13px] flex items-center justify-center text-[14px] font-semibold"
+          <div className="w-11 h-11 rounded-[13px] flex items-center justify-center text-[14px] font-semibold"
             style={{ background: u.avatar_bg, color: u.avatar_fg }}>
             {u.initials || u.name[0]}
           </div>
@@ -143,7 +137,6 @@ export default function PlanDetailPage() {
           </div>
         </div>
 
-        {/* Spots */}
         <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-4 flex items-center justify-between mb-6">
           <div>
             <div className="text-[12px] text-muted">Spots available</div>
@@ -153,7 +146,6 @@ export default function PlanDetailPage() {
           </div>
         </div>
 
-        {/* CTA */}
         {isOwn ? (
           <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted flex items-center gap-2">
             <span>📋</span>
@@ -169,12 +161,9 @@ export default function PlanDetailPage() {
           <Link href="/auth" className="btn btn-accent btn-full btn-lg">Sign in to message {u.name} →</Link>
         ) : showMessageBox ? (
           <div className="flex flex-col gap-3">
-            <textarea
-              value={messageText} onChange={e => setMessageText(e.target.value)}
-              rows={4} maxLength={2000}
-              placeholder={`Send ${u.name} a short message about the plan…`}
-              className="input resize-none"
-              autoFocus />
+            <textarea value={messageText} onChange={e => setMessageText(e.target.value)}
+              rows={4} maxLength={2000} placeholder={`Send ${u.name} a short message about the plan…`}
+              className="input resize-none" autoFocus />
             {error && <p className="text-[12px] text-accent">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setShowMessageBox(false)} className="btn btn-ghost flex-1">Cancel</button>
@@ -194,5 +183,13 @@ export default function PlanDetailPage() {
         )}
       </div>
     </>
+  );
+}
+
+export default function PlanDetailPage() {
+  return (
+    <Suspense fallback={<div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
+      <PlanDetailContent />
+    </Suspense>
   );
 }
