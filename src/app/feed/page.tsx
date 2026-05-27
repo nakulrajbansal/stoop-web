@@ -2,23 +2,36 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Nav from '@/components/Nav';
-import PlanCard from '@/components/PlanCard';
 import { useCityPreference, setCityPreference } from '@/lib/city-preference';
+import { intentTagLabel } from '@/lib/utils';
 
-const NYC_HOODS = ['williamsburg', 'west-village', 'park-slope', 'lower-east-side', 'astoria', 'bushwick', 'greenpoint', 'harlem'];
-const AUSTIN_HOODS = ['east-austin', 'south-congress', 'mueller', 'hyde-park', 'east-cesar-chavez', 'clarksville'];
 const CATEGORIES = ['coffee', 'outdoors', 'arts', 'food', 'books', 'music'];
+
+function weekOfLabel(): string {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  return monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function dateStamp(iso: string | null): { weekday: string; day: number } | null {
+  if (!iso) return null;
+  const date = new Date(iso + 'T00:00:00');
+  return {
+    weekday: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+    day: date.getDate()
+  };
+}
 
 function FeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [cityPref] = useCityPreference();
 
-  // URL param wins, otherwise use preference, otherwise show both
   const cityParam = searchParams.get('city');
   const activeCity = cityParam ?? cityPref ?? 'all';
-  const hood = searchParams.get('neighborhood');
   const cat = searchParams.get('category');
 
   const [plans, setPlans] = useState<any[]>([]);
@@ -28,88 +41,204 @@ function FeedContent() {
     setLoading(true);
     const params = new URLSearchParams();
     if (activeCity !== 'all') params.set('city', activeCity);
-    if (hood) params.set('neighborhood', hood);
     if (cat) params.set('category', cat);
 
     fetch(`/api/plans?${params}`)
       .then(r => r.json())
-      .then(d => { setPlans(d.plans || []); setLoading(false); })
+      .then(d => {
+        // Sort by when_date ascending (soonest first), no-date at the bottom
+        const sorted = (d.plans || []).sort((a: any, b: any) => {
+          if (!a.when_date && !b.when_date) return 0;
+          if (!a.when_date) return 1;
+          if (!b.when_date) return -1;
+          return a.when_date.localeCompare(b.when_date);
+        });
+        setPlans(sorted);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  }, [activeCity, hood, cat]);
+  }, [activeCity, cat]);
 
-  function setFilter(key: string, value: string | null) {
+  function pickCity(c: 'all' | 'nyc' | 'austin') {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value); else params.delete(key);
-    router.push(`/feed?${params.toString()}`);
-  }
-
-  function pickCity(c: 'nyc' | 'austin' | 'all') {
     if (c === 'all') {
       setCityPreference(null);
-      setFilter('city', null);
+      params.delete('city');
     } else {
       setCityPreference(c);
-      setFilter('city', c);
+      params.set('city', c);
     }
-    // Clear neighborhood when changing city
-    const params = new URLSearchParams(searchParams.toString());
-    if (c === 'all') params.delete('city'); else params.set('city', c);
-    params.delete('neighborhood');
     router.push(`/feed?${params.toString()}`);
   }
 
-  const hoods = activeCity === 'austin' ? AUSTIN_HOODS : activeCity === 'nyc' ? NYC_HOODS : [];
-  const cityName = activeCity === 'austin' ? 'Austin' : activeCity === 'nyc' ? 'New York' : 'both cities';
-  const showNeighborhoodFilter = activeCity !== 'all';
+  function setCategory(c: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (c) params.set('category', c); else params.delete('category');
+    router.push(`/feed?${params.toString()}`);
+  }
+
+  const planCount = plans.length;
+  const totalSpots = plans.reduce((acc, p) => acc + (p.spots_left ?? 0), 0);
+  const hostCount = new Set(plans.map(p => p.user_id)).size;
+  const week = weekOfLabel();
+  const cityLabel = activeCity === 'austin' ? 'Austin' : activeCity === 'nyc' ? 'New York' : 'NYC + Austin';
 
   return (
     <>
       <Nav />
-      <div className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-6">
-        <div className="text-[11px] uppercase tracking-wider text-muted font-medium mb-1">This week in {cityName}</div>
-        <h2 className="font-serif text-[clamp(28px,4vw,42px)] font-bold tracking-tight mb-1.5">Browse plans</h2>
-        <p className="text-[13px] text-muted mb-5">
-          {loading ? 'Loading…' : `${plans.length} plan${plans.length !== 1 ? 's' : ''} this week`}
-        </p>
-
-        {/* City switcher */}
-        <div className="flex gap-2 mb-4">
-          <button onClick={() => pickCity('all')} className={`btn ${activeCity === 'all' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Both cities</button>
-          <button onClick={() => pickCity('nyc')} className={`btn ${activeCity === 'nyc' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>New York</button>
-          <button onClick={() => pickCity('austin')} className={`btn ${activeCity === 'austin' ? 'btn-primary' : 'btn-ghost'} btn-sm`}>Austin</button>
+      <div className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-16">
+        {/* Masthead */}
+        <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-4">
+          <span className="w-6 h-px bg-accent"></span>
+          <span>Week of {week}</span>
+          <span className="opacity-40">·</span>
+          <span>{cityLabel}</span>
         </div>
 
-        {/* Neighborhood filter — only shown when a single city is selected */}
-        {showNeighborhoodFilter && (
-          <div className="flex gap-1.5 flex-wrap mb-3">
-            <button onClick={() => setFilter('neighborhood', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!hood ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All areas</button>
-            {hoods.map(h => (
-              <button key={h} onClick={() => setFilter('neighborhood', h)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border capitalize ${hood === h ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>
-                {h.replace(/-/g, ' ')}
-              </button>
-            ))}
-          </div>
+        {/* Headline */}
+        {loading ? (
+          <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+            This week<em className="italic text-accent">…</em>
+          </h1>
+        ) : (
+          <>
+            <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+              This week, <em className="italic text-accent">{planCount} {planCount === 1 ? 'plan' : 'plans'}.</em>
+            </h1>
+            {planCount > 0 ? (
+              <p className="text-[13px] text-muted mb-8">
+                Posted by {hostCount} {hostCount === 1 ? 'host' : 'hosts'}
+                <span className="opacity-40 mx-1.5">·</span>
+                {totalSpots} {totalSpots === 1 ? 'spot' : 'spots'} open
+              </p>
+            ) : (
+              <p className="text-[13px] text-muted mb-8">Nothing live in {cityLabel} yet.</p>
+            )}
+          </>
         )}
 
-        {/* Category filter */}
-        <div className="flex gap-1.5 flex-wrap mb-7">
-          <button onClick={() => setFilter('category', null)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border ${!cat ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>All</button>
-          {CATEGORIES.map(c => (
-            <button key={c} onClick={() => setFilter('category', c)} className={`px-3.5 py-[7px] rounded-full text-[12.5px] border capitalize ${cat === c ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'}`}>{c}</button>
+        {/* Editor's note */}
+        <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-5 py-4 mb-9 max-w-[640px]">
+          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">A note from the Stoop</div>
+          <p className="text-[13.5px] text-ink-2 leading-[1.65]">
+            Stoop is small on purpose. A few plans, posted by real people in your city, that you can actually show up to. If nothing here fits, post your own. See who comes.
+          </p>
+        </div>
+
+        {/* City filter tabs */}
+        <div className="flex border-b border-[var(--border)] mb-1">
+          {[
+            { id: 'all' as const, label: 'Both cities' },
+            { id: 'nyc' as const, label: 'New York' },
+            { id: 'austin' as const, label: 'Austin' }
+          ].map(t => (
+            <button key={t.id} onClick={() => pickCity(t.id)}
+              className={`px-4 py-2.5 text-[13px] border-b-2 -mb-px transition-colors ${
+                activeCity === t.id
+                  ? 'text-ink border-accent font-medium'
+                  : 'text-muted border-transparent hover:text-ink-2'
+              }`}>
+              {t.label}
+            </button>
           ))}
         </div>
 
+        {/* Quiet category filter */}
+        <div className="flex items-center gap-1 flex-wrap py-3 mb-2">
+          <button onClick={() => setCategory(null)} className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2 py-1 rounded ${
+            !cat ? 'text-ink bg-cream-2' : 'text-muted hover:text-ink-2'
+          }`}>All</button>
+          {CATEGORIES.map(c => (
+            <button key={c} onClick={() => setCategory(c)} className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2 py-1 rounded ${
+              cat === c ? 'text-accent bg-[rgba(200,71,42,0.08)]' : 'text-muted hover:text-ink-2'
+            }`}>{c}</button>
+          ))}
+        </div>
+
+        {/* Plan list - itinerary view */}
         {loading ? (
-          <div className="text-center py-12 text-muted text-sm">Loading plans…</div>
+          <div className="text-center py-12 text-muted text-sm">Loading…</div>
         ) : plans.length === 0 ? (
-          <div className="text-center py-16 text-muted">
-            <div className="text-3xl opacity-30 mb-3">◎</div>
-            <p className="text-sm">No plans match this filter.<br />Try a different area or category.</p>
+          <div className="py-16 text-center">
+            <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
+            <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
+              Nothing here for {cityLabel.toLowerCase()} this week. The type of person who posts on Stoop is the same type who shows up.
+            </p>
+            <Link href="/post" className="btn btn-accent">Post a plan →</Link>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {plans.map(plan => <PlanCard key={plan.id} plan={plan} />)}
-          </div>
+          <>
+            <div className="flex flex-col">
+              {plans.map((plan: any) => {
+                const stamp = dateStamp(plan.when_date);
+                const timeStr = plan.when_time_specific || (plan.when_time ? plan.when_time.toLowerCase() : '');
+                const tags = plan.intent_tags ?? [];
+                return (
+                  <Link key={plan.id} href={`/plan/${plan.slug}`}
+                    className="group flex items-start gap-4 sm:gap-5 py-5 border-b border-[var(--border)] hover:bg-cream-2/40 -mx-3 px-3 rounded-md transition-colors">
+                    {/* Date stamp column */}
+                    <div className="flex-shrink-0 w-[56px] sm:w-[64px] text-center">
+                      {stamp ? (
+                        <>
+                          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted">{stamp.weekday}</div>
+                          <div className="font-serif text-[26px] sm:text-[30px] font-bold leading-none tracking-tight text-ink mt-0.5">{stamp.day}</div>
+                          {timeStr && <div className="text-[10.5px] text-muted mt-1.5 leading-tight">{timeStr}</div>}
+                        </>
+                      ) : (
+                        <div className="text-[11px] text-muted mt-1">{plan.when_day}</div>
+                      )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px self-stretch bg-[var(--border)] flex-shrink-0"></div>
+
+                    {/* Plan content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center flex-wrap mb-1.5 text-[10px] font-mono uppercase tracking-[0.1em]">
+                        <span className="text-accent">{plan.category}</span>
+                        {tags.slice(0, 2).map((t: string) => (
+                          <span key={t} className="text-muted">
+                            <span className="opacity-40 mx-1.5">·</span>{intentTagLabel(t)}
+                          </span>
+                        ))}
+                      </div>
+                      <h3 className="font-serif text-[17px] sm:text-[18px] font-bold text-ink leading-snug mb-1 tracking-[-0.2px]">
+                        {plan.text.length > 100 ? plan.text.substring(0, 100) + '…' : plan.text}
+                      </h3>
+                      <div className="text-[12px] text-muted">
+                        <span className="text-ink-2 font-medium">{plan.poster?.name}</span>
+                        <span className="opacity-40 mx-1.5">·</span>
+                        hosting
+                        {plan.neighborhood?.name && (
+                          <>
+                            <span className="opacity-40 mx-1.5">·</span>
+                            {plan.neighborhood.name}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right action column */}
+                    <div className="flex-shrink-0 text-right pt-1 hidden sm:block">
+                      <div className="text-[11px] font-mono text-sage flex items-center gap-1.5 justify-end">
+                        <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block"></span>
+                        {plan.spots_left} open
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Closing prompt */}
+            <div className="mt-10 bg-cream-2 border border-[var(--border)] rounded-2xl px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <div className="font-serif text-[17px] font-bold text-ink mb-0.5">Nothing here for you?</div>
+                <div className="text-[12.5px] text-muted">Be the first this weekend in your neighborhood. Plans get joined fast.</div>
+              </div>
+              <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
+            </div>
+          </>
         )}
       </div>
     </>
