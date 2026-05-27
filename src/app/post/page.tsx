@@ -63,11 +63,15 @@ export default function PostPage() {
     if (!ready) return;
     setSubmitting(true); setError('');
 
+    const selectedChip = dateChips.find(c => c.iso === dateIso);
+
     const res = await fetch('/api/plans', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text, category: CATEGORY_IDS[category], spot: spot || null,
-        whenDate: dateIso, whenTime: time || null,
+        whenDate: dateIso,
+        whenDayLabel: selectedChip?.label ?? '',
+        whenTime: time || null,
         whenTimeSpecific: specificTime || null,
         spots, neighborhoodSlug: neighborhood,
         intentTags: selectedTags
