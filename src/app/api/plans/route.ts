@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
+import { calculateExpiry, slugify, formatPlanDate, INTENT_TAGS } from '@/lib/utils';
 
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { text, category, spot, whenDay, whenTime, whenTimeSpecific, spots, neighborhoodSlug, intentTags } = body;
+  const { text, category, spot, whenDate, whenTime, whenTimeSpecific, spots, neighborhoodSlug, intentTags } = body;
 
   if (!text || typeof text !== 'string' || text.length < 25 || text.length > 220) {
     return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
   if (![1, 2].includes(spots)) {
     return NextResponse.json({ error: 'Spots must be 1 or 2' }, { status: 400 });
   }
-  if (!whenDay) {
-    return NextResponse.json({ error: 'Day is required' }, { status: 400 });
+  if (!whenDate || !/^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
+    return NextResponse.json({ error: 'Date is required' }, { status: 400 });
   }
 
   const cleanTags: string[] = Array.isArray(intentTags)
@@ -119,13 +119,14 @@ export async function POST(req: NextRequest) {
       text,
       category,
       spot: spot ?? null,
-      when_day: whenDay,
+      when_day: formatPlanDate(whenDate),
+      when_date: whenDate,
       when_time: whenTime ?? null,
       when_time_specific: whenTimeSpecific ?? null,
       spots_total: spots,
       spots_left: spots,
       intent_tags: cleanTags,
-      expires_at: calculateExpiry(whenDay)
+      expires_at: calculateExpiry(whenDate)
     })
     .select()
     .single();
@@ -139,7 +140,7 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { planId, text, whenDay, whenTime, whenTimeSpecific, intentTags } = await req.json();
+  const { planId, text, whenDate, whenTime, whenTimeSpecific, intentTags } = await req.json();
   if (!planId) return NextResponse.json({ error: 'planId required' }, { status: 400 });
 
   // Verify ownership BEFORE updating, using admin client
@@ -159,7 +160,11 @@ export async function PATCH(req: NextRequest) {
 
   const updates: any = {};
   if (typeof text === 'string' && text.length >= 25 && text.length <= 220) updates.text = text;
-  if (typeof whenDay === 'string' && whenDay) updates.when_day = whenDay;
+  if (typeof whenDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
+    updates.when_date = whenDate;
+    updates.when_day = formatPlanDate(whenDate);
+    updates.expires_at = calculateExpiry(whenDate);
+  }
   if (typeof whenTime === 'string') updates.when_time = whenTime || null;
   if (typeof whenTimeSpecific === 'string') updates.when_time_specific = whenTimeSpecific || null;
   if (cleanTags !== undefined) updates.intent_tags = cleanTags;

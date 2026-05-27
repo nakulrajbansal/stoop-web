@@ -5,9 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { createClient } from '@/lib/supabase/client';
-import { INTENT_TAGS } from '@/lib/utils';
+import { INTENT_TAGS, getDateChips } from '@/lib/utils';
 
-const DAYS = ['Today', 'Tomorrow', 'This Saturday', 'This Sunday', 'Next week'];
 const TIMES = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
 export default function EditPlanPage() {
@@ -18,12 +17,14 @@ export default function EditPlanPage() {
 
   const [plan, setPlan] = useState<any>(null);
   const [text, setText] = useState('');
-  const [day, setDay] = useState('');
+  const [dateIso, setDateIso] = useState('');
   const [time, setTime] = useState('');
   const [specificTime, setSpecificTime] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const dateChips = getDateChips();
 
   useEffect(() => {
     async function load() {
@@ -33,7 +34,7 @@ export default function EditPlanPage() {
       if (!data || data.user_id !== user.id) { router.push('/feed'); return; }
       setPlan(data);
       setText(data.text);
-      setDay(data.when_day);
+      setDateIso(data.when_date ?? '');
       setTime(data.when_time ?? '');
       setSpecificTime(data.when_time_specific ?? '');
       setSelectedTags(data.intent_tags ?? []);
@@ -52,11 +53,12 @@ export default function EditPlanPage() {
   async function save() {
     setError('');
     if (text.length < 25 || text.length > 220) { setError('Plan text must be 25-220 characters'); return; }
+    if (!dateIso) { setError('Pick a date'); return; }
     setSaving(true);
     const res = await fetch('/api/plans', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        planId: plan.id, text, whenDay: day, whenTime: time || null,
+        planId: plan.id, text, whenDate: dateIso, whenTime: time || null,
         whenTimeSpecific: specificTime || null, intentTags: selectedTags
       })
     });
@@ -91,12 +93,12 @@ export default function EditPlanPage() {
           </div>
 
           <div>
-            <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Day</label>
+            <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Date</label>
             <div className="flex gap-1.5 flex-wrap">
-              {DAYS.map(d => (
-                <button key={d} onClick={() => setDay(d)} className={`px-3.5 py-1.5 rounded-full border text-[13px] ${
-                  day === d ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'
-                }`}>{d}</button>
+              {dateChips.map(d => (
+                <button key={d.iso} onClick={() => setDateIso(d.iso)} className={`px-3.5 py-1.5 rounded-full border text-[13px] ${
+                  dateIso === d.iso ? 'bg-ink text-cream border-ink' : 'border-[var(--border2)] text-ink-2'
+                }`}>{d.label}</button>
               ))}
             </div>
           </div>

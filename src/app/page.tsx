@@ -1,90 +1,143 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import PlanCard from '@/components/PlanCard';
 import { createClient } from '@/lib/supabase/server';
 
 export const revalidate = 60;
 
+function weekOfLabel(): string {
+  const now = new Date();
+  // Find the Monday of this week
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  return monday.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
-  // Fetch plans from BOTH cities, mixed
-  const { data: plans } = await supabase
+  const { data: plans, count } = await supabase
     .from('plans')
     .select(`
       *,
       poster:profiles!plans_user_id_fkey(name, initials, avatar_bg, avatar_fg),
       neighborhood:neighborhoods(name),
       city:cities(slug, name)
-    `)
+    `, { count: 'exact' })
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
-    .limit(6);
+    .limit(3);
+
+  const planCount = count ?? 0;
+  const totalSpots = plans?.reduce((acc, p) => acc + (p.spots_left ?? 0), 0) ?? 0;
+  const week = weekOfLabel();
 
   return (
     <>
       <Nav />
 
-      {/* Hero */}
-      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 py-16 sm:py-20 grid sm:grid-cols-2 gap-16 items-center">
-        <div>
-          <div className="flex items-center gap-2.5 mb-6 text-[11px] uppercase tracking-wider text-accent font-medium">
-            <span className="w-5 h-px bg-accent"></span>
-            <span>New York + Austin · This week</span>
-          </div>
-          <h1 className="font-serif text-[clamp(54px,6vw,84px)] font-bold leading-[0.95] tracking-[-2.5px] mb-7">
-            Plans,<br />not <em className="italic text-accent">profiles.</em>
-          </h1>
-          <p className="text-[17px] text-ink-2 leading-[1.65] font-light max-w-[420px] mb-9">
-            Post what you&apos;re doing this week.{' '}
-            <strong className="text-ink font-medium">Meet the person who shows up.</strong>{' '}
-            No swiping, no algorithm, no awkward intros.
-          </p>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/feed" className="btn btn-primary btn-lg">See what&apos;s out there</Link>
-            <Link href="/post" className="btn btn-ghost btn-lg">Post a plan →</Link>
-          </div>
-          <p className="text-[11.5px] text-muted mt-4 flex items-center gap-1.5">
-            <span className="text-[10px]">↑</span>
-            Browse everything free. No sign-up until you&apos;re ready to act.
-          </p>
+      {/* Editorial masthead */}
+      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-12 pb-4">
+        <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent">
+          <span className="w-6 h-px bg-accent"></span>
+          <span>Week of {week}</span>
+          <span className="opacity-40">·</span>
+          <span>NYC + Austin</span>
+          {planCount > 0 && (
+            <>
+              <span className="opacity-40">·</span>
+              <span>{planCount} {planCount === 1 ? 'plan' : 'plans'}</span>
+            </>
+          )}
         </div>
+      </section>
 
-        <div className="hidden sm:block relative h-[460px]">
-          {plans?.slice(0, 3).map((plan, i) => {
-            const rotations = ['-2.5deg', '1.8deg', '-1deg'];
-            const tops = ['10px', '110px', '210px'];
-            const lefts = ['-10px', '15px', '-5px'];
-            return (
-              <div
-                key={plan.id}
-                className="absolute w-[268px]"
-                style={{
-                  top: tops[i],
-                  left: lefts[i],
-                  transform: `rotate(${rotations[i]})`,
-                  zIndex: 3 - i
-                }}
-              >
-                <PlanCard plan={plan as any} />
+      {/* Hero with featured plans index */}
+      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-2 pb-12 sm:pb-16">
+        <div className="grid sm:grid-cols-[1.1fr,1fr] gap-12 sm:gap-16 items-start">
+          {/* Left column: headline + CTA */}
+          <div>
+            <h1 className="font-serif text-[clamp(56px,7vw,96px)] font-bold leading-[0.92] tracking-[-3px] mb-7">
+              Plans,<br />not <em className="italic text-accent">profiles.</em>
+            </h1>
+            <p className="text-[17px] text-ink-2 leading-[1.6] font-light mb-8 max-w-[440px]">
+              Post what you&apos;re doing this week.{' '}
+              <strong className="text-ink font-medium">Meet the person who shows up.</strong>{' '}
+              No swiping, no algorithm, no awkward intros.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Link href="/feed" className="btn btn-primary btn-lg">
+                See all {planCount > 0 ? `${planCount} plans` : 'plans'}
+              </Link>
+              <Link href="/post" className="btn btn-ghost btn-lg">Post your own →</Link>
+            </div>
+            <p className="text-[11.5px] text-muted mt-5">
+              Free to browse. Sign up when you&apos;re ready to act.
+            </p>
+          </div>
+
+          {/* Right column: featured plans index */}
+          <div className="pt-2">
+            <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-ink/15">
+              <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-ink-2">Featured this week</div>
+              {planCount > 0 && totalSpots > 0 && (
+                <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted">{totalSpots} open</div>
+              )}
+            </div>
+
+            {!plans || plans.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-[13.5px] text-muted leading-relaxed mb-4">
+                  Nothing live yet this week.<br />Be the first.
+                </p>
+                <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
               </div>
-            );
-          })}
+            ) : (
+              <div className="flex flex-col">
+                {plans.map((plan: any) => (
+                  <Link key={plan.id} href={`/plan/${plan.slug}`}
+                    className="group flex items-start gap-3 py-3.5 border-b border-[var(--border)] last:border-0 hover:bg-cream-2/60 -mx-3 px-3 rounded-md transition-colors">
+                    <div
+                      className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-[11px] font-semibold flex-shrink-0 mt-0.5"
+                      style={{ background: plan.poster?.avatar_bg ?? '#eee', color: plan.poster?.avatar_fg ?? '#666' }}>
+                      {plan.poster?.initials || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-0.5">
+                        {plan.text.length > 70 ? plan.text.substring(0, 70) + '…' : plan.text}
+                      </div>
+                      <div className="text-[11.5px] text-muted">
+                        {plan.poster?.name}
+                        <span className="opacity-40 mx-1">·</span>
+                        {plan.when_day}
+                        {plan.when_time_specific && `, ${plan.when_time_specific}`}
+                        {!plan.when_time_specific && plan.when_time && `, ${plan.when_time.toLowerCase()}`}
+                        <span className="opacity-40 mx-1">·</span>
+                        {plan.neighborhood?.name}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-accent font-medium whitespace-nowrap mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {plan.spots_left} open →
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="bg-cream-2 py-16 sm:py-20">
+      <section className="bg-cream-2 py-16 sm:py-20 border-y border-[var(--border)]">
         <div className="max-w-[1080px] mx-auto px-6 sm:px-9">
-          <div className="text-[11px] uppercase tracking-wider text-muted font-medium mb-2">How it works</div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">How it works</div>
           <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
             Three steps to <em className="italic text-accent">an actual plan.</em>
           </h2>
 
           <div className="grid sm:grid-cols-3 gap-[2px] mt-10 rounded-2xl overflow-hidden bg-[var(--border)]">
             {[
-              { n: '01', h: 'Write your plan', p: 'In your own words. Specific place and time. No event form, no category dropdown.' },
+              { n: '01', h: 'Write your plan', p: 'In your own words. Specific place, specific time. No event form, no category dropdown.' },
               { n: '02', h: 'Someone reaches out', p: 'Not a swipe. A real message from someone who read what you wrote and wants to come.' },
               { n: '03', h: 'You meet', p: 'Two people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
             ].map(step => (
@@ -98,22 +151,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Feed preview */}
-      <section className="py-16 sm:py-20">
-        <div className="max-w-[1080px] mx-auto px-6 sm:px-9">
-          <div className="text-[11px] uppercase tracking-wider text-muted font-medium mb-2">Happening this week</div>
-          <h2 className="font-serif text-[clamp(24px,3vw,36px)] font-bold tracking-tight mb-5">Across both cities</h2>
-          <div className="grid sm:grid-cols-3 gap-2.5">
-            {plans?.slice(0, 3).map(plan => <PlanCard key={plan.id} plan={plan as any} />)}
-          </div>
-          <div className="text-center mt-6">
-            <Link href="/feed" className="btn btn-ghost">See all plans →</Link>
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
-      <section className="px-6 sm:px-9 mb-20">
+      <section className="px-6 sm:px-9 my-16 sm:my-20">
         <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl px-12 py-16 sm:py-20 flex items-center justify-between gap-8 flex-wrap relative overflow-hidden">
           <div>
             <h2 className="font-serif text-[clamp(28px,4vw,46px)] font-bold tracking-[-1.2px] leading-[1.05] text-cream mb-2">

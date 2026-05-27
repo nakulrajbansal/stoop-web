@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
-import { INTENT_TAGS } from '@/lib/utils';
+import { INTENT_TAGS, getDateChips } from '@/lib/utils';
 
 const CATEGORIES = ['Coffee', 'Outdoors', 'Arts', 'Food', 'Books', 'Music'];
 const CATEGORY_IDS: Record<string, string> = {
@@ -12,7 +12,6 @@ const CATEGORY_IDS: Record<string, string> = {
   Food: 'food', Books: 'books', Music: 'music'
 };
 
-const DAYS = ['Today', 'Tomorrow', 'This Saturday', 'This Sunday', 'Next week'];
 const TIMES = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
 export default function PostPage() {
@@ -21,7 +20,7 @@ export default function PostPage() {
 
   const [text, setText] = useState('');
   const [category, setCategory] = useState('Coffee');
-  const [day, setDay] = useState('');
+  const [dateIso, setDateIso] = useState('');
   const [time, setTime] = useState('');
   const [specificTime, setSpecificTime] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
@@ -31,6 +30,8 @@ export default function PostPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const dateChips = getDateChips();
 
   useEffect(() => {
     async function load() {
@@ -48,7 +49,7 @@ export default function PostPage() {
     load();
   }, []);
 
-  const ready = text.length >= 25 && day && neighborhood && spots;
+  const ready = text.length >= 25 && dateIso && neighborhood && spots;
 
   function toggleTag(id: string) {
     setSelectedTags(prev => {
@@ -66,7 +67,7 @@ export default function PostPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text, category: CATEGORY_IDS[category], spot: spot || null,
-        whenDay: day, whenTime: time || null,
+        whenDate: dateIso, whenTime: time || null,
         whenTimeSpecific: specificTime || null,
         spots, neighborhoodSlug: neighborhood,
         intentTags: selectedTags
@@ -118,16 +119,19 @@ export default function PostPage() {
           </div>
 
           <div>
-            <h2 className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">When?</h2>
-            <p className="text-[12px] text-muted mb-3">Pick a day, then a rough time of day. Or set an exact time below.</p>
-            <div className="flex gap-1.5 flex-wrap mb-2.5">
-              {DAYS.map(d => (
-                <button key={d} onClick={() => setDay(d)} className={`px-4 py-2 rounded-full border text-[13px] ${
-                  day === d ? 'bg-ink border-ink text-cream font-medium' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'
-                }`}>{d}</button>
+            <h2 className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">Which day?</h2>
+            <p className="text-[12px] text-muted mb-3">Up to two weeks out. Pick a rough time below, or set an exact one.</p>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {dateChips.map(d => (
+                <button key={d.iso} onClick={() => setDateIso(d.iso)} className={`px-4 py-2 rounded-full border text-[13px] ${
+                  dateIso === d.iso ? 'bg-ink border-ink text-cream font-medium' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'
+                }`}>{d.label}</button>
               ))}
             </div>
             <div className="flex gap-1.5 flex-wrap mb-3">
+              <button onClick={() => setTime('')} className={`px-4 py-2 rounded-full border text-[13px] ${
+                !time ? 'bg-cream-2 border-[var(--border2)] text-muted' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'
+              }`}>No time</button>
               {TIMES.map(t => (
                 <button key={t} onClick={() => setTime(t)} className={`px-4 py-2 rounded-full border text-[13px] ${
                   time === t ? 'bg-ink border-ink text-cream font-medium' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'

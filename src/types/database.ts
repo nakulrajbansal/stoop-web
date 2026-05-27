@@ -38,7 +38,7 @@ export type Database = {
         Row: {
           id: string; slug: string; user_id: string; city_id: string; neighborhood_id: string;
           text: string; category: string; spot: string | null;
-          when_day: string; when_time: string | null; when_time_specific: string | null;
+          when_day: string; when_date: string | null; when_time: string | null; when_time_specific: string | null;
           spots_total: number; spots_left: number;
           intent_tags: string[];
           status: 'open' | 'full' | 'expired' | 'removed';
@@ -47,7 +47,7 @@ export type Database = {
         Insert: {
           id?: string; slug: string; user_id: string; city_id: string; neighborhood_id: string;
           text: string; category: string; spot?: string | null;
-          when_day: string; when_time?: string | null; when_time_specific?: string | null;
+          when_day: string; when_date?: string | null; when_time?: string | null; when_time_specific?: string | null;
           spots_total: number; spots_left: number;
           intent_tags?: string[];
           status?: 'open' | 'full' | 'expired' | 'removed';
@@ -55,7 +55,7 @@ export type Database = {
         };
         Update: {
           text?: string; category?: string; spot?: string | null;
-          when_day?: string; when_time?: string | null; when_time_specific?: string | null;
+          when_day?: string; when_date?: string | null; when_time?: string | null; when_time_specific?: string | null;
           spots_total?: number; spots_left?: number;
           intent_tags?: string[];
           status?: 'open' | 'full' | 'expired' | 'removed';

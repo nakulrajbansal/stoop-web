@@ -38,37 +38,42 @@ export function pickAvatarColors(seed: string): { bg: string; fg: string } {
   return { bg, fg };
 }
 
-export function calculateExpiry(whenDay: string): string {
+/** Expire a plan at the end of its scheduled day (uses when_date if available). */
+export function calculateExpiry(whenDate: string | Date): string {
+  const date = typeof whenDate === 'string' ? new Date(whenDate + 'T00:00:00') : whenDate;
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+}
+
+/** Return a human label for a date, relative to today when possible. */
+export function formatPlanDate(iso: string | Date): string {
+  const date = typeof iso === 'string' ? new Date(iso + (iso.length === 10 ? 'T00:00:00' : '')) : iso;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let target = new Date(today);
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffMs = target.getTime() - today.getTime();
+  const days = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  switch (whenDay) {
-    case 'Today':
-      // expire at end of today
-      target = today;
-      break;
-    case 'Tomorrow':
-      target.setDate(today.getDate() + 1);
-      break;
-    case 'This Saturday':
-      // 6 = Saturday in JS (0=Sunday)
-      target.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7 || 7));
-      break;
-    case 'This Sunday':
-      target.setDate(today.getDate() + ((0 - today.getDay() + 7) % 7 || 7));
-      break;
-    case 'Next week':
-      // 7 days out, falls on whatever weekday it lands on
-      target.setDate(today.getDate() + 7);
-      break;
-    default:
-      target.setDate(today.getDate() + 7);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  if (days === -1) return 'Yesterday';
+  if (days > 1 && days < 7) return target.toLocaleDateString('en-US', { weekday: 'long' });
+  if (days >= 7 && days < 14) return 'Next ' + target.toLocaleDateString('en-US', { weekday: 'long' });
+  return target.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** Return the next 14 days as picker chips. */
+export function getDateChips(): { iso: string; label: string }[] {
+  const chips = [];
+  const now = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    chips.push({
+      iso: d.toISOString().substring(0, 10),
+      label: formatPlanDate(d)
+    });
   }
-
-  // Expire at end of the target day (23:59:59 local, then convert)
-  target.setHours(23, 59, 59, 999);
-  return target.toISOString();
+  return chips;
 }
 
 export function timeAgo(iso: string): string {
