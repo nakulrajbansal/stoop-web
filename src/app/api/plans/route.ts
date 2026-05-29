@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
   if (!['coffee','outdoors','arts','food','books','music'].includes(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
   }
-  if (![1, 2].includes(spots)) {
-    return NextResponse.json({ error: 'Spots must be 1 or 2' }, { status: 400 });
+  if (![1, 2, 3].includes(spots)) {
+    return NextResponse.json({ error: 'Spots must be 1, 2, or 3' }, { status: 400 });
   }
   if (!whenDate || !/^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
     return NextResponse.json({ error: 'Date is required' }, { status: 400 });

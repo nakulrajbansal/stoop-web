@@ -184,9 +184,9 @@ export default function PostPage() {
 
           <div>
             <h2 className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">How many can join?</h2>
-            <p className="text-[12px] text-muted mb-3">Keep it small.</p>
+            <p className="text-[12px] text-muted mb-3">Keep it small. Up to four total, counting you.</p>
             <div className="flex gap-2">
-              {[1, 2].map(n => (
+              {[1, 2, 3].map(n => (
                 <button key={n} onClick={() => setSpots(n)} className={`flex-1 py-5 rounded-2xl border text-center transition-all ${
                   spots === n ? 'border-accent bg-[rgba(200,71,42,0.05)]' : 'border-[var(--border2)] bg-card hover:border-accent/40'
                 }`}>
