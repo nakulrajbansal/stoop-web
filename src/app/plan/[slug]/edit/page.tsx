@@ -55,11 +55,17 @@ export default function EditPlanPage() {
     if (text.length < 25 || text.length > 220) { setError('Plan text must be 25-220 characters'); return; }
     if (!dateIso) { setError('Pick a date'); return; }
     setSaving(true);
+    const selectedChip = dateChips.find(d => d.iso === dateIso);
+
     const res = await fetch('/api/plans', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        planId: plan.id, text, whenDate: dateIso, whenTime: time || null,
-        whenTimeSpecific: specificTime || null, intentTags: selectedTags
+        planId: plan.id, text,
+        whenDate: dateIso,
+        whenDayLabel: selectedChip?.label ?? '',
+        whenTime: time || null,
+        whenTimeSpecific: specificTime || null,
+        intentTags: selectedTags
       })
     });
     const data = await res.json();

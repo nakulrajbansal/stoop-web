@@ -63,7 +63,7 @@ export default function PostPage() {
     if (!ready) return;
     setSubmitting(true); setError('');
 
-    const selectedChip = dateChips.find(c => c.iso === dateIso);
+    const selectedChip = dateChips.find(d => d.iso === dateIso);
 
     const res = await fetch('/api/plans', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
