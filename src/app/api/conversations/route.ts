@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sendConfirmed } from '@/lib/resend'; 
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
 
 export async function POST(req: NextRequest) {
