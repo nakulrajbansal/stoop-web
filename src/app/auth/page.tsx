@@ -15,6 +15,7 @@ export default function AuthPage() {
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [phoneE164, setPhoneE164] = useState('');
+  const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [city, setCity] = useState('nyc');
@@ -99,12 +100,13 @@ export default function AuthPage() {
   async function completeProfile() {
     setError('');
     if (!name.trim() || name.trim().length < 1) { setError('Name required'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setError('A valid email is required for notifications'); return; }
     if (!neighborhood) { setError('Pick your neighborhood'); return; }
     setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError('Session expired. Sign in again.'); return; }
+      if (!user) { setError('Session expired. Sign in again.'); setLoading(false); return; }
 
       const { data: cityRow } = await supabase.from('cities').select('id').eq('slug', city).single();
       if (!cityRow) throw new Error('City not found');
@@ -122,10 +124,18 @@ export default function AuthPage() {
         city_id: cityRow.id,
         neighborhood_id: nb?.id ?? null,
         about: about.trim() || null,
+        notify_email: email.trim().toLowerCase(),
         initials
       });
 
       if (insErr) { setError(insErr.message); setLoading(false); return; }
+
+      // Fire welcome email (non-blocking)
+      fetch('/api/welcome', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), name: trimmed })
+      }).catch(() => {});
+
       router.push('/feed');
     } catch (e) {
       setError('Could not save profile');
@@ -201,6 +211,11 @@ export default function AuthPage() {
                 <option value="">Where are you based?</option>
                 {hoods.map(h => <option key={h} value={h} className="capitalize">{h.replace(/-/g, ' ')}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your email</label>
+              <input type="email" placeholder="e.g. you@example.com" value={email}
+                onChange={e => setEmail(e.target.value)} className="input" maxLength={254} />
             </div>
             <div>
               <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">

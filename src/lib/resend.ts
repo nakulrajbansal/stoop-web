@@ -1,66 +1,133 @@
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-const FROM = process.env.RESEND_FROM_EMAIL || 'Stoop <hi@stoop.co>';
+const FROM_SYSTEM = 'Stoop <hi@stoop.house>';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://stoop.house';
 
-export async function sendWelcome(to: string, name: string) {
-  try {
-    await resend.emails.send({
-      from: FROM,
-      to,
-      subject: 'Welcome to Stoop',
-      html: `
-        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-          <h2 style="font-family:Georgia,serif;font-size:28px;color:#14110D">Hey ${escape(name)},</h2>
-          <p style="font-size:15px;line-height:1.6;color:#4A4540">You're on Stoop. The fastest way to see if it works for you is to post a plan today — something you were already going to do this week.</p>
-          <p style="margin:24px 0"><a href="${process.env.NEXT_PUBLIC_APP_URL}/post" style="background:#C8472A;color:#fff;padding:12px 24px;border-radius:100px;text-decoration:none;font-weight:500">Post a plan →</a></p>
-          <p style="font-size:13px;color:#9C958D;margin-top:32px">Plans, not profiles.</p>
-        </div>`
-    });
-  } catch (e) {
-    console.error('sendWelcome failed:', e);
-  }
-}
-
-export async function sendMessageAlert(to: string, fromName: string, planText: string, convId: string) {
-  try {
-    await resend.emails.send({
-      from: FROM,
-      to,
-      subject: `${escape(fromName)} messaged about your plan`,
-      html: `
-        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-          <p style="font-size:15px;color:#4A4540">${escape(fromName)} just messaged about your plan:</p>
-          <blockquote style="font-family:Georgia,serif;font-style:italic;font-size:17px;color:#14110D;border-left:3px solid #C8472A;padding-left:16px;margin:20px 0">${escape(planText)}</blockquote>
-          <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/inbox/${convId}" style="background:#14110D;color:#F0EBE1;padding:10px 20px;border-radius:100px;text-decoration:none;font-weight:500;font-size:14px">Open the conversation →</a></p>
-        </div>`
-    });
-  } catch (e) {
-    console.error('sendMessageAlert failed:', e);
-  }
-}
-
-export async function sendConfirmed(to: string, planText: string, posterName: string) {
-  try {
-    await resend.emails.send({
-      from: FROM,
-      to,
-      subject: `You're on — ${escape(posterName)} confirmed your plan`,
-      html: `
-        <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-          <h2 style="font-family:Georgia,serif;font-size:26px;color:#14110D">You're on.</h2>
-          <p style="font-size:15px;color:#4A4540">${escape(posterName)} confirmed your plan:</p>
-          <blockquote style="font-family:Georgia,serif;font-style:italic;font-size:17px;color:#14110D;border-left:3px solid #2A4232;padding-left:16px;margin:20px 0">${escape(planText)}</blockquote>
-          <p style="font-size:13px;color:#9C958D">A few tips for the meet: pick a public spot. Tell a friend where you'll be. Trust your gut.</p>
-        </div>`
-    });
-  } catch (e) {
-    console.error('sendConfirmed failed:', e);
-  }
-}
+const C = {
+  accent: '#C8472A', ink: '#14110D', ink2: '#3A332B',
+  muted: '#8C8278', cream: '#F0EBE1', cream2: '#E6DFD2', border: '#D9D1C2',
+};
 
 function escape(s: string): string {
   return s.replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]!));
+}
+
+type WrapArgs = { preheader: string; content: string; ctaUrl?: string; ctaText?: string };
+
+function wrap({ preheader, content, ctaUrl, ctaText }: WrapArgs): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:${C.cream};font-family:Georgia,'Times New Roman',serif;color:${C.ink};">
+<span style="display:none;font-size:0;line-height:0;max-height:0;opacity:0;overflow:hidden;">${escape(preheader)}</span>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.cream};">
+<tr><td align="center" style="padding:48px 24px 24px 24px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="520" style="max-width:520px;width:100%;">
+<tr><td style="padding:0 0 36px 0;">
+<span style="font-family:Georgia,serif;font-size:24px;font-weight:bold;letter-spacing:-0.5px;color:${C.ink};">St<em style="color:${C.accent};font-style:italic;">oo</em>p</span>
+</td></tr>
+<tr><td>${content}</td></tr>
+${ctaUrl && ctaText ? `<tr><td style="padding:32px 0 0 0;"><a href="${ctaUrl}" style="display:inline-block;background:${C.accent};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-family:Georgia,serif;font-style:italic;font-size:16px;font-weight:bold;">${ctaText}</a></td></tr>` : ''}
+<tr><td style="padding:56px 0 0 0;border-top:1px solid ${C.border};">
+<p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:24px 0 8px 0;">Plans, not profiles. NYC + Austin.</p>
+<p style="font-family:Georgia,serif;font-size:11px;color:${C.muted};margin:0;"><a href="${APP_URL}/profile" style="color:${C.muted};text-decoration:underline;">Manage notifications</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+function planBlock(planText: string, meta?: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${C.cream2};border-left:3px solid ${C.accent};border-radius:0 8px 8px 0;margin:24px 0;">
+<tr><td style="padding:18px 22px;">
+<p style="font-family:Georgia,serif;font-style:italic;font-size:17px;line-height:1.45;color:${C.ink};margin:0;">"${escape(planText)}"</p>
+${meta ? `<p style="font-family:'Courier New',monospace;font-size:11px;color:${C.muted};letter-spacing:0.08em;text-transform:uppercase;margin:8px 0 0 0;">${escape(meta)}</p>` : ''}
+</td></tr></table>`;
+}
+
+export async function sendWelcome(to: string, name: string) {
+  const first = name.split(' ')[0];
+  try {
+    await resend.emails.send({
+      from: FROM_SYSTEM,
+      to,
+      subject: `Welcome to Stoop, ${escape(first)}`,
+      html: wrap({
+        preheader: "You're in. Now post a plan.",
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:34px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">Welcome to <em style="color:${C.accent};font-style:italic;">Stoop.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:16px;line-height:1.65;color:${C.ink2};margin:20px 0 0 0;">Glad you're here, ${escape(first)}.</p>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">Stoop is small on purpose. A few real plans, posted by real people in your city, that you can actually show up to. No algorithm. No swiping. Two to four people, one thing, no pressure.</p>
+          <p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">The fastest way to find out if Stoop is for you is to post one plan this week. Something you're already going to do. See who shows up.</p>
+        `,
+        ctaUrl: `${APP_URL}/post`,
+        ctaText: 'Post your first plan →'
+      })
+    });
+  } catch (e) { console.error('sendWelcome failed:', e); }
+}
+
+export async function sendMessageAlert(to: string, fromName: string, planText: string, convId: string, messagePreview?: string) {
+  const preview = messagePreview && messagePreview.length > 140 ? messagePreview.substring(0, 140) + '…' : messagePreview;
+  try {
+    await resend.emails.send({
+      from: `${escape(fromName)} at Stoop <hi@stoop.house>`,
+      to,
+      subject: `${escape(fromName)} wants to join your plan`,
+      html: wrap({
+        preheader: `${fromName} just messaged you about your plan on Stoop.`,
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">${escape(fromName)} wants to join<br>your <em style="color:${C.accent};font-style:italic;">plan.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">They read what you wrote and reached out. Here's the plan:</p>
+          ${planBlock(planText)}
+          ${preview ? `<p style="font-family:'Courier New',monospace;font-size:11px;color:${C.muted};letter-spacing:0.08em;text-transform:uppercase;margin:0 0 8px 0;">What they said</p><p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink};margin:0;font-style:italic;">"${escape(preview)}"</p>` : ''}
+        `,
+        ctaUrl: `${APP_URL}/inbox/${convId}`,
+        ctaText: 'Open the conversation →'
+      })
+    });
+  } catch (e) { console.error('sendMessageAlert failed:', e); }
+}
+
+export async function sendReplyAlert(to: string, fromName: string, planText: string, convId: string, messagePreview?: string) {
+  const preview = messagePreview && messagePreview.length > 140 ? messagePreview.substring(0, 140) + '…' : messagePreview;
+  try {
+    await resend.emails.send({
+      from: `${escape(fromName)} at Stoop <hi@stoop.house>`,
+      to,
+      subject: `${escape(fromName)} replied`,
+      html: wrap({
+        preheader: `${fromName} sent you a message on Stoop.`,
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">${escape(fromName)} <em style="color:${C.accent};font-style:italic;">replied.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">About the plan:</p>
+          ${planBlock(planText)}
+          ${preview ? `<p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink};margin:0;font-style:italic;">"${escape(preview)}"</p>` : ''}
+        `,
+        ctaUrl: `${APP_URL}/inbox/${convId}`,
+        ctaText: 'Open the conversation →'
+      })
+    });
+  } catch (e) { console.error('sendReplyAlert failed:', e); }
+}
+
+export async function sendConfirmed(to: string, planText: string, posterName: string, convId?: string) {
+  try {
+    await resend.emails.send({
+      from: FROM_SYSTEM,
+      to,
+      subject: `You're in. ${escape(posterName)} confirmed.`,
+      html: wrap({
+        preheader: `${posterName} confirmed your spot on Stoop.`,
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">You're <em style="color:${C.accent};font-style:italic;">in.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">${escape(posterName)} confirmed your spot. Here's where you're showing up:</p>
+          ${planBlock(planText)}
+          <p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:0;">A few tips for the meet: pick a public spot, tell a friend where you'll be, trust your gut.</p>
+        `,
+        ctaUrl: convId ? `${APP_URL}/inbox/${convId}` : `${APP_URL}/my-plans`,
+        ctaText: 'Open the conversation →'
+      })
+    });
+  } catch (e) { console.error('sendConfirmed failed:', e); }
 }
