@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
+import { getBlockedIds } from '@/lib/blocks';
 
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Blocked users (either direction) are filtered out of the feed entirely
+  const blockedIds = user ? await getBlockedIds(supabase, user.id) : [];
   const { searchParams } = new URL(req.url);
   const citySlug = searchParams.get('city');
   const neighborhoodSlug = searchParams.get('neighborhood');
@@ -29,6 +34,9 @@ export async function GET(req: NextRequest) {
     `)
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
+    if (blockedIds.length > 0) {
+      query = query.not('user_id', 'in', `(${blockedIds.join(',')})`);
+    }
     .order('created_at', { ascending: false })
     .limit(60);
 

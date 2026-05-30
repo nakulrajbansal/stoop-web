@@ -20,7 +20,27 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState(false);
   const msgsEndRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
+  async function blockUser() {
+    if (!conv) return;
+    const isPoster = conv.poster_id === currentUser;
+    const otherId = isPoster ? conv.joiner_id : conv.poster_id;
+    const otherName = (isPoster ? conv.joiner : conv.poster)?.name ?? 'this person';
+    if (!confirm(`Block ${otherName}? They won't see your plans or be able to message you, and you won't see theirs. They won't be told.`)) return;
+    setBlocking(true);
+    const res = await fetch('/api/block', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blockedId: otherId })
+    });
+    setBlocking(false);
+    if (res.ok) {
+      router.push('/inbox');
+    } else {
+      alert('Could not block. Try again.');
+    }
+  }
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -153,6 +173,21 @@ export default function ChatPage() {
           }`}>
             {conv.status === 'confirmed' ? 'Confirmed ✓' : conv.status === 'declined' ? 'Declined' : 'Pending'}
           </span>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setMenuOpen(v => !v)} className="text-muted hover:text-ink px-2 py-1 text-lg leading-none">⋯</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 bg-card border border-[var(--border2)] rounded-lg shadow-lg py-1 min-w-[160px] z-50">
+                <button onClick={() => { setMenuOpen(false); blockUser(); }} disabled={blocking}
+                  className="block w-full text-left px-3 py-2 text-[13px] text-ink hover:bg-cream-2">
+                  Block this person
+                </button>
+                <button onClick={() => { setMenuOpen(false); router.push(`/report?conversation=${convId}`); }}
+                  className="block w-full text-left px-3 py-2 text-[13px] text-accent hover:bg-cream-2">
+                  Report
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Messages */}

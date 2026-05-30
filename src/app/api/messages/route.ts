@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendReplyAlert } from '@/lib/resend';
+import { getBlockedIds } from '@/lib/blocks';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -13,6 +14,32 @@ export async function POST(req: NextRequest) {
   }
   if (text.length < 1 || text.length > 2000) {
     return NextResponse.json({ error: 'Message length out of range' }, { status: 400 });
+  }
+
+  // Load the conversation first — we need it for the block check AND the email logic
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select(`
+      poster_id, joiner_id, status,
+      plan:plans(text),
+      poster:profiles!conversations_poster_id_fkey(name, notify_email),
+      joiner:profiles!conversations_joiner_id_fkey(name, notify_email)
+    `)
+    .eq('id', conversationId)
+    .single();
+
+  if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+
+  // The sender must be part of this conversation
+  if (conv.poster_id !== user.id && conv.joiner_id !== user.id) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
+
+  // Refuse if either party has blocked the other
+  const otherId = conv.poster_id === user.id ? conv.joiner_id : conv.poster_id;
+  const blockedIds = await getBlockedIds(supabase, user.id);
+  if (blockedIds.includes(otherId)) {
+    return NextResponse.json({ error: 'This conversation is no longer available.' }, { status: 403 });
   }
 
   // Rate limit: 50 messages per user per day
@@ -38,36 +65,22 @@ export async function POST(req: NextRequest) {
   // Notify the OTHER person by email, but only if they seem to have stepped away
   // (haven't sent a message in this conversation in the last 15 minutes).
   try {
-    const { data: conv } = await supabase
-      .from('conversations')
-      .select(`
-        poster_id, joiner_id,
-        plan:plans(text),
-        poster:profiles!conversations_poster_id_fkey(name, notify_email),
-        joiner:profiles!conversations_joiner_id_fkey(name, notify_email)
-      `)
-      .eq('id', conversationId)
-      .single();
+    const recipientIsPoster = conv.joiner_id === user.id;
+    const recipientId = recipientIsPoster ? conv.poster_id : conv.joiner_id;
+    const recipient: any = recipientIsPoster ? conv.poster : conv.joiner;
+    const sender: any = recipientIsPoster ? conv.joiner : conv.poster;
 
-    if (conv) {
-      const recipientIsPoster = conv.joiner_id === user.id;
-      const recipientId = recipientIsPoster ? conv.poster_id : conv.joiner_id;
-      const recipient: any = recipientIsPoster ? conv.poster : conv.joiner;
-      const sender: any = recipientIsPoster ? conv.joiner : conv.poster;
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { count: recentByRecipient } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('from_user_id', recipientId)
+      .gte('created_at', fifteenMinAgo);
 
-      // Has the recipient sent anything recently? If so, they're active — skip email.
-      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      const { count: recentByRecipient } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId)
-        .eq('from_user_id', recipientId)
-        .gte('created_at', fifteenMinAgo);
-
-      const planText = (conv.plan as any)?.text ?? 'your plan';
-      if ((recentByRecipient ?? 0) === 0 && recipient?.notify_email) {
-        await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
-      }
+    const planText = (conv.plan as any)?.text ?? 'your plan';
+    if ((recentByRecipient ?? 0) === 0 && recipient?.notify_email) {
+      await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
     }
   } catch (e) {
     console.error('reply-email failed (non-fatal):', e);

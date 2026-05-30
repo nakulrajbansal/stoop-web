@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getBlockedIds } from '@/lib/blocks';
 import PlanDetailClient from './PlanDetailClient';
 import type { Metadata } from 'next';
 
@@ -18,6 +19,16 @@ async function fetchPlan(slug: string) {
     `)
     .eq('slug', slug)
     .single();
+
+  if (!data) return null;
+
+  // If the viewer and the poster are blocked (either direction), hide the plan
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const blockedIds = await getBlockedIds(supabase, user.id);
+    if (blockedIds.includes(data.user_id)) return null;
+  }
+
   return data;
 }
 

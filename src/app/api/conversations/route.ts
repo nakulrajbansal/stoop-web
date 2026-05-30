@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
+import { getBlockedIds } from '@/lib/blocks';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -28,6 +29,12 @@ export async function POST(req: NextRequest) {
   }
   if (plan.status !== 'open' || plan.spots_left < 1) {
     return NextResponse.json({ error: 'This plan is no longer open' }, { status: 400 });
+  }
+
+  // Refuse if either party has blocked the other
+  const blockedIds = await getBlockedIds(supabase, user.id);
+  if (blockedIds.includes(plan.user_id)) {
+    return NextResponse.json({ error: 'This plan is unavailable.' }, { status: 403 });
   }
 
   // Check for existing conversation
