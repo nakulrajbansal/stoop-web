@@ -7,7 +7,7 @@ import Nav from '@/components/Nav';
 import { useCityPreference, setCityPreference } from '@/lib/city-preference';
 import { intentTagLabel } from '@/lib/utils';
 
-const CATEGORIES = ['coffee', 'outdoors', 'arts', 'food', 'books', 'music'];
+const CATEGORIES = ['coffee', 'outdoors', 'sports', 'arts', 'food', 'books', 'music'];
 
 function weekOfLabel(): string {
   const now = new Date();

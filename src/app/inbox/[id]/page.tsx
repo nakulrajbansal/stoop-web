@@ -31,7 +31,7 @@ export default function ChatPage() {
         .from('conversations')
         .select(`
           *,
-          plan:plans(id, text, when_day, when_time, status),
+          plan:plans(id, slug, text, when_day, when_time, status),
           poster:profiles!conversations_poster_id_fkey(id, name, initials, avatar_bg, avatar_fg),
           joiner:profiles!conversations_joiner_id_fkey(id, name, initials, avatar_bg, avatar_fg)
         `)
@@ -142,7 +142,7 @@ export default function ChatPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[14px] font-medium text-ink">{other.name}</div>
-            <Link href={`/plan/${conv.plan?.id}`} className="text-[12px] text-muted hover:text-ink truncate block">
+            <Link href={`/plan/${conv.plan?.slug}`} className="text-[12px] text-muted hover:text-ink truncate block">
               {conv.plan?.text?.substring(0, 60)}{conv.plan?.text?.length > 60 ? '…' : ''}
             </Link>
           </div>

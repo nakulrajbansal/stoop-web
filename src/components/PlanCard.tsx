@@ -29,6 +29,7 @@ type Plan = {
 const CATEGORY_LABEL: Record<string, string> = {
   coffee: 'Coffee',
   outdoors: 'Outdoors',
+  sports: 'Sports',
   arts: 'Arts',
   food: 'Food',
   books: 'Books',

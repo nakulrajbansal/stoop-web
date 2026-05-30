@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   if (!text || typeof text !== 'string' || text.length < 25 || text.length > 220) {
     return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
   }
-  if (!['coffee','outdoors','arts','food','books','music'].includes(category)) {
+  if (!['coffee','outdoors','arts','food','books','music','sports'].includes(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
   }
   if (![1, 2, 3].includes(spots)) {

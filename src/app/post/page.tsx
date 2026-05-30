@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
 import { INTENT_TAGS, getDateChips } from '@/lib/utils';
 
-const CATEGORIES = ['Coffee', 'Outdoors', 'Arts', 'Food', 'Books', 'Music'];
+const CATEGORIES = ['Coffee', 'Outdoors', 'Sports', 'Arts', 'Food', 'Books', 'Music'];
 const CATEGORY_IDS: Record<string, string> = {
-  Coffee: 'coffee', Outdoors: 'outdoors', Arts: 'arts',
+  Coffee: 'coffee', Outdoors: 'outdoors', Sports: 'sports', Arts: 'arts',
   Food: 'food', Books: 'books', Music: 'music'
 };
 
@@ -100,8 +100,13 @@ export default function PostPage() {
               placeholder="going to the farmers market saturday morning, making coffee first…"
               className="w-full bg-card border border-[var(--border2)] rounded-2xl px-5 py-4 text-[16px] font-light text-ink placeholder:text-muted resize-none outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(200,71,42,0.06)]"
             />
-            <div className={`text-right text-[11px] font-mono mt-1.5 ${text.length > 180 ? 'text-accent' : 'text-muted'}`}>
-              {text.length} / 220
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-[11px] text-muted">
+                {text.length < 25 ? `${25 - text.length} more characters to go` : 'Looks good'}
+              </span>
+              <span className={`text-[11px] font-mono ${text.length > 180 ? 'text-accent' : 'text-muted'}`}>
+                {text.length} / 220
+              </span>
             </div>
           </div>
 

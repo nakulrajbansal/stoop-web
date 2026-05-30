@@ -55,8 +55,8 @@ export default function Nav() {
 
       {profile ? (
         <>
-          <Link href="/feed" className="text-sm text-ink-2 hover:text-ink hidden sm:block">Browse</Link>
-          <Link href="/my-plans" className="text-sm text-ink-2 hover:text-ink hidden sm:block">My Plans</Link>
+          <Link href="/feed" className="text-[13px] sm:text-sm text-ink-2 hover:text-ink">Browse</Link>
+          <Link href="/my-plans" className="text-[13px] sm:text-sm text-ink-2 hover:text-ink">My Plans</Link>
           <Link href="/inbox" className="text-sm text-ink-2 hover:text-ink relative">
             Inbox
             {unreadCount > 0 && (
