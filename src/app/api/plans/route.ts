@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
 import { getBlockedIds } from '@/lib/blocks';
+import { isSuspended } from '@/lib/moderation';
 
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
 
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (await isSuspended(user.id)) {
+    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+  }
 
   const body = await req.json();
   const { text, category, spot, whenDate, whenDayLabel, whenTime, whenTimeSpecific, spots, neighborhoodSlug, intentTags } = body;

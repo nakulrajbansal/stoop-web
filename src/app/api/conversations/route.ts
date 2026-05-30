@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
 import { getBlockedIds } from '@/lib/blocks';
+import { isSuspended } from '@/lib/moderation';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (await isSuspended(user.id)) {
+    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+  }
 
   const { planId, firstMessage } = await req.json();
   if (!planId || !firstMessage || typeof firstMessage !== 'string') {
