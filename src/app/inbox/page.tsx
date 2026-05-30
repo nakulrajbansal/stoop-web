@@ -48,18 +48,33 @@ export default function InboxPage() {
               const isPoster = c.poster_id === currentUser;
               const other = isPoster ? c.joiner : c.poster;
               const lastMsg = c.messages?.[c.messages.length - 1];
-              const unread = lastMsg && lastMsg.from_user_id !== currentUser && c.status !== 'confirmed';
+              const isClosed = c.status === 'confirmed' || c.status === 'declined';
+              const unread = lastMsg && lastMsg.from_user_id !== currentUser && !isClosed;
+
+              const statusLabel =
+                c.status === 'confirmed' ? 'Confirmed' :
+                c.status === 'declined' ? 'Declined' : null;
+              const statusClass =
+                c.status === 'confirmed' ? 'text-sage bg-[rgba(42,66,50,0.08)]' :
+                'text-muted bg-[rgba(20,17,13,0.06)]';
 
               return (
                 <Link key={c.id} href={`/inbox/${c.id}`}
-                  className="bg-card border border-[var(--border)] rounded-2xl px-4 py-3.5 flex items-start gap-3.5 hover:border-accent/25 hover:shadow-sm transition-all">
+                  className={`bg-card border border-[var(--border)] rounded-2xl px-4 py-3.5 flex items-start gap-3.5 hover:border-accent/25 hover:shadow-sm transition-all ${c.status === 'declined' ? 'opacity-60' : ''}`}>
                   <div className="w-10 h-10 rounded-[11px] flex items-center justify-center text-[13px] font-semibold flex-shrink-0"
                     style={{ background: other.avatar_bg, color: other.avatar_fg }}>
                     {other.initials || other.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[13.5px] font-medium text-ink">{other.name}</span>
+                      <span className="text-[13.5px] font-medium text-ink flex items-center gap-2">
+                        {other.name}
+                        {statusLabel && (
+                          <span className={`text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded-full ${statusClass}`}>
+                            {statusLabel}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[11px] text-muted font-mono">
                         {lastMsg ? timeAgo(lastMsg.created_at) : 'New'}
                       </span>
