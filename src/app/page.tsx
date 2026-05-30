@@ -139,7 +139,7 @@ export default async function HomePage() {
             {[
               { n: '01', h: 'Write your plan', p: 'In your own words. Specific place, specific time. No event form, no category dropdown.' },
               { n: '02', h: 'Someone reaches out', p: 'Not a swipe. A real message from someone who read what you wrote and wants to come.' },
-              { n: '03', h: 'You meet', p: 'Two people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
+              { n: '03', h: 'You meet', p: 'A few people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
             ].map(step => (
               <div key={step.n} className="bg-cream p-8">
                 <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-cream-2 mb-3">{step.n}</div>
