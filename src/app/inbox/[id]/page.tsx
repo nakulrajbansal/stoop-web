@@ -46,7 +46,13 @@ export default function ChatPage() {
         .select('*')
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true });
-      setMessages(msgs || []);
+        setMessages(msgs || []);
+
+        // Mark this conversation as seen
+        fetch('/api/unread/seen', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: convId })
+        }).catch(() => {});
     }
     load();
 
@@ -61,6 +67,10 @@ export default function ChatPage() {
             if (m.find(x => x.id === payload.new.id)) return m;
             return [...m, payload.new];
           });
+          fetch('/api/unread/seen', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId: convId })
+          }).catch(() => {});
         })
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${convId}` },

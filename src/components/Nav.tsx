@@ -14,7 +14,7 @@ type Profile = {
 
 export default function Nav() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [unreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -30,10 +30,19 @@ export default function Nav() {
       if (mounted && data) setProfile(data);
     }
     load();
+    async function loadUnread() {
+      try {
+        const res = await fetch('/api/unread');
+        const data = await res.json();
+        setUnreadCount(data.count ?? 0);
+      } catch {}
+    }
+    loadUnread();
+    const interval = setInterval(loadUnread, 30000); // refresh every 30s
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) setProfile(null); else load();
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { mounted = false; subscription.unsubscribe(); clearInterval(interval); };
   }, []);
 
   return (
