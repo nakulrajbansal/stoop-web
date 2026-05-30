@@ -50,7 +50,9 @@ See docs/SAFETY_SPEC.md "Status" section for the live build state. At time of wr
 - Core loop works end to end (post -> message -> email -> confirm -> email).
 - Mandatory email + welcome/join/reply/confirm emails wired and live.
 - Unread badge live.
-- Safety layer IN PROGRESS: Push 1 (block) deploying. Pushes 2-4 pending.
+- Safety layer CODE COMPLETE for all 4 pushes (block, report+admin, guidance+share, TOS).
+  Before it is fully live: run migration 0002 in Supabase, set ADMIN_USER_ID env var, push,
+  then run the live tests in docs/SAFETY_SPEC.md. See that file's STATUS for specifics.
 - Twilio must be upgraded out of trial or real signups fail (error 21608).
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and

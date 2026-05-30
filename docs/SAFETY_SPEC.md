@@ -12,12 +12,28 @@ real hole that exposes a real person.
 ---
 
 ## STATUS (keep this current at the end of each session)
-- Push 1 (Block): IN PROGRESS / deploying. Code written; run the 8-step test below to verify.
-- Push 2 (Report + Admin): NOT STARTED.
-- Push 3 (Guidance + Share): NOT STARTED. Note: the confirm EMAIL already includes brief
-  safety guidance ("public spot, tell a friend, trust your gut"); the in-app card is the new part.
-- Push 4 (TOS + Community Standard): NOT STARTED. Apple will require a TOS URL if/when a native
-  app ships; also wanted for the documented 24-hour report-review commitment.
+- Push 1 (Block): CODE COMPLETE. Run the 8-step test below against the live deploy to verify.
+- Push 2 (Report + Admin): CODE COMPLETE, pending two manual steps + live test:
+    1. Run migration `supabase/migrations/0002_safety_push2_reports.sql` in the Supabase SQL editor.
+    2. Set env var `ADMIN_USER_ID` (your profile/auth user id) in Vercel + local `.env`, so
+       `/admin/reports` and `/api/admin/reports` recognize you. Without it, the admin page 404s
+       for everyone (safe default).
+  Surfaces: /report form (reason + optional note + "also block" default on); /api/reports
+  derives the reported user from the conversation and writes via admin client; /admin/reports
+  lists open reports with conversation context and Dismiss/Warn/Suspend; Suspend sets
+  profiles.blocked_at (gates sign-in already) + hides their plans; isSuspended() also blocks
+  posting, messaging, and joining (defense in depth).
+- Push 3 (Guidance + Share): CODE COMPLETE. SafetyCard shows in the chat when a plan is
+  confirmed (both parties): calm reminders + "send these details to a friend" via navigator.share
+  with clipboard fallback. The confirm EMAIL guidance was already live.
+- Push 4 (TOS + Community Standard): CODE COMPLETE. /terms page (Community Standard one-liner +
+  24-hour review commitment), linked from landing footer, signup flow, and report form.
+
+REMAINING TO FULLY SHIP THE SAFETY LAYER:
+- Run the Push 2 migration and set ADMIN_USER_ID (above).
+- Push to main so Vercel deploys, then run the Push 1 8-step test and a quick Push 2 test
+  (file a report from account A, confirm it appears in /admin/reports, try Dismiss/Warn/Suspend,
+  verify a suspended user can't sign in, post, or message and their plans vanish).
 
 ---
 
