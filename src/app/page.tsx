@@ -170,6 +170,7 @@ export default async function HomePage() {
         <div className="flex gap-5">
           <Link href="/feed" className="text-xs text-muted hover:text-ink">Browse</Link>
           <Link href="/post" className="text-xs text-muted hover:text-ink">Post a plan</Link>
+          <Link href="/terms" className="text-xs text-muted hover:text-ink">Terms</Link>
         </div>
         <div className="text-[11px] text-muted">NYC + Austin · 2026</div>
       </footer>

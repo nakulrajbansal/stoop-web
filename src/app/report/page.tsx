@@ -136,6 +136,11 @@ function ReportForm() {
             {submitting ? <span className="spinner" /> : 'Send report'}
           </button>
         </div>
+
+        <p className="text-[11.5px] text-muted mt-6 leading-[1.6]">
+          We review every report within 24 hours. See our{' '}
+          <a href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</a>.
+        </p>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toE164 } from '@/lib/utils';
@@ -227,6 +228,10 @@ export default function AuthPage() {
             <button onClick={completeProfile} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
               {loading ? <span className="spinner" /> : 'Create my account →'}
             </button>
+            <p className="text-[11px] text-muted text-center leading-[1.6]">
+              By creating an account you agree to our{' '}
+              <Link href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</Link>.
+            </p>
           </div>
         )}
       </div>
