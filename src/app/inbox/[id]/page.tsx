@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import SafetyCard from '@/components/SafetyCard';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
 
@@ -51,7 +52,7 @@ export default function ChatPage() {
         .from('conversations')
         .select(`
           *,
-          plan:plans(id, slug, text, when_day, when_time, status),
+          plan:plans(id, slug, text, when_day, when_time, spot, status),
           poster:profiles!conversations_poster_id_fkey(id, name, initials, avatar_bg, avatar_fg),
           joiner:profiles!conversations_joiner_id_fkey(id, name, initials, avatar_bg, avatar_fg)
         `)
@@ -192,6 +193,9 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-2.5">
+          {conv.status === 'confirmed' && (
+            <SafetyCard plan={conv.plan} otherName={other.name} />
+          )}
           {messages.length === 0 ? (
             <div className="text-center text-muted text-sm py-6">Start the conversation ↓</div>
           ) : messages.map(m => {
