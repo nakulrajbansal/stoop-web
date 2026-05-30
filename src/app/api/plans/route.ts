@@ -34,14 +34,15 @@ export async function GET(req: NextRequest) {
     `)
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
-    if (blockedIds.length > 0) {
-      query = query.not('user_id', 'in', `(${blockedIds.join(',')})`);
-    }
     .order('created_at', { ascending: false })
     .limit(60);
 
   if (cityId) query = query.eq('city_id', cityId);
   if (category) query = query.eq('category', category);
+
+  if (blockedIds.length > 0) {
+    query = query.not('user_id', 'in', `(${blockedIds.join(',')})`);
+  }
 
   if (neighborhoodSlug && cityId) {
     const { data: nb } = await supabase
