@@ -9,8 +9,10 @@
   --ink: #14110D;
   --ink2: #4A4540;
   --muted: #6E675E; /* 4.7:1 on cream; do not lighten below WCAG AA */
-  --accent: #C8472A;
-  --acc2: #E05535;
+  --accent: #2F6B3F; /* civic green: buttons, links, structure */
+  --acc2: #3B7F4E;
+  --gold: #8A681E; /* mustard: headline emphasis only */
+  --danger: #B3402A; /* errors, delete, report; never for CTAs */
   --sage: #2A4232;
   --border: rgba(20, 17, 13, 0.09);
   --border2: rgba(20, 17, 13, 0.15);
@@ -46,7 +48,7 @@ body {
   transition: all 0.2s;
 }
 .plan-card:hover {
-  border-color: rgba(200, 71, 42, 0.25);
+  border-color: rgba(47, 107, 63, 0.3);
   box-shadow: 0 6px 24px rgba(20, 17, 13, 0.07);
   transform: translateY(-2px);
 }
@@ -94,8 +96,8 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .input:focus {
-  border-color: rgba(200, 71, 42, 0.5);
-  box-shadow: 0 0 0 3px rgba(200, 71, 42, 0.08);
+  border-color: rgba(47, 107, 63, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 107, 63, 0.1);
 }
 .input::placeholder { color: var(--muted); }
 

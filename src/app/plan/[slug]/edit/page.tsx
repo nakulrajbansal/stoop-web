@@ -95,7 +95,7 @@ export default function EditPlanPage() {
           <div>
             <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Plan text</label>
             <textarea value={text} onChange={e => setText(e.target.value)} rows={4} maxLength={220} className="input resize-none" />
-            <div className={`text-right text-[11px] font-mono mt-1 ${text.length > 180 ? 'text-accent' : 'text-muted'}`}>{text.length} / 220</div>
+            <div className={`text-right text-[11px] font-mono mt-1 ${text.length > 180 ? 'text-danger' : 'text-muted'}`}>{text.length} / 220</div>
           </div>
 
           <div>
@@ -145,7 +145,7 @@ export default function EditPlanPage() {
             </div>
           </div>
 
-          {error && <div className="bg-accent/10 border border-accent/25 text-accent text-[13px] rounded-xl px-4 py-3">{error}</div>}
+          {error && <div className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3">{error}</div>}
 
           <button onClick={save} disabled={saving} className="btn btn-accent btn-full btn-lg mt-2">
             {saving ? <span className="spinner" /> : 'Save changes'}

@@ -59,12 +59,12 @@ export default async function HomePage() {
           {/* Left column: headline + CTA */}
           <div>
             <h1 className="font-serif text-[clamp(56px,7vw,96px)] font-bold leading-[0.92] tracking-[-3px] mb-7">
-              Plans,<br />not <em className="italic text-accent">profiles.</em>
+              Plans,<br />not <em className="italic text-gold">profiles.</em>
             </h1>
             <p className="text-[17px] text-ink-2 leading-[1.6] font-light mb-8 max-w-[440px]">
-              Post what you&apos;re doing this week.{' '}
-              <strong className="text-ink font-medium">Meet the person who shows up.</strong>{' '}
-              No swiping, no algorithm, no awkward intros.
+              Post what you&apos;re already doing this week.{' '}
+              <strong className="text-ink font-medium">A few neighbors join you.</strong>{' '}
+              That&apos;s the whole app.
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               {planCount > 0 ? (
@@ -161,13 +161,13 @@ export default async function HomePage() {
         <div className="max-w-[1080px] mx-auto px-6 sm:px-9">
           <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">How it works</div>
           <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
-            Three steps to <em className="italic text-accent">an actual plan.</em>
+            Three steps to <em className="italic text-gold">an actual plan.</em>
           </h2>
 
           <div className="grid sm:grid-cols-3 gap-[2px] mt-10 rounded-2xl overflow-hidden bg-[var(--border)]">
             {[
               { n: '01', h: 'Write your plan', p: 'In your own words. Specific place, specific time. No event form, no category dropdown.' },
-              { n: '02', h: 'Someone reaches out', p: 'Not a swipe. A real message from someone who read what you wrote and wants to come.' },
+              { n: '02', h: 'A neighbor reaches out', p: 'A real message from someone nearby who read what you wrote and wants to come along.' },
               { n: '03', h: 'You meet', p: 'A few people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
             ].map(step => (
               <div key={step.n} className="bg-cream p-8">
@@ -185,9 +185,9 @@ export default async function HomePage() {
         <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl px-12 py-16 sm:py-20 flex items-center justify-between gap-8 flex-wrap relative overflow-hidden">
           <div>
             <h2 className="font-serif text-[clamp(28px,4vw,46px)] font-bold tracking-[-1.2px] leading-[1.05] text-cream mb-2">
-              Your city has<br /><em className="italic text-accent">interesting people.</em>
+              The best plans are<br /><em className="italic text-[#D4A93C]">three blocks away.</em>
             </h2>
-            <p className="text-[14px] text-cream/50 font-light leading-relaxed">Post what you&apos;re doing this week. See who shows up.</p>
+            <p className="text-[14px] text-cream/50 font-light leading-relaxed">Post yours this week. See which neighbors turn up.</p>
           </div>
           <Link href="/post" className="btn btn-lg bg-cream text-ink hover:bg-white">Post your first plan →</Link>
         </div>

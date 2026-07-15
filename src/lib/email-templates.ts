@@ -1,4 +1,4 @@
-const ACCENT = '#C8472A';
+const ACCENT = '#2F6B3F';
 const INK = '#14110D';
 const INK_2 = '#3A332B';
 const MUTED = '#6E675E';
@@ -231,7 +231,7 @@ export function welcomeEmail(args: {
           Glad you're here, ${args.name.split(' ')[0]}.
         </p>
         <p style="font-family:Georgia,serif;font-size:15px;line-height:1.7;color:${INK_2};margin:14px 0 0 0;">
-          Stoop is small on purpose. A few real plans, posted by real people in your city, that you can actually show up to. No algorithm. No swiping. Two people, one thing, no pressure.
+          Stoop is small on purpose. A few real plans, posted by real people in your city, that you can actually show up to. Two to four neighbors, one thing, no pressure.
         </p>
         <p style="font-family:Georgia,serif;font-size:15px;line-height:1.7;color:${INK_2};margin:14px 0 0 0;">
           The way it works:

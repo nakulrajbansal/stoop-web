@@ -27,7 +27,7 @@ export default function ReportActions({ reportId }: { reportId: string }) {
       <button onClick={() => act('warn')} disabled={!!busy}
         className="btn btn-sm btn-ghost">Warn</button>
       <button onClick={() => act('suspend')} disabled={!!busy}
-        className="btn btn-sm" style={{ background: 'var(--accent)', color: '#fff' }}>
+        className="btn btn-sm" style={{ background: 'var(--danger)', color: '#fff' }}>
         {busy === 'suspend' ? <span className="spinner" /> : 'Suspend'}
       </button>
     </div>

@@ -62,7 +62,7 @@ export default function MyPlansPage() {
       ? 'bg-[rgba(20,17,13,0.07)] text-muted'
       : p.status === 'full'
         ? 'bg-[rgba(20,17,13,0.07)] text-muted'
-        : 'bg-[rgba(200,71,42,0.09)] text-accent';
+        : 'bg-[rgba(47,107,63,0.09)] text-accent';
     const statusTxt =
       p.status === 'open' ? 'Open' :
       p.status === 'full' ? 'Full' :
@@ -90,7 +90,7 @@ export default function MyPlansPage() {
   function renderJoinedCard(c: any, isPast: boolean) {
     const statusCls = c.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.09)] text-sage'
       : c.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
-      : 'bg-[rgba(200,71,42,0.09)] text-accent';
+      : 'bg-[rgba(138,104,30,0.12)] text-gold';
     const statusTxt = c.status === 'confirmed' ? 'Confirmed' : c.status === 'declined' ? 'Declined' : 'Pending';
 
     return (

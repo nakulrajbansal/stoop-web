@@ -175,7 +175,7 @@ export default function ChatPage() {
           <span className={`text-[11px] px-2.5 py-1 rounded-full font-mono flex-shrink-0 ${
             conv.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.1)] text-sage' :
             conv.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted' :
-            'bg-[rgba(200,71,42,0.1)] text-accent'
+            'bg-[rgba(138,104,30,0.12)] text-gold'
           }`}>
             {conv.status === 'confirmed' ? 'Confirmed ✓' : conv.status === 'declined' ? 'Declined' : 'Pending'}
           </span>

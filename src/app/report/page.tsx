@@ -106,8 +106,8 @@ function ReportForm() {
               onClick={() => setReason(r.id)}
               className={`text-left px-4 py-3 rounded-[12px] border text-[14px] transition-colors ${
                 reason === r.id
-                  ? 'border-accent bg-[rgba(200,71,42,0.06)] text-ink'
-                  : 'border-[var(--border2)] bg-card text-ink hover:border-accent/40'
+                  ? 'border-danger bg-danger/5 text-ink'
+                  : 'border-[var(--border2)] bg-card text-ink hover:border-danger/40'
               }`}>
               {r.label}
             </button>

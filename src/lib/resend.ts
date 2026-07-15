@@ -5,7 +5,7 @@ const FROM_SYSTEM = 'Stoop <hi@stoop.house>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://stoop.house';
 
 const C = {
-  accent: '#C8472A', ink: '#14110D', ink2: '#3A332B',
+  accent: '#2F6B3F', ink: '#14110D', ink2: '#3A332B',
   muted: '#6E675E', cream: '#F0EBE1', cream2: '#E6DFD2', border: '#D9D1C2',
 };
 
@@ -58,7 +58,7 @@ export async function sendWelcome(to: string, name: string) {
         content: `
           <h1 style="font-family:Georgia,serif;font-size:34px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">Welcome to <em style="color:${C.accent};font-style:italic;">Stoop.</em></h1>
           <p style="font-family:Georgia,serif;font-size:16px;line-height:1.65;color:${C.ink2};margin:20px 0 0 0;">Glad you're here, ${escape(first)}.</p>
-          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">Stoop is small on purpose. A few real plans, posted by real people in your city, that you can actually show up to. No algorithm. No swiping. Two to four people, one thing, no pressure.</p>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">Stoop is small on purpose. A few real plans, posted by real people in your city, that you can actually show up to. Two to four neighbors, one thing, no pressure.</p>
           <p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">The fastest way to find out if Stoop is for you is to post one plan this week. Something you're already going to do. See who shows up.</p>
         `,
         ctaUrl: `${APP_URL}/post`,

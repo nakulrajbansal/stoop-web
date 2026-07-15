@@ -81,7 +81,7 @@ export default async function AdminReportsPage() {
                     <span className="text-[11px] text-muted font-mono flex-shrink-0">{when(r.created_at)}</span>
                   </div>
 
-                  <div className="text-[12.5px] text-accent font-medium mb-1">
+                  <div className="text-[12.5px] text-danger font-medium mb-1">
                     {REASON_LABELS[r.reason] ?? r.reason}
                   </div>
                   {r.details && (

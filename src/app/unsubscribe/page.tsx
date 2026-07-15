@@ -43,13 +43,13 @@ function UnsubscribeContent() {
       ) : (
         <>
           <h1 className="font-serif text-[28px] font-bold tracking-tight mb-3">
-            Stop the weekly <em className="italic text-accent">digest?</em>
+            Stop the weekly <em className="italic text-gold">digest?</em>
           </h1>
           <p className="text-[14px] text-ink-2 leading-relaxed mb-6">
             You&apos;ll stop getting the Sunday &quot;this week on your stoop&quot; email. Emails about your own plans (joins, replies, confirmations) keep working.
           </p>
           {state === 'error' && (
-            <p className="text-[13px] text-accent mb-4">Something went wrong. Try again.</p>
+            <p className="text-[13px] text-danger mb-4">Something went wrong. Try again.</p>
           )}
           <button onClick={confirm} disabled={state === 'busy'} className="btn btn-accent">
             {state === 'busy' ? <span className="spinner" /> : 'Yes, stop the digest'}

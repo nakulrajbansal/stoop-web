@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ size: s
           justifyContent: 'center',
           fontSize: Math.round(size * 0.62),
           fontWeight: 700,
-          color: '#C8472A',
+          color: '#2F6B3F',
           fontStyle: 'italic',
           fontFamily: 'serif',
           lineHeight: 1,

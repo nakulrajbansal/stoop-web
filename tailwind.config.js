@@ -8,7 +8,9 @@ module.exports = {
         card: '#FDFAF6',
         ink: { DEFAULT: '#14110D', 2: '#4A4540' },
         muted: '#6E675E',
-        accent: { DEFAULT: '#C8472A', 2: '#E05535' },
+        accent: { DEFAULT: '#2F6B3F', 2: '#3B7F4E' },
+        gold: '#8A681E',
+        danger: '#B3402A',
         sage: '#2A4232'
       },
       fontFamily: {

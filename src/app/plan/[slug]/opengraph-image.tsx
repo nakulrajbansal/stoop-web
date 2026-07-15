@@ -28,7 +28,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
         background: '#F0EBE1', padding: '80px', fontFamily: 'sans-serif',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 40 }}>
-          <div style={{ fontSize: 36, fontWeight: 700, color: '#14110D' }}>St<span style={{ color: '#C8472A', fontStyle: 'italic' }}>oo</span>p</div>
+          <div style={{ fontSize: 36, fontWeight: 700, color: '#14110D' }}>St<span style={{ color: '#2F6B3F', fontStyle: 'italic' }}>oo</span>p</div>
           <div style={{ fontSize: 16, color: '#6E675E', marginLeft: 8 }}>· Plans, not profiles.</div>
         </div>
         <div style={{ fontSize: 48, lineHeight: 1.25, fontStyle: 'italic', color: '#14110D', flex: 1, fontFamily: 'serif' }}>

@@ -186,11 +186,11 @@ function AuthContent() {
           <h2 className="font-serif text-[36px] font-bold tracking-tight mb-1.5">
             Join <em className="italic text-accent">Stoop</em>
           </h2>
-          <p className="text-sm text-muted">No algorithm. No swiping. Just plans and people.</p>
+          <p className="text-sm text-muted">Real plans from people in your neighborhood.</p>
         </div>
 
         {error && (
-          <div className="bg-[rgba(200,71,42,0.08)] border border-[rgba(200,71,42,0.25)] text-accent text-[13px] rounded-xl px-4 py-3 mb-4">
+          <div className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4">
             {error}
           </div>
         )}

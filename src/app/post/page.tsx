@@ -150,7 +150,7 @@ export default function PostPage() {
       <div className="max-w-[700px] mx-auto px-6 py-10 pb-20">
         <div className="text-[11px] font-mono uppercase tracking-wider text-accent mb-2">Post a plan</div>
         <h1 className="font-serif text-[clamp(32px,4.5vw,44px)] font-bold tracking-[-1px] leading-[1.05] mb-1">
-          What&apos;s the <em className="italic text-accent">plan?</em>
+          What&apos;s the <em className="italic text-gold">plan?</em>
         </h1>
         <p className="text-[14px] text-muted mb-10">Write it like you&apos;d text a friend. Specific time, specific place.</p>
 
@@ -168,13 +168,13 @@ export default function PostPage() {
               value={text} onChange={e => setText(e.target.value)}
               maxLength={220} rows={4}
               placeholder="going to the farmers market saturday morning, making coffee first…"
-              className="w-full bg-card border border-[var(--border2)] rounded-2xl px-5 py-4 text-[16px] font-light text-ink placeholder:text-muted resize-none outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(200,71,42,0.06)]"
+              className="w-full bg-card border border-[var(--border2)] rounded-2xl px-5 py-4 text-[16px] font-light text-ink placeholder:text-muted resize-none outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(47,107,63,0.08)]"
             />
             <div className="flex items-center justify-between mt-1.5">
               <span className="text-[11px] text-muted">
                 {text.length < 25 ? `${25 - text.length} more characters to go` : 'Looks good'}
               </span>
-              <span className={`text-[11px] font-mono ${text.length > 180 ? 'text-accent' : 'text-muted'}`}>
+              <span className={`text-[11px] font-mono ${text.length > 180 ? 'text-danger' : 'text-muted'}`}>
                 {text.length} / 220
               </span>
             </div>
@@ -269,7 +269,7 @@ export default function PostPage() {
             <div className="flex gap-2">
               {[1, 2, 3].map(n => (
                 <button key={n} onClick={() => setSpots(n)} className={`flex-1 py-5 rounded-2xl border text-center transition-all ${
-                  spots === n ? 'border-accent bg-[rgba(200,71,42,0.05)]' : 'border-[var(--border2)] bg-card hover:border-accent/40'
+                  spots === n ? 'border-accent bg-[rgba(47,107,63,0.06)]' : 'border-[var(--border2)] bg-card hover:border-accent/40'
                 }`}>
                   <div className={`font-serif text-[40px] font-bold leading-none tracking-tight ${spots === n ? 'text-accent' : 'text-ink-2'}`}>
                     {n}
@@ -283,7 +283,7 @@ export default function PostPage() {
           </div>
 
           {error && (
-            <div className="bg-[rgba(200,71,42,0.08)] border border-[rgba(200,71,42,0.2)] text-accent text-[13px] rounded-xl px-4 py-3">
+            <div className="bg-danger/10 border border-danger/20 text-danger text-[13px] rounded-xl px-4 py-3">
               {error}
             </div>
           )}

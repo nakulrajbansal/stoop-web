@@ -99,14 +99,14 @@ function FeedContent() {
         {/* Headline */}
         {loading ? (
           <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
-            This week<em className="italic text-accent">…</em>
+            This week<em className="italic text-gold">…</em>
           </h1>
         ) : (
           <>
             {planCount > 0 ? (
               <>
                 <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
-                  This week, <em className="italic text-accent">{planCount} {planCount === 1 ? 'plan' : 'plans'}.</em>
+                  This week, <em className="italic text-gold">{planCount} {planCount === 1 ? 'plan' : 'plans'}.</em>
                 </h1>
                 <p className="text-[13px] text-muted mb-8">
                   Posted by {hostCount} {hostCount === 1 ? 'host' : 'hosts'}
@@ -117,7 +117,7 @@ function FeedContent() {
             ) : (
               <>
                 <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
-                  This week is <em className="italic text-accent">wide open.</em>
+                  This week is <em className="italic text-gold">wide open.</em>
                 </h1>
                 <p className="text-[13px] text-muted mb-8">Whatever gets posted first sets the tone.</p>
               </>
@@ -158,7 +158,7 @@ function FeedContent() {
           }`}>All</button>
           {CATEGORIES.map(c => (
             <button key={c} onClick={() => setCategory(c)} className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2 py-1 rounded ${
-              cat === c ? 'text-accent bg-[rgba(200,71,42,0.08)]' : 'text-muted hover:text-ink-2'
+              cat === c ? 'text-accent bg-[rgba(47,107,63,0.08)]' : 'text-muted hover:text-ink-2'
             }`}>{c}</button>
           ))}
         </div>

@@ -29,7 +29,7 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: 'Stoop · Plans, not profiles.',
-  description: 'Post what you\'re doing this week. Meet the person who shows up.',
+  description: 'Post what you\'re already doing this week. A few neighbors join you.',
   openGraph: {
     title: 'Stoop',
     description: 'Plans, not profiles.',

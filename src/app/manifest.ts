@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Stoop',
     short_name: 'Stoop',
-    description: "Plans, not profiles. Post what you're doing this week; meet the person who shows up.",
+    description: "Plans, not profiles. Post what you're already doing this week; a few neighbors join you.",
     start_url: '/feed',
     display: 'standalone',
     background_color: '#F0EBE1',

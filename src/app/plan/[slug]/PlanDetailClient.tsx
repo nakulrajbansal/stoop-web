@@ -163,7 +163,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
           </div>
         </div>
 
-        {error && <div className="bg-accent/10 border border-accent/25 text-accent text-[13px] rounded-xl px-4 py-3 mb-4">{error}</div>}
+        {error && <div className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4">{error}</div>}
 
         {isOwn ? (
           <div className="flex flex-col gap-2.5">
@@ -174,7 +174,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
             <div className="flex gap-2">
               <Link href={`/plan/${plan.slug}/edit`} className="btn btn-ghost flex-1">Edit plan</Link>
               <button onClick={deletePlan} disabled={deleting}
-                className="flex-1 px-4 py-2 rounded-full border border-accent/30 text-accent text-[13px] hover:bg-accent/5">
+                className="flex-1 px-4 py-2 rounded-full border border-danger/30 text-danger text-[13px] hover:bg-danger/5">
                 {deleting ? 'Deleting…' : 'Delete plan'}
               </button>
             </div>

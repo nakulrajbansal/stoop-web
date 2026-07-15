@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     body { font-family: -apple-system, sans-serif; background: #F0EBE1; padding: 48px; color: #14110D; }
     h1 { font-family: Georgia, serif; font-weight: bold; }
     a { display: block; padding: 12px 16px; background: #fff; border: 1px solid #D9D1C2; border-radius: 8px; margin-bottom: 8px; color: #14110D; text-decoration: none; }
-    a:hover { border-color: #C8472A; }
+    a:hover { border-color: #2F6B3F; }
     code { font-family: monospace; color: #8C8278; font-size: 12px; }
   </style>
 </head>
