@@ -69,6 +69,13 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   Ops + safe testing: RUNBOOK "Weekly digest".
 - /admin/metrics (ADMIN_USER_ID-gated): plans/week, join rate, repeat posters,
   report SLA. PWA manifest live (Add to Home Screen works).
+- POST-PLAN FOLLOW-UP built but DARK: daily cron (16:00 UTC) emails both people
+  the day after a confirmed plan; one tap on /followup records great/fine/noshow
+  into plan_feedback (service-role only). Activates when migration 0005 is run
+  (CRON_SECRET shared with digest). Ops: RUNBOOK "Post-plan follow-up".
+- NEIGHBORHOOD PAGES live: /nyc, /austin, /{city}/{neighborhood} (5-min cache,
+  via the cookie-free anon client src/lib/supabase/public.ts), plus generated
+  sitemap.xml and robots.txt. Plan pages show "has posted N plans" from 2 up.
 - DESIGN SYSTEM (July 2026, "neighborhood noticeboard" rebrand): the old
   terracotta accent read as a dating app, so the palette is now cream paper +
   civic GREEN accent #2F6B3F (buttons, links, icons, emails), MUSTARD #8A681E

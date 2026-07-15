@@ -158,6 +158,41 @@ export async function sendWeeklyDigest(to: string, userId: string, cityName: str
   });
 }
 
+// Day-after follow-up for a confirmed plan. The email itself has ONE link,
+// to the /followup page, where the actual one-tap answer happens. That way an
+// email scanner that prefetches links can never record an answer by accident
+// (same reasoning as the unsubscribe confirm page).
+export async function sendFollowUp(
+  to: string,
+  userId: string,
+  conversationId: string,
+  planText: string,
+  isHost: boolean,
+  planFilled: boolean
+) {
+  const followupUrl = `${APP_URL}/followup?c=${conversationId}&u=${userId}`;
+  const nudge = isHost && planFilled
+    ? `<p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:14px 0 0 0;">Your plan filled up. That usually means the next one will too; post another whenever you're doing something.</p>`
+    : '';
+  await resend.emails.send({
+    from: FROM_SYSTEM,
+    to,
+    subject: 'How was it?',
+    html: wrap({
+      preheader: 'One tap tells us how your plan went.',
+      content: `
+        <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">How was <em style="color:${C.accent};font-style:italic;">it?</em></h1>
+        <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">Yesterday you had a plan:</p>
+        ${planBlock(planText)}
+        <p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:0;">One tap, no typing. It helps us keep Stoop full of people who actually show up.</p>
+        ${nudge}
+      `,
+      ctaUrl: followupUrl,
+      ctaText: 'Tell us in one tap →'
+    })
+  });
+}
+
 export async function sendConfirmed(to: string, planText: string, posterName: string, convId?: string) {
   try {
     await resend.emails.send({

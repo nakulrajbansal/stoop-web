@@ -46,6 +46,8 @@ matters until these are done.
 - [ ] **Run migration 0004 + set CRON_SECRET in Vercel** (any long random string,
       then redeploy) to switch on the weekly digest. Test it first with the dry run
       described in RUNBOOK "Weekly digest".
+- [ ] **Run migration 0005** to switch on the day-after "How was it?" follow-up
+      (uses the same CRON_SECRET; see RUNBOOK "Post-plan follow-up").
 - [ ] **Seed the feed**: 5 to 10 real plans in ONE target neighborhood before inviting
       anyone. Real plans you and friends will actually host.
 
@@ -63,8 +65,9 @@ matters until these are done.
       neighborhood, about, avatar colors, and so on). Run 0003 after this code is live.
 - [x] **Photo nudge at signup.** After the profile-completion step, new members are
       offered the photo upload right away. Skippable, never forced.
-- [ ] **Host context on plan cards.** "Maya has hosted 3 plans" is a cheap, honest
-      trust signal once there is data for it. Build after there are real plans.
+- [x] **Host context on plan pages.** The plan page now shows "has posted N plans"
+      next to the host once they have posted at least 2 (a first-timer gets no
+      empty badge). Turns on by itself as real data accumulates.
 
 ## Phase 2: First impression and reach
 
@@ -74,9 +77,10 @@ matters until these are done.
 - [ ] **Verify link previews.** Plan pages already generate Open Graph images; confirm
       they render properly when a plan link is pasted into iMessage, WhatsApp, and
       Instagram DMs (that is where invites will actually be shared).
-- [ ] **Neighborhood pages.** /nyc/williamsburg style pages listing that neighborhood's
-      open plans. This is the SEO surface and the QR-card landing target. Only worth
-      real investment after there is steady content.
+- [x] **Neighborhood pages.** /nyc/williamsburg style pages listing that neighborhood's
+      open plans, plus /nyc and /austin neighborhood indexes, a generated sitemap.xml,
+      and robots.txt. This is the SEO surface and the QR-card landing target. Founder
+      step after launch: submit the sitemap in Google Search Console.
 - [x] **PWA basics.** Web app manifest + home-screen icons are live; "Add to Home
       Screen" now gives an app-like entry point. Runway toward push notifications later.
 
@@ -91,10 +95,12 @@ engagement mechanics.
       empty, blocks respected, unsubscribe page included. To ACTIVATE: run migration
       0004 and set CRON_SECRET in Vercel (see RUNBOOK "Weekly digest"). Neighborhood-
       level targeting can come once one city has real density.
-- [ ] **Post-plan follow-up.** The day after a confirmed plan: "How was it?" One tap:
-      great / fine / no-show / report a problem. Doubles as a safety read and gives you
-      the no-show data the group-size decision needs.
-- [ ] **"Post another" nudge** inside the follow-up email for hosts whose plan filled.
+- [x] **Post-plan follow-up.** BUILT, ships dark. The day after a confirmed plan both
+      people get "How was it?" with one-tap great / fine / no-show on the /followup
+      page (plus a report link). Answers land in the plan_feedback table. To ACTIVATE:
+      run migration 0005 (CRON_SECRET is shared with the digest). See RUNBOOK
+      "Post-plan follow-up".
+- [x] **"Post another" nudge** inside the follow-up email for hosts whose plan filled.
 
 ## Phase 4: Measure what matters
 
@@ -139,3 +145,12 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
   anti-dating copy ("no swiping, no algorithm", "meet the person who shows up")
   rewritten to neighborly language in the app, metadata, manifest, and both
   email code paths. Tagline unchanged.
+- 2026-07-15 (wave 6, roadmap completion): built every remaining code item that
+  does not require real users. Post-plan follow-up loop (dark until migration
+  0005; daily 16:00 UTC cron, one-tap great/fine/no-show on /followup, answers
+  in plan_feedback, "post another" nudge for hosts whose plan filled).
+  Neighborhood SEO surface (/nyc + /austin indexes, /city/neighborhood plan
+  listings, sitemap.xml, robots.txt). Host trust signal on plan pages ("has
+  posted N plans" from 2 plans up). Remaining roadmap items all need real-world
+  traction first: landing-page proof photos, link-preview spot checks, and the
+  founder checklist in Phase 0.

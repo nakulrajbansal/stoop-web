@@ -50,12 +50,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PlanDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const plan = await fetchPlan(slug);
+  const plan: any = await fetchPlan(slug);
   if (!plan) notFound();
+
+  // Honest trust signal: how many plans this host has posted (removed ones
+  // don't count). Shown on the page only once they have a track record.
+  const supabase = await createClient();
+  const { count: hostPlanCount } = await supabase
+    .from('plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', plan.user_id)
+    .neq('status', 'removed');
 
   return (
     <Suspense fallback={<div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
-      <PlanDetailClient initialPlan={plan} />
+      <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
     </Suspense>
   );
 }

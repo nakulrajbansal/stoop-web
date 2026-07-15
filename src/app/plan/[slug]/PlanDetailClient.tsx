@@ -8,7 +8,7 @@ import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import { intentTagLabel } from '@/lib/utils';
 
-export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) {
+export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { initialPlan: any; hostPlanCount?: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -150,7 +150,10 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
               {u.name}
               {u.is_founding_member && <span className="text-[10px] font-mono uppercase tracking-wider bg-accent text-white px-2 py-0.5 rounded-full">Founding</span>}
             </div>
-            <div className="text-[13px] text-muted">{u.about || 'Neighbor'}</div>
+            <div className="text-[13px] text-muted">
+              {u.about || 'Neighbor'}
+              {hostPlanCount >= 2 && <span> · has posted {hostPlanCount} plans</span>}
+            </div>
           </div>
         </div>
 
