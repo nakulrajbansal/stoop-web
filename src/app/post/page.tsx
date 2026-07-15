@@ -288,7 +288,7 @@ export default function PostPage() {
             </div>
           )}
 
-          <div className="pt-2 sticky bottom-4">
+          <div className="sticky bottom-3 bg-cream/95 backdrop-blur-sm rounded-[22px] p-2 -mx-2 shadow-[0_-8px_24px_rgba(20,17,13,0.06)]">
             <button onClick={submit} disabled={!ready || submitting}
               className={`w-full py-4 rounded-2xl font-serif font-bold italic text-[19px] transition-all ${
                 ready ? 'bg-accent text-white hover:bg-acc2 hover:-translate-y-[2px] shadow-lg shadow-accent/20' : 'bg-cream-2 text-muted cursor-not-allowed'
@@ -296,15 +296,15 @@ export default function PostPage() {
               {submitting ? <span className="spinner" /> : 'Put it out there →'}
             </button>
             {!ready ? (
-              <p className="text-[11.5px] text-muted text-center mt-3">
+              <p className="text-[11.5px] text-muted text-center mt-2 pb-1">
                 Still needed: {missing.join(', ')}.
               </p>
             ) : signedIn === false ? (
-              <p className="text-[11.5px] text-muted text-center mt-3">
+              <p className="text-[11.5px] text-muted text-center mt-2 pb-1">
                 Next: a 30-second phone verification, then your plan goes live.
               </p>
             ) : (
-              <p className="text-[11.5px] text-muted text-center mt-3">Free to post. Visible to people in your area.</p>
+              <p className="text-[11.5px] text-muted text-center mt-2 pb-1">Free to post. Visible to people in your area.</p>
             )}
           </div>
         </div>
