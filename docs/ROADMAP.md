@@ -131,3 +131,11 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
   plan-card pills reworked into one warm per-category palette so no tag looks like a
   button. Success banner recolored to sage. Feed shows skeleton rows while loading.
   Dead dark-mode CSS deleted.
+- 2026-07-15 (wave 5, rebrand): founder flagged that the site read as a dating
+  app; chose the "neighborhood noticeboard" direction. Accent went from
+  terracotta to civic green (#2F6B3F) across app, icons, OG image, and emails;
+  mustard (#8A681E) now carries the italic headline emphasis; a separate danger
+  red (#B3402A) covers errors, delete, and the report/suspend flows. All
+  anti-dating copy ("no swiping, no algorithm", "meet the person who shows up")
+  rewritten to neighborly language in the app, metadata, manifest, and both
+  email code paths. Tagline unchanged.
