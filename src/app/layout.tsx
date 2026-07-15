@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Stoop — Plans, not profiles.',
+  title: 'Stoop · Plans, not profiles.',
   description: 'Post what you\'re doing this week. Meet the person who shows up.',
   openGraph: {
     title: 'Stoop',

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toE164 } from '@/lib/utils';
+import { toAvatarJpeg } from '@/lib/avatar-image';
 import Nav from '@/components/Nav';
 
-type Step = 'phone' | 'otp' | 'profile';
+type Step = 'phone' | 'otp' | 'profile' | 'photo';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -24,6 +25,9 @@ export default function AuthPage() {
   const [about, setAbout] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const hoods = city === 'austin'
     ? ['east-austin', 'south-congress', 'mueller', 'hyde-park', 'east-cesar-chavez', 'clarksville']
@@ -137,11 +141,32 @@ export default function AuthPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase(), name: trimmed })
       }).catch(() => {});
 
-      router.push('/feed');
+      setStep('photo');
     } catch (e) {
       setError('Could not save profile');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onSignupPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || photoBusy) return;
+    setError('');
+    setPhotoBusy(true);
+    try {
+      const jpeg = await toAvatarJpeg(file);
+      const form = new FormData();
+      form.append('file', jpeg, 'avatar.jpg');
+      const res = await fetch('/api/avatar', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setPhotoPreview(URL.createObjectURL(jpeg));
+    } catch (err: any) {
+      setError(err?.message || 'Could not upload that photo');
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
@@ -232,6 +257,45 @@ export default function AuthPage() {
               By creating an account you agree to our{' '}
               <Link href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</Link>.
             </p>
+          </div>
+        )}
+
+        {step === 'photo' && (
+          <div className="flex flex-col items-center gap-5 text-center">
+            <p className="text-[14px] text-ink-2 leading-[1.65] max-w-[320px]">
+              One last thing: add a photo. Plans posted with a face get joined a lot more. Just one, and you can change it anytime.
+            </p>
+            <div className="w-[104px] h-[104px] rounded-[28px] bg-cream-2 border border-[var(--border)] flex items-center justify-center overflow-hidden">
+              {photoPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[32px] opacity-30">☺</span>
+              )}
+            </div>
+            {photoPreview ? (
+              <>
+                <button onClick={() => router.push('/feed')} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+                  Looks good, take me in →
+                </button>
+                <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                  className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
+                  Use a different photo
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                  className="btn btn-accent btn-full" style={{ padding: 13 }}>
+                  {photoBusy ? <span className="spinner" /> : 'Add a photo'}
+                </button>
+                <button onClick={() => router.push('/feed')}
+                  className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
+                  Skip for now
+                </button>
+              </>
+            )}
+            <input ref={photoInputRef} type="file" accept="image/*" onChange={onSignupPhotoPicked} className="hidden" />
           </div>
         )}
       </div>

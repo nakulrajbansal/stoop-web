@@ -15,9 +15,9 @@ function escape(s: string): string {
   }[c]!));
 }
 
-type WrapArgs = { preheader: string; content: string; ctaUrl?: string; ctaText?: string };
+type WrapArgs = { preheader: string; content: string; ctaUrl?: string; ctaText?: string; footerHtml?: string };
 
-function wrap({ preheader, content, ctaUrl, ctaText }: WrapArgs): string {
+function wrap({ preheader, content, ctaUrl, ctaText, footerHtml }: WrapArgs): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:${C.cream};font-family:Georgia,'Times New Roman',serif;color:${C.ink};">
@@ -33,6 +33,7 @@ ${ctaUrl && ctaText ? `<tr><td style="padding:32px 0 0 0;"><a href="${ctaUrl}" s
 <tr><td style="padding:56px 0 0 0;border-top:1px solid ${C.border};">
 <p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:24px 0 8px 0;">Plans, not profiles. NYC + Austin.</p>
 <p style="font-family:Georgia,serif;font-size:11px;color:${C.muted};margin:0;"><a href="${APP_URL}/profile" style="color:${C.muted};text-decoration:underline;">Manage notifications</a></p>
+${footerHtml ?? ''}
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -109,6 +110,52 @@ export async function sendReplyAlert(to: string, fromName: string, planText: str
       })
     });
   } catch (e) { console.error('sendReplyAlert failed:', e); }
+}
+
+export type DigestPlan = {
+  slug: string;
+  text: string;
+  when_day: string;
+  when_time: string | null;
+  when_time_specific: string | null;
+  neighborhood: string | null;
+  hostName: string | null;
+};
+
+// The Sunday-evening comeback loop: "this week on your stoop."
+// Returns the built HTML so callers can preview it without sending.
+export function buildWeeklyDigestHtml(userId: string, cityName: string, plans: DigestPlan[]): string {
+  const items = plans.map(p => {
+    const time = p.when_time_specific || (p.when_time ? p.when_time.toLowerCase() : '');
+    const meta = [p.when_day, time, p.neighborhood, p.hostName ? `hosted by ${p.hostName}` : '']
+      .filter(Boolean).join(' · ');
+    return `<a href="${APP_URL}/plan/${p.slug}" style="text-decoration:none;">${planBlock(p.text, meta)}</a>`;
+  }).join('');
+
+  return wrap({
+    preheader: `${plans.length} ${plans.length === 1 ? 'plan' : 'plans'} near you this week.`,
+    content: `
+      <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">This week on<br>your <em style="color:${C.accent};font-style:italic;">stoop.</em></h1>
+      <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">${plans.length === 1 ? 'One real plan' : `${plans.length} real plans`} in ${escape(cityName)}, posted by people who will actually be there:</p>
+      ${items}
+      <p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:6px 0 0 0;">Nothing that fits? Post your own. The type of person who posts is the type who shows up.</p>
+    `,
+    ctaUrl: `${APP_URL}/feed`,
+    ctaText: 'See all plans →',
+    footerHtml: `<p style="font-family:Georgia,serif;font-size:11px;color:${C.muted};margin:6px 0 0 0;"><a href="${APP_URL}/unsubscribe?uid=${userId}" style="color:${C.muted};text-decoration:underline;">Stop the weekly digest</a></p>`
+  });
+}
+
+export async function sendWeeklyDigest(to: string, userId: string, cityName: string, plans: DigestPlan[]) {
+  await resend.emails.send({
+    from: FROM_SYSTEM,
+    to,
+    subject: `This week on your stoop: ${plans.length} ${plans.length === 1 ? 'plan' : 'plans'} in ${cityName}`,
+    html: buildWeeklyDigestHtml(userId, cityName, plans),
+    headers: {
+      'List-Unsubscribe': `<${APP_URL}/unsubscribe?uid=${userId}>`
+    }
+  });
 }
 
 export async function sendConfirmed(to: string, planText: string, posterName: string, convId?: string) {

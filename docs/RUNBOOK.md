@@ -22,15 +22,14 @@ Inventory (names; values live in Vercel / .env.local, never commit them):
 - Twilio creds as required by the Supabase phone-auth provider config
 When adding an env var: add it in Vercel, then redeploy (env changes need a fresh build).
 
-## Twilio — lifting the trial restriction (DO THIS BEFORE RECRUITING)
-Symptom: real signups fail with "Trial accounts cannot send messages to unverified numbers"
-(error 21608). A trial account can only SMS numbers you manually verified in Twilio.
-Fix:
-1. console.twilio.com -> look for the Trial badge / Upgrade button.
-2. Upgrade / add billing (about $20 minimum balance).
-3. Once upgraded, the Verify service Supabase calls can reach ANY valid mobile.
-4. TEST: have someone who is NOT you sign up, confirm the OTP arrives. Per-OTP cost ~ $0.05-0.08.
-No Supabase reconfiguration needed; the upgrade is account-wide.
+## Twilio (UPGRADED as of July 2026; trial restriction is gone)
+The account is off trial; real signups work. Per-OTP cost ~ $0.05-0.08.
+If OTPs ever stop arriving again, check IN THIS ORDER:
+1. Twilio Console -> Monitor -> Logs (delivery errors, account balance).
+2. Account balance: keep auto-recharge on so OTPs never fail on an empty balance.
+3. Supabase Auth logs (Auth -> Providers -> Phone still pointed at the Verify service).
+Historical note: error 21608 means a trial account tried to text an unverified number.
+That was the state before July 2026 and should not recur now the account is upgraded.
 
 ## Email deliverability (avoid the spam folder)
 - DNS (Cloudflare, all "DNS only"): SPF (send.stoop.house TXT v=spf1 include:amazonses.com ~all),
@@ -65,6 +64,21 @@ NEVER enable Cloudflare proxy (orange cloud) on these — it breaks Vercel SSL/r
   storage object); a hard refresh clears it.
 - Moderation: if a photo is reported, delete the object in Supabase Storage ->
   avatars; the profile instantly falls back to initials.
+
+## Weekly digest ("This week on your stoop")
+- WHAT: Sunday 22:00 UTC (5/6pm ET) cron hits /api/digest, which emails each member
+  whose CITY has at least one open plan (up to 6, soonest first, blocks respected,
+  own plans excluded). Never sends an empty digest. Unsubscribe link goes to
+  /unsubscribe (confirm-button page; sets profiles.digest_opt_out_at).
+- ACTIVATION (it ships dark until BOTH are done):
+  1. Run migration 0004 in the Supabase SQL editor.
+  2. Add CRON_SECRET in Vercel (any long random string) and redeploy. Vercel's cron
+     automatically sends it as a bearer token; the route refuses everything else.
+- TESTING (safe): while signed in as the admin, open /api/digest for a DRY RUN
+  (JSON of who would get what; sends nothing), /api/digest?preview=1 to see the email
+  HTML, /api/digest?send=1 to actually send once manually.
+- Note: the cron and a same-day manual ?send=1 will both send; there is no dedupe at
+  this scale. Do not manually send on Sundays.
 
 ## Supabase admin tasks (SQL Editor)
 - Clear OTP rate limits during testing: DELETE FROM otp_attempts;  (table name may vary)

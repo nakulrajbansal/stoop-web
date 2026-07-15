@@ -62,7 +62,13 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
 - PRIVACY HARDENING code is in (all notify_email reads go through the admin client).
   Migration 0003 (locks phone/email columns away from the public API) must be run in
   Supabase AFTER that code is deployed. Until it runs, the old exposure remains.
-- Twilio must be upgraded out of trial or real signups fail (error 21608).
+- Twilio is UPGRADED (off trial, July 2026). Real signups work.
+- SIGNUP now ends with an optional add-a-photo step.
+- WEEKLY DIGEST built but DARK: Sunday cron emails each member their city's open
+  plans. Activates only when migration 0004 is run AND CRON_SECRET is set in Vercel.
+  Ops + safe testing: RUNBOOK "Weekly digest".
+- /admin/metrics (ADMIN_USER_ID-gated): plans/week, join rate, repeat posters,
+  report SLA. PWA manifest live (Add to Home Screen works).
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and
 in docs/SAFETY_SPEC.md so the next session starts accurate.

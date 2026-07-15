@@ -6,10 +6,9 @@ notes current the same way SAFETY_SPEC.md is kept current.
 
 ## The honest diagnosis (why traction is stalled)
 
-1. **Signups may literally be broken.** Twilio is still on a trial account (per the
-   runbook), which means anyone who is not a manually verified number gets NO OTP text
-   (error 21608). If that is still true, zero traction is not a product signal at all;
-   nobody could get in. This is the single highest-priority item on this list.
+1. **RESOLVED 2026-07-14: signups work.** The docs said Twilio was still on trial
+   (which would have blocked all real signups); the founder confirmed the account is
+   upgraded. The funnel is open, so the rest of this list is what actually matters.
 2. **The safety layer is code complete but not fully live.** Migration 0002 and the
    Vercel `ADMIN_USER_ID` env var were still pending as of the last session, and the
    live block/report tests have not been run. The whole point of that work was to make
@@ -35,15 +34,18 @@ notes current the same way SAFETY_SPEC.md is kept current.
 These are things only you can do; no code involved. Nothing else on this roadmap
 matters until these are done.
 
-- [ ] **Upgrade Twilio out of trial** (runbook has the steps). Then have someone who is
-      NOT you sign up end to end and confirm the OTP arrives.
+- [x] **Upgrade Twilio out of trial.** Done (confirmed by founder 2026-07-14). Still
+      worth one end-to-end signup test by someone who is not you.
 - [ ] **Run migration 0002** in the Supabase SQL editor (safe to run twice).
 - [ ] **Confirm `ADMIN_USER_ID` is set in Vercel** (it is already in local .env.local),
       then redeploy so it takes effect.
 - [ ] **Run the safety live tests**: the 8-step block test and the report/suspend test
       in SAFETY_SPEC.md.
-- [ ] **Run migration 0003** (privacy hardening, added in Phase 1 below) AFTER the
-      Phase 1 code push is live.
+- [ ] **Run migration 0003** (privacy hardening) in the Supabase SQL editor. The
+      code it depends on is already live.
+- [ ] **Run migration 0004 + set CRON_SECRET in Vercel** (any long random string,
+      then redeploy) to switch on the weekly digest. Test it first with the dry run
+      described in RUNBOOK "Weekly digest".
 - [ ] **Seed the feed**: 5 to 10 real plans in ONE target neighborhood before inviting
       anyone. Real plans you and friends will actually host.
 
@@ -59,8 +61,8 @@ matters until these are done.
       through the admin client, and migration `0003_privacy_hardening.sql` locks the
       profiles table down so the public API can only read the safe columns (name,
       neighborhood, about, avatar colors, and so on). Run 0003 after this code is live.
-- [ ] **Photo nudge at signup.** After the profile-completion step, offer the photo
-      upload right away ("plans with a face get joined more"). Skippable, never forced.
+- [x] **Photo nudge at signup.** After the profile-completion step, new members are
+      offered the photo upload right away. Skippable, never forced.
 - [ ] **Host context on plan cards.** "Maya has hosted 3 plans" is a cheap, honest
       trust signal once there is data for it. Build after there are real plans.
 
@@ -75,8 +77,8 @@ matters until these are done.
 - [ ] **Neighborhood pages.** /nyc/williamsburg style pages listing that neighborhood's
       open plans. This is the SEO surface and the QR-card landing target. Only worth
       real investment after there is steady content.
-- [ ] **PWA basics.** Web app manifest + icons so "Add to Home Screen" gives an
-      app-like entry point. Cheap, and the runway toward push notifications later.
+- [x] **PWA basics.** Web app manifest + home-screen icons are live; "Add to Home
+      Screen" now gives an app-like entry point. Runway toward push notifications later.
 
 ## Phase 3: The comeback loop (the week-eight question)
 
@@ -84,9 +86,11 @@ The retention shape problem from DECISIONS.md is real: after someone finds their
 circle, their need drops. The answer at this scale is a calm weekly rhythm, not
 engagement mechanics.
 
-- [ ] **Weekly neighborhood digest email.** Sunday evening: "This week on your stoop:
-      4 plans near you." Only sends if there are actually plans (never send an empty
-      digest). One-tap unsubscribe. This is THE comeback mechanism while there is no app.
+- [x] **Weekly city digest email.** BUILT, ships dark. Sunday 22:00 UTC cron sends
+      "This week on your stoop" per city, only to people whose city has plans, never
+      empty, blocks respected, unsubscribe page included. To ACTIVATE: run migration
+      0004 and set CRON_SECRET in Vercel (see RUNBOOK "Weekly digest"). Neighborhood-
+      level targeting can come once one city has real density.
 - [ ] **Post-plan follow-up.** The day after a confirmed plan: "How was it?" One tap:
       great / fine / no-show / report a problem. Doubles as a safety read and gives you
       the no-show data the group-size decision needs.
@@ -94,12 +98,10 @@ engagement mechanics.
 
 ## Phase 4: Measure what matters
 
-- [ ] **/admin/metrics page** (gated like /admin/reports): plans posted per week,
-      fraction of plans that get at least one join, signups, and how many posters
-      return to post again. Per DECISIONS.md, plans-per-week and join-fraction are the
-      metrics; signups are not.
-- [ ] **Report review SLA**: show oldest-open-report age on the admin page so the
-      24-hour commitment is visible.
+- [x] **/admin/metrics page** (gated like /admin/reports): plans per week, join
+      fraction, confirmed fraction, members, repeat posters, last 8 weeks table.
+- [x] **Report review SLA**: /admin/metrics shows open report count and the oldest
+      open report's age against the 24-hour commitment.
 
 ## Explicitly not doing (unchanged from DECISIONS.md)
 
@@ -111,3 +113,7 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
 - 2026-07-14: Roadmap created. Phase 1 profile photos + privacy hardening built and
   pushed (see git log). Phase 0 checklist is with the founder. Migration 0003 written,
   waiting to be run AFTER the Phase 1 deploy is confirmed live.
+- 2026-07-15: Twilio confirmed upgraded (funnel is open). Wave 2 shipped: signup photo
+  step, weekly digest (dark until migration 0004 + CRON_SECRET), /admin/metrics,
+  PWA manifest + icons. Founder to-dos now: migrations 0002/0003/0004, ADMIN_USER_ID +
+  CRON_SECRET in Vercel, safety live tests, seed plans, then start recruiting.
