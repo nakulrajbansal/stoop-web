@@ -6,7 +6,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://stoop.house';
 
 const C = {
   accent: '#C8472A', ink: '#14110D', ink2: '#3A332B',
-  muted: '#8C8278', cream: '#F0EBE1', cream2: '#E6DFD2', border: '#D9D1C2',
+  muted: '#6E675E', cream: '#F0EBE1', cream2: '#E6DFD2', border: '#D9D1C2',
 };
 
 function escape(s: string): string {

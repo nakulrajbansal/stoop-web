@@ -97,7 +97,7 @@ export default async function HomePage() {
               <div className="py-2">
                 {/* Empty week: show what a plan looks like instead of a void */}
                 <div className="border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-4">
-                  <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted mb-2">What a plan looks like</div>
+                  <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">What a plan looks like</div>
                   <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
                     going to the farmers market saturday morning, making coffee after…
                   </div>

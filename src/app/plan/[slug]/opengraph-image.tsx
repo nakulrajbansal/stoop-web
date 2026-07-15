@@ -29,7 +29,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 40 }}>
           <div style={{ fontSize: 36, fontWeight: 700, color: '#14110D' }}>St<span style={{ color: '#C8472A', fontStyle: 'italic' }}>oo</span>p</div>
-          <div style={{ fontSize: 16, color: '#9C958D', marginLeft: 8 }}>· Plans, not profiles.</div>
+          <div style={{ fontSize: 16, color: '#6E675E', marginLeft: 8 }}>· Plans, not profiles.</div>
         </div>
         <div style={{ fontSize: 48, lineHeight: 1.25, fontStyle: 'italic', color: '#14110D', flex: 1, fontFamily: 'serif' }}>
           {text.length > 180 ? text.substring(0, 180) + '…' : text}

@@ -53,7 +53,7 @@ export default function PlanCard({ plan }: { plan: Plan }) {
   return (
     <Link href={`/plan/${plan.slug}`} className="plan-card block no-underline">
       <div className="flex items-center gap-1.5 flex-wrap mb-3">
-        <span className="text-[11px] font-medium text-accent bg-[rgba(200,71,42,0.09)] px-2.5 py-[3px] rounded-full">
+        <span className={`tag tag-${plan.category}`}>
           {CATEGORY_LABEL[plan.category] ?? plan.category}
         </span>
         {tags.slice(0, 2).map(t => (

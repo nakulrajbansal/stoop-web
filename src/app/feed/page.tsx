@@ -127,7 +127,7 @@ function FeedContent() {
 
         {/* Editor's note */}
         <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-5 py-4 mb-9 max-w-[640px]">
-          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">A note from the Stoop</div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">A note from the Stoop</div>
           <p className="text-[13.5px] text-ink-2 leading-[1.65]">
             Stoop is small on purpose. A few plans, posted by real people in your city, that you can actually show up to. If nothing here fits, post your own. See who comes.
           </p>
@@ -165,7 +165,22 @@ function FeedContent() {
 
         {/* Plan list - itinerary view */}
         {loading ? (
-          <div className="text-center py-12 text-muted text-sm">Loading…</div>
+          <div className="flex flex-col" aria-hidden="true">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="flex items-start gap-4 sm:gap-5 py-5 border-b border-[var(--border)] animate-pulse">
+                <div className="flex-shrink-0 w-[56px] sm:w-[64px] flex flex-col items-center gap-2 pt-1">
+                  <div className="h-2.5 w-8 rounded bg-cream-2"></div>
+                  <div className="h-7 w-9 rounded-lg bg-cream-2"></div>
+                </div>
+                <div className="w-px self-stretch bg-[var(--border)] flex-shrink-0"></div>
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="h-2.5 w-20 rounded bg-cream-2 mb-3"></div>
+                  <div className="h-4 w-3/4 max-w-[420px] rounded bg-cream-2 mb-3"></div>
+                  <div className="h-3 w-44 rounded bg-cream-2"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : plans.length === 0 ? (
           <div className="py-16 text-center">
             <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
@@ -188,7 +203,7 @@ function FeedContent() {
                     <div className="flex-shrink-0 w-[56px] sm:w-[64px] text-center">
                       {stamp ? (
                         <>
-                          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted">{stamp.weekday}</div>
+                          <div className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-muted">{stamp.weekday}</div>
                           <div className="font-serif text-[26px] sm:text-[30px] font-bold leading-none tracking-tight text-ink mt-0.5">{stamp.day}</div>
                           {timeStr && <div className="text-[10.5px] text-muted mt-1.5 leading-tight">{timeStr}</div>}
                         </>
@@ -202,7 +217,7 @@ function FeedContent() {
 
                     {/* Plan content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center flex-wrap mb-1.5 text-[10px] font-mono uppercase tracking-[0.1em]">
+                      <div className="flex items-center flex-wrap mb-1.5 text-[10.5px] font-mono uppercase tracking-[0.1em]">
                         <span className="text-accent">{plan.category}</span>
                         {tags.slice(0, 2).map((t: string) => (
                           <span key={t} className="text-muted">

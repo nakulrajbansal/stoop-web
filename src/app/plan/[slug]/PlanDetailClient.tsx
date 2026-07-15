@@ -95,7 +95,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
       <Nav />
       <div className="max-w-[720px] mx-auto px-6 py-10 pb-20">
         {justPosted && (
-          <div className="bg-[#F0FDF4] border border-[#16A34A] text-[#15803D] rounded-xl px-4 py-3 mb-6 text-[13.5px]">
+          <div className="bg-[rgba(42,66,50,0.08)] border border-[rgba(42,66,50,0.3)] text-sage rounded-xl px-4 py-3 mb-6 text-[13.5px]">
             🌃 You&apos;re out there. Your plan is live and someone in your city is going to see this.
           </div>
         )}
@@ -110,7 +110,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
         <div className="flex items-center gap-1.5 flex-wrap mb-4">
           <span className={`tag tag-${plan.category}`}>{plan.category}</span>
           {tags.map((t: string) => (
-            <span key={t} className="text-[10px] font-medium tracking-wide text-ink-2 bg-cream-2 px-2 py-[3px] rounded-full">
+            <span key={t} className="text-[10.5px] font-medium tracking-wide text-ink-2 bg-cream-2 px-2 py-[3px] rounded-full">
               {intentTagLabel(t)}
             </span>
           ))}
