@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/server';
 
 export const revalidate = 60;
@@ -97,11 +98,16 @@ export default async function HomePage() {
                 {plans.map((plan: any) => (
                   <Link key={plan.id} href={`/plan/${plan.slug}`}
                     className="group flex items-start gap-3 py-3.5 border-b border-[var(--border)] last:border-0 hover:bg-cream-2/60 -mx-3 px-3 rounded-md transition-colors">
-                    <div
-                      className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-[11px] font-semibold flex-shrink-0 mt-0.5"
-                      style={{ background: plan.poster?.avatar_bg ?? '#eee', color: plan.poster?.avatar_fg ?? '#666' }}>
-                      {plan.poster?.initials || '?'}
-                    </div>
+                    <Avatar
+                      userId={plan.user_id}
+                      name={plan.poster?.name}
+                      initials={plan.poster?.initials}
+                      bg={plan.poster?.avatar_bg}
+                      fg={plan.poster?.avatar_fg}
+                      size={34}
+                      radius={10}
+                      className="mt-0.5"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-0.5">
                         {plan.text.length > 70 ? plan.text.substring(0, 70) + '…' : plan.text}

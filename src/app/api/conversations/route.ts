@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
@@ -75,7 +76,9 @@ export async function POST(req: NextRequest) {
   // Notify the poster by email (only on a brand-new conversation, not repeat messages)
   if (!existing) {
     try {
-      const { data: poster } = await supabase
+      // notify_email is a private column; only the admin client may read it
+      // (migration 0003 revokes it from the API roles).
+      const { data: poster } = await supabaseAdmin
         .from('profiles').select('notify_email').eq('id', plan.user_id).single();
       const { data: joiner } = await supabase
         .from('profiles').select('name').eq('id', user.id).single();
@@ -127,7 +130,8 @@ export async function PATCH(req: NextRequest) {
     .eq('id', conversationId);
     if (newStatus === 'confirmed') {
       try {
-        const { data: joiner } = await supabase
+        // Same as above: private column, admin client only.
+        const { data: joiner } = await supabaseAdmin
           .from('profiles').select('notify_email').eq('id', conv.joiner_id).single();
         const planText = (conv.plan as any)?.text ?? 'your plan';
         const posterName = (conv.poster as any)?.name ?? 'The host';

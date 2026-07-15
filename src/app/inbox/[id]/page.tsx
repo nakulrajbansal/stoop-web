@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Avatar from '@/components/Avatar';
 import SafetyCard from '@/components/SafetyCard';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
@@ -156,11 +157,15 @@ export default function ChatPage() {
         {/* Header */}
         <div className="border-b border-[var(--border)] px-5 py-3.5 flex items-center gap-3.5 bg-cream sticky top-[58px] z-10">
           <Link href="/inbox" className="text-[13px] text-muted hover:text-ink">←</Link>
-          <div
-            className="w-9 h-9 rounded-[10px] flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
-            style={{ background: other.avatar_bg, color: other.avatar_fg }}>
-            {other.initials || other.name[0]}
-          </div>
+          <Avatar
+            userId={other.id}
+            name={other.name}
+            initials={other.initials}
+            bg={other.avatar_bg}
+            fg={other.avatar_fg}
+            size={36}
+            radius={10}
+          />
           <div className="flex-1 min-w-0">
             <div className="text-[14px] font-medium text-ink">{other.name}</div>
             <Link href={`/plan/${conv.plan?.slug}`} className="text-[12px] text-muted hover:text-ink truncate block">

@@ -3,7 +3,9 @@
 Read this first, every session. For deeper detail, see the `/docs` folder:
 - `docs/ARCHITECTURE.md` — stack, data model, gotchas, conventions, deploy/ops
 - `docs/DECISIONS.md` — settled product decisions and the reasoning behind them
-- `docs/SAFETY_SPEC.md` — the active safety-layer build (requirements, design, status)
+- `docs/SAFETY_SPEC.md` — the safety-layer build (requirements, design, status)
+- `docs/ROADMAP.md` — the overhaul roadmap (phases, status, founder checklist)
+- `docs/RUNBOOK.md` — operational procedures (deploy, DNS, Twilio, test scripts)
 
 ## What this is
 Stoop is a hyperlocal social platform. Tagline: "Plans, not profiles."
@@ -46,13 +48,20 @@ Live at https://stoop.house. Two cities at launch: NYC and Austin.
 - URLs use plan SLUGS not ids: /plan/[slug].
 
 ## Current state
-See docs/SAFETY_SPEC.md "Status" section for the live build state. At time of writing:
+See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing (July 2026):
 - Core loop works end to end (post -> message -> email -> confirm -> email).
 - Mandatory email + welcome/join/reply/confirm emails wired and live.
 - Unread badge live.
 - Safety layer CODE COMPLETE for all 4 pushes (block, report+admin, guidance+share, TOS).
-  Before it is fully live: run migration 0002 in Supabase, set ADMIN_USER_ID env var, push,
+  Before it is fully live: run migration 0002 in Supabase, confirm ADMIN_USER_ID in Vercel,
   then run the live tests in docs/SAFETY_SPEC.md. See that file's STATUS for specifics.
+- PROFILE PHOTOS live in code: one photo per person, uploaded from /profile, shown on
+  every avatar surface via src/components/Avatar.tsx. Photos live in the public
+  "avatars" storage bucket at {userId}.jpg; the app creates the bucket on first upload,
+  so there is NO manual Supabase step and NO DB column for it.
+- PRIVACY HARDENING code is in (all notify_email reads go through the admin client).
+  Migration 0003 (locks phone/email columns away from the public API) must be run in
+  Supabase AFTER that code is deployed. Until it runs, the old exposure remains.
 - Twilio must be upgraded out of trial or real signups fail (error 21608).
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and

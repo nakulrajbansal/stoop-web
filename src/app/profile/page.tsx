@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
+import Avatar, { avatarSrc } from '@/components/Avatar';
+import { toAvatarJpeg } from '@/lib/avatar-image';
 import { createClient } from '@/lib/supabase/client';
 
 export default function ProfilePage() {
@@ -22,15 +24,24 @@ export default function ProfilePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
+  // Profile photo state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [hasPhoto, setHasPhoto] = useState(false);
+  const [photoVersion, setPhotoVersion] = useState<number | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth'); return; }
 
+      // Explicit columns only (never *): migration 0003 restricts which
+      // profile columns the API may read, and * would trip over it.
       const { data } = await supabase
         .from('profiles')
         .select(`
-          *,
+          id, name, about, city_id, neighborhood_id, initials,
+          avatar_bg, avatar_fg, is_founding_member,
           city:cities(slug, name),
           neighborhood:neighborhoods(slug, name)
         `)
@@ -39,6 +50,12 @@ export default function ProfilePage() {
 
       if (!data) { router.push('/auth'); return; }
       setProfile(data);
+
+      // Find out whether this user already has a photo (drives the
+      // Change/Remove buttons). A failed load just means no photo yet.
+      const probe = new Image();
+      probe.onload = () => setHasPhoto(true);
+      probe.src = avatarSrc(user.id, Date.now());
       setName(data.name);
       setCity(data.city?.slug || 'nyc');
       setNeighborhood(data.neighborhood?.slug || '');
@@ -93,6 +110,44 @@ export default function ProfilePage() {
     if (!error) setProfile({ ...profile, name: trimmed, initials });
   }
 
+  async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || photoBusy) return;
+    setPhotoBusy(true);
+    try {
+      const jpeg = await toAvatarJpeg(file);
+      const form = new FormData();
+      form.append('file', jpeg, 'avatar.jpg');
+      const res = await fetch('/api/avatar', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setHasPhoto(true);
+      setPhotoVersion(data.version ?? Date.now());
+      setToast('Photo updated');
+    } catch (err: any) {
+      setToast(err?.message || 'Could not upload that photo');
+    } finally {
+      setPhotoBusy(false);
+      setTimeout(() => setToast(''), 2500);
+    }
+  }
+
+  async function removePhoto() {
+    if (photoBusy) return;
+    setPhotoBusy(true);
+    const res = await fetch('/api/avatar', { method: 'DELETE' });
+    setPhotoBusy(false);
+    if (res.ok) {
+      setHasPhoto(false);
+      setPhotoVersion(Date.now());
+      setToast('Photo removed');
+    } else {
+      setToast('Could not remove photo');
+    }
+    setTimeout(() => setToast(''), 2500);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     router.push('/');
@@ -130,12 +185,19 @@ export default function ProfilePage() {
       <Nav />
       <div className="max-w-[480px] mx-auto px-6 py-10 pb-20">
         <div className="flex items-center gap-4 mb-7">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-[18px] font-semibold"
-            style={{ background: profile.avatar_bg, color: profile.avatar_fg }}>
-            {profile.initials || profile.name[0]}
-          </div>
-          <div>
+          {/* key remounts the avatar so a fresh upload shows immediately */}
+          <Avatar
+            key={photoVersion ?? 'initial'}
+            userId={profile.id}
+            name={profile.name}
+            initials={profile.initials}
+            bg={profile.avatar_bg}
+            fg={profile.avatar_fg}
+            size={56}
+            radius={16}
+            version={photoVersion}
+          />
+          <div className="flex-1 min-w-0">
             <div className="font-serif text-[24px] font-bold tracking-tight flex items-center gap-2">
               {profile.name}
               {profile.is_founding_member && (
@@ -143,8 +205,25 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="text-[13px] text-muted">{profile.neighborhood?.name}</div>
+            <div className="flex items-center gap-3 mt-1.5">
+              <button onClick={() => fileInputRef.current?.click()} disabled={photoBusy}
+                className="text-[12px] text-accent font-medium hover:underline disabled:opacity-50">
+                {photoBusy ? 'Working…' : hasPhoto ? 'Change photo' : 'Add a photo'}
+              </button>
+              {hasPhoto && !photoBusy && (
+                <button onClick={removePhoto}
+                  className="text-[12px] text-muted hover:text-ink">
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={onPhotoPicked} className="hidden" />
         </div>
+
+        <p className="text-[12px] text-muted leading-relaxed mb-6 -mt-3">
+          One photo, shown next to your plans and messages. A real face makes people much more comfortable joining.
+        </p>
 
         <div className="flex flex-col gap-4">
           <div>

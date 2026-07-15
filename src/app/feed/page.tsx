@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Avatar from '@/components/Avatar';
 import { useCityPreference, setCityPreference } from '@/lib/city-preference';
 import { intentTagLabel } from '@/lib/utils';
 
@@ -205,7 +206,17 @@ function FeedContent() {
                       <h3 className="font-serif text-[17px] sm:text-[18px] font-bold text-ink leading-snug mb-1 tracking-[-0.2px]">
                         {plan.text.length > 100 ? plan.text.substring(0, 100) + '…' : plan.text}
                       </h3>
-                      <div className="text-[12px] text-muted">
+                      <div className="text-[12px] text-muted flex items-center flex-wrap">
+                        <Avatar
+                          userId={plan.user_id}
+                          name={plan.poster?.name}
+                          initials={plan.poster?.initials}
+                          bg={plan.poster?.avatar_bg}
+                          fg={plan.poster?.avatar_fg}
+                          size={20}
+                          radius={6}
+                          className="mr-1.5"
+                        />
                         <span className="text-ink-2 font-medium">{plan.poster?.name}</span>
                         <span className="opacity-40 mx-1.5">·</span>
                         hosting

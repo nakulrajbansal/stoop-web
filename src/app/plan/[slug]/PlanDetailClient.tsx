@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import { intentTagLabel } from '@/lib/utils';
 
@@ -135,10 +136,15 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
         <div className="h-px bg-[var(--border)] my-7"></div>
 
         <div className="flex items-center gap-3.5 mb-7">
-          <div className="w-11 h-11 rounded-[13px] flex items-center justify-center text-[14px] font-semibold"
-            style={{ background: u.avatar_bg, color: u.avatar_fg }}>
-            {u.initials || u.name[0]}
-          </div>
+          <Avatar
+            userId={u.id ?? plan.user_id}
+            name={u.name}
+            initials={u.initials}
+            bg={u.avatar_bg}
+            fg={u.avatar_fg}
+            size={44}
+            radius={13}
+          />
           <div>
             <div className="text-[15px] font-medium text-ink flex items-center gap-2">
               {u.name}

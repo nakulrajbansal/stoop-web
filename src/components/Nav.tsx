@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import Avatar from '@/components/Avatar';
 
 type Profile = {
   id: string;
@@ -67,12 +68,16 @@ export default function Nav() {
             <span className="hidden sm:inline">+ Post a plan</span>
             <span className="sm:hidden">+</span>
           </Link>
-          <Link
-            href="/profile"
-            className="w-[30px] h-[30px] rounded-[9px] flex items-center justify-center text-[11px] font-semibold"
-            style={{ background: profile.avatar_bg, color: profile.avatar_fg }}
-          >
-            {profile.initials || profile.name[0]?.toUpperCase()}
+          <Link href="/profile" className="flex">
+            <Avatar
+              userId={profile.id}
+              name={profile.name}
+              initials={profile.initials}
+              bg={profile.avatar_bg}
+              fg={profile.avatar_fg}
+              size={30}
+              radius={9}
+            />
           </Link>
         </>
       ) : (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendReplyAlert } from '@/lib/resend';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
@@ -27,8 +28,8 @@ export async function POST(req: NextRequest) {
     .select(`
       poster_id, joiner_id, status,
       plan:plans(text),
-      poster:profiles!conversations_poster_id_fkey(name, notify_email),
-      joiner:profiles!conversations_joiner_id_fkey(name, notify_email)
+      poster:profiles!conversations_poster_id_fkey(name),
+      joiner:profiles!conversations_joiner_id_fkey(name)
     `)
     .eq('id', conversationId)
     .single();
@@ -72,7 +73,6 @@ export async function POST(req: NextRequest) {
   try {
     const recipientIsPoster = conv.joiner_id === user.id;
     const recipientId = recipientIsPoster ? conv.poster_id : conv.joiner_id;
-    const recipient: any = recipientIsPoster ? conv.poster : conv.joiner;
     const sender: any = recipientIsPoster ? conv.joiner : conv.poster;
 
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -84,8 +84,14 @@ export async function POST(req: NextRequest) {
       .gte('created_at', fifteenMinAgo);
 
     const planText = (conv.plan as any)?.text ?? 'your plan';
-    if ((recentByRecipient ?? 0) === 0 && recipient?.notify_email) {
-      await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
+    if ((recentByRecipient ?? 0) === 0) {
+      // notify_email is a private column; only the admin client may read it
+      // (migration 0003 revokes it from the API roles).
+      const { data: recipient } = await supabaseAdmin
+        .from('profiles').select('notify_email').eq('id', recipientId).single();
+      if (recipient?.notify_email) {
+        await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
+      }
     }
   } catch (e) {
     console.error('reply-email failed (non-fatal):', e);

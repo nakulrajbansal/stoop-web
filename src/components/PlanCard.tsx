@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Avatar from '@/components/Avatar';
 import { intentTagLabel } from '@/lib/utils';
 
 type Plan = {
   id: string;
   slug: string;
+  user_id?: string;
   text: string;
   category: string;
   when_day: string;
@@ -77,12 +79,15 @@ export default function PlanCard({ plan }: { plan: Plan }) {
 
       <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
         <div className="flex items-center gap-2.5">
-          <span
-            className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center text-[11px] font-semibold"
-            style={{ background: plan.poster?.avatar_bg ?? '#eee', color: plan.poster?.avatar_fg ?? '#666' }}
-          >
-            {plan.poster?.initials || '?'}
-          </span>
+          <Avatar
+            userId={plan.user_id}
+            name={plan.poster?.name}
+            initials={plan.poster?.initials}
+            bg={plan.poster?.avatar_bg}
+            fg={plan.poster?.avatar_fg}
+            size={28}
+            radius={8}
+          />
           <div>
             <div className="text-[12.5px] font-semibold text-ink leading-tight">{plan.poster?.name ?? '—'}</div>
             <div className="text-[10.5px] text-muted leading-tight">hosting</div>

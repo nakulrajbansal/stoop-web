@@ -7,6 +7,14 @@ export async function DELETE(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Their profile photo lives in storage, outside the FK cascade,
+  // so remove it explicitly. Non-fatal if there was none.
+  try {
+    await supabaseAdmin.storage.from('avatars').remove([`${user.id}.jpg`]);
+  } catch (e) {
+    console.error('avatar cleanup on delete failed (non-fatal):', e);
+  }
+
   // Delete the auth user. Cascading FK deletes wipe profiles, plans,
   // conversations, messages, reports automatically (via ON DELETE CASCADE).
   const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id);

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
 
@@ -61,10 +62,15 @@ export default function InboxPage() {
               return (
                 <Link key={c.id} href={`/inbox/${c.id}`}
                   className={`bg-card border border-[var(--border)] rounded-2xl px-4 py-3.5 flex items-start gap-3.5 hover:border-accent/25 hover:shadow-sm transition-all ${c.status === 'declined' ? 'opacity-60' : ''}`}>
-                  <div className="w-10 h-10 rounded-[11px] flex items-center justify-center text-[13px] font-semibold flex-shrink-0"
-                    style={{ background: other.avatar_bg, color: other.avatar_fg }}>
-                    {other.initials || other.name[0]}
-                  </div>
+                  <Avatar
+                    userId={other.id}
+                    name={other.name}
+                    initials={other.initials}
+                    bg={other.avatar_bg}
+                    fg={other.avatar_fg}
+                    size={40}
+                    radius={11}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-[13.5px] font-medium text-ink flex items-center gap-2">
