@@ -89,7 +89,7 @@ export default function PlanCard({ plan }: { plan: Plan }) {
             radius={8}
           />
           <div>
-            <div className="text-[12.5px] font-semibold text-ink leading-tight">{plan.poster?.name ?? '—'}</div>
+            <div className="text-[12.5px] font-semibold text-ink leading-tight">{plan.poster?.name ?? 'A neighbor'}</div>
             <div className="text-[10.5px] text-muted leading-tight">hosting</div>
           </div>
         </div>

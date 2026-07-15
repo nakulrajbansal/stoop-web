@@ -67,13 +67,20 @@ export default async function HomePage() {
               No swiping, no algorithm, no awkward intros.
             </p>
             <div className="flex items-center gap-3 flex-wrap">
-              <Link href="/feed" className="btn btn-primary btn-lg">
-                See all {planCount > 0 ? `${planCount} plans` : 'plans'}
-              </Link>
-              <Link href="/post" className="btn btn-ghost btn-lg">Post your own →</Link>
+              {planCount > 0 ? (
+                <>
+                  <Link href="/feed" className="btn btn-primary btn-lg">See all {planCount} plans</Link>
+                  <Link href="/post" className="btn btn-ghost btn-lg">Post your own →</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/post" className="btn btn-primary btn-lg">Post the first plan →</Link>
+                  <Link href="/feed" className="btn btn-ghost btn-lg">Browse</Link>
+                </>
+              )}
             </div>
             <p className="text-[11.5px] text-muted mt-5">
-              Free to browse. Sign up when you&apos;re ready to act.
+              Free to browse. You can even write your plan before signing up.
             </p>
           </div>
 
@@ -87,11 +94,27 @@ export default async function HomePage() {
             </div>
 
             {!plans || plans.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-[13.5px] text-muted leading-relaxed mb-4">
-                  Nothing live yet this week.<br />Be the first.
+              <div className="py-2">
+                {/* Empty week: show what a plan looks like instead of a void */}
+                <div className="border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-4">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted mb-2">What a plan looks like</div>
+                  <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
+                    going to the farmers market saturday morning, making coffee after…
+                  </div>
+                  <div className="text-[11.5px] text-muted opacity-70">
+                    Saturday, 9am
+                    <span className="opacity-40 mx-1">·</span>
+                    2 spots
+                    <span className="opacity-40 mx-1">·</span>
+                    your neighborhood
+                  </div>
+                </div>
+                <p className="text-[13px] text-muted leading-relaxed mb-4 text-center">
+                  This week is still wide open.<br />The first plan sets the tone.
                 </p>
-                <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
+                <div className="text-center">
+                  <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col">

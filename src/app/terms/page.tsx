@@ -15,7 +15,7 @@ export default function TermsPage() {
         <h1 className="font-serif text-[30px] font-bold tracking-tight mb-2">Terms &amp; Community Standard</h1>
         <p className="text-[12px] text-muted mb-9">Last updated: May 2026</p>
 
-        {/* Community Standard — the heart of it, kept to one line */}
+        {/* Community Standard: the heart of it, kept to one line */}
         <div className="border border-[rgba(42,66,50,0.18)] bg-[rgba(42,66,50,0.05)] rounded-[14px] px-5 py-4 mb-9">
           <div className="text-[12px] font-mono uppercase tracking-wider text-sage mb-1.5">Community Standard</div>
           <p className="text-[15px] text-ink leading-[1.6]">

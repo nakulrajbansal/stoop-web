@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toE164 } from '@/lib/utils';
 import { toAvatarJpeg } from '@/lib/avatar-image';
@@ -10,9 +10,17 @@ import Nav from '@/components/Nav';
 
 type Step = 'phone' | 'otp' | 'profile' | 'photo';
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter();
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  // Where to land after auth: back to a half-written plan, or back to the
+  // plan they wanted to join. Only known-safe internal paths are honored.
+  const rawNext = searchParams.get('next') ?? '';
+  const destination =
+    rawNext === 'post' ? '/post'
+    : /^\/plan\/[a-z0-9-]+$/i.test(rawNext) ? rawNext
+    : '/feed';
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -91,7 +99,7 @@ export default function AuthPage() {
         .maybeSingle();
 
       if (profile) {
-        router.push('/feed');
+        router.push(destination);
       } else {
         setStep('profile');
       }
@@ -194,6 +202,9 @@ export default function AuthPage() {
               <input type="tel" inputMode="tel" placeholder="(555) 123-4567" value={phone}
                 onChange={e => setPhone(e.target.value)} className="input" />
               <p className="text-[11px] text-muted mt-1.5">Real mobile only. Google Voice and Burner numbers won&apos;t work.</p>
+              <p className="text-[11px] text-muted mt-1">
+                Your number just proves you&apos;re a real person. It&apos;s never shown to anyone, and we don&apos;t text you beyond the code.
+              </p>
             </div>
             <button onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
               {loading ? <span className="spinner" /> : 'Send code →'}
@@ -275,8 +286,8 @@ export default function AuthPage() {
             </div>
             {photoPreview ? (
               <>
-                <button onClick={() => router.push('/feed')} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-                  Looks good, take me in →
+                <button onClick={() => router.push(destination)} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+                  {destination === '/post' ? 'Looks good, now publish my plan →' : 'Looks good, take me in →'}
                 </button>
                 <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
                   className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
@@ -289,7 +300,7 @@ export default function AuthPage() {
                   className="btn btn-accent btn-full" style={{ padding: 13 }}>
                   {photoBusy ? <span className="spinner" /> : 'Add a photo'}
                 </button>
-                <button onClick={() => router.push('/feed')}
+                <button onClick={() => router.push(destination)}
                   className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
                   Skip for now
                 </button>
@@ -300,5 +311,14 @@ export default function AuthPage() {
         )}
       </div>
     </>
+  );
+}
+
+export default function AuthPage() {
+  // useSearchParams requires a Suspense boundary at build time
+  return (
+    <Suspense fallback={<div className="max-w-[440px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
+      <AuthContent />
+    </Suspense>
   );
 }

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Message length out of range' }, { status: 400 });
   }
 
-  // Load the conversation first — we need it for the block check AND the email logic
+  // Load the conversation first; we need it for the block check AND the email logic
   const { data: conv } = await supabase
     .from('conversations')
     .select(`

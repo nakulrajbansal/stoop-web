@@ -117,3 +117,10 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
   step, weekly digest (dark until migration 0004 + CRON_SECRET), /admin/metrics,
   PWA manifest + icons. Founder to-dos now: migrations 0002/0003/0004, ADMIN_USER_ID +
   CRON_SECRET in Vercel, safety live tests, seed plans, then start recruiting.
+- 2026-07-15 (wave 3, UI review): walked the live site as a first-time visitor and
+  fixed the conversion path. Logged-out visitors can now write a full plan and sign
+  up at publish time (draft saved and restored); after signup they land back on the
+  plan or post they came from. Empty states stopped announcing failure ("0 plans"
+  headline replaced, landing shows an example plan). Disabled publish button now says
+  what is missing. Phone-number reassurance added at signup. Em dashes removed from
+  UI copy per the writing convention.

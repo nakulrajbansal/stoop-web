@@ -43,7 +43,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
 
   async function sendOpener() {
     setError('');
-    if (messageText.length < 5) { setError('Write a bit more — at least 5 characters'); return; }
+    if (messageText.length < 5) { setError('Write a bit more, at least 5 characters'); return; }
     setMessaging(true);
     const res = await fetch('/api/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -181,12 +181,15 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
           </div>
         ) : isFull ? (
           <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted">
-            This plan is full — but you can <Link href="/post" className="text-accent font-medium hover:underline">post your own</Link>
+            This plan is full, but you can <Link href="/post" className="text-accent font-medium hover:underline">post your own</Link>
           </div>
         ) : existingConv ? (
           <Link href={`/inbox/${existingConv}`} className="btn btn-accent btn-full btn-lg">Open conversation →</Link>
         ) : !currentUser ? (
-          <Link href="/auth" className="btn btn-accent btn-full btn-lg">Sign in to message {u.name} →</Link>
+          <>
+            <Link href={`/auth?next=/plan/${plan.slug}`} className="btn btn-accent btn-full btn-lg">Sign up to message {u.name} →</Link>
+            <p className="text-[12px] text-muted text-center mt-2">Takes about a minute. You&apos;ll come right back to this plan.</p>
+          </>
         ) : showMessageBox ? (
           <div className="flex flex-col gap-3">
             <textarea value={messageText} onChange={e => setMessageText(e.target.value)}
@@ -205,7 +208,7 @@ export default function PlanDetailClient({ initialPlan }: { initialPlan: any }) 
             <button onClick={() => setShowMessageBox(true)} className="btn btn-accent btn-full btn-lg">
               Message {u.name} →
             </button>
-            <p className="text-[12px] text-muted text-center mt-2">Not a request — just a message. Short conversation, then you decide.</p>
+            <p className="text-[12px] text-muted text-center mt-2">Not a request, just a message. Short conversation, then you decide.</p>
           </>
         )}
       </div>

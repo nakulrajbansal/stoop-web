@@ -18,7 +18,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server component — cookies cannot be set; middleware handles refresh
+            // Server component: cookies cannot be set; middleware handles refresh
           }
         }
       }

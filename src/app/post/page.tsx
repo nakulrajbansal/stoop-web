@@ -30,26 +30,78 @@ export default function PostPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // null = still checking; false = browsing logged out (allowed; they sign
+  // up at publish time and their draft survives the trip)
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [hoodGroups, setHoodGroups] = useState<{ city: string; hoods: { slug: string; name: string }[] }[]>([]);
 
   const dateChips = getDateChips();
+  const DRAFT_KEY = 'stoop-plan-draft';
 
   useEffect(() => {
+    // Restore a draft (e.g. written logged-out, finished after signup)
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.text) setText(d.text);
+        if (d.category) setCategory(d.category);
+        // Only restore the day if it is still one of the pickable chips
+        if (d.dateIso && getDateChips().some(c => c.iso === d.dateIso)) setDateIso(d.dateIso);
+        if (d.time) setTime(d.time);
+        if (d.specificTime) setSpecificTime(d.specificTime);
+        if (d.neighborhood) setNeighborhood(d.neighborhood);
+        if (d.spot) setSpot(d.spot);
+        if (d.spots) setSpots(d.spots);
+        if (Array.isArray(d.selectedTags)) setSelectedTags(d.selectedTags);
+      }
+    } catch {}
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth'); return; }
-      const { data: profile } = await supabase.from('profiles').select('city_id, neighborhood_id').eq('id', user.id).single();
-      if (!profile) { router.push('/auth'); return; }
-      const { data: nb } = await supabase.from('neighborhoods').select('slug, name').eq('city_id', profile.city_id);
-      setHoods(nb || []);
-      if (profile.neighborhood_id) {
-        const { data: own } = await supabase.from('neighborhoods').select('slug').eq('id', profile.neighborhood_id).single();
-        if (own) setNeighborhood(own.slug);
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('city_id, neighborhood_id').eq('id', user.id).single();
+        if (profile) {
+          setSignedIn(true);
+          const { data: nb } = await supabase.from('neighborhoods').select('slug, name').eq('city_id', profile.city_id);
+          setHoods(nb || []);
+          if (profile.neighborhood_id && !localStorage.getItem(DRAFT_KEY)) {
+            const { data: own } = await supabase.from('neighborhoods').select('slug').eq('id', profile.neighborhood_id).single();
+            if (own) setNeighborhood(own.slug);
+          }
+          return;
+        }
       }
+      // Logged out (or no profile yet): let them write the whole plan.
+      // Show every neighborhood, grouped by city; publishing routes
+      // through signup with the draft kept.
+      setSignedIn(false);
+      const { data: cities } = await supabase.from('cities').select('id, name').order('name');
+      const { data: nb } = await supabase.from('neighborhoods').select('slug, name, city_id');
+      const groups = (cities || []).map((c: any) => ({
+        city: c.name,
+        hoods: (nb || []).filter((h: any) => h.city_id === c.id)
+      })).filter(g => g.hoods.length);
+      setHoodGroups(groups);
     }
     load();
   }, []);
 
   const ready = text.length >= 25 && dateIso && neighborhood && spots;
+
+  const missing: string[] = [];
+  if (text.length < 25) missing.push(text.length === 0 ? 'the plan itself' : `${25 - text.length} more characters`);
+  if (!dateIso) missing.push('which day');
+  if (!neighborhood) missing.push('a neighborhood');
+  if (!spots) missing.push('group size');
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        text, category, dateIso, time, specificTime, neighborhood, spot, spots, selectedTags
+      }));
+    } catch {}
+  }
 
   function toggleTag(id: string) {
     setSelectedTags(prev => {
@@ -61,6 +113,15 @@ export default function PostPage() {
 
   async function submit() {
     if (!ready) return;
+
+    // Not signed in: park the draft and run them through signup.
+    // The draft is restored when they land back here.
+    if (!signedIn) {
+      saveDraft();
+      router.push('/auth?next=post');
+      return;
+    }
+
     setSubmitting(true); setError('');
 
     const selectedChip = dateChips.find(d => d.iso === dateIso);
@@ -79,6 +140,7 @@ export default function PostPage() {
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error || 'Could not post plan'); setSubmitting(false); return; }
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
     router.push(`/plan/${data.plan.slug}?posted=1`);
   }
 
@@ -91,6 +153,14 @@ export default function PostPage() {
           What&apos;s the <em className="italic text-accent">plan?</em>
         </h1>
         <p className="text-[14px] text-muted mb-10">Write it like you&apos;d text a friend. Specific time, specific place.</p>
+
+        {signedIn === false && (
+          <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-8 -mt-6">
+            <p className="text-[13px] text-ink-2 leading-relaxed">
+              Write it now; you&apos;ll create your account when you hit publish. Your plan comes along, nothing gets lost.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-8">
           <div>
@@ -159,7 +229,13 @@ export default function PostPage() {
             <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
               className="w-full bg-card border border-[var(--border2)] rounded-xl px-4 py-3 text-[14px] text-ink outline-none focus:border-accent/50 mb-2.5 cursor-pointer">
               <option value="">Neighborhood…</option>
-              {hoods.map(h => <option key={h.slug} value={h.slug}>{h.name}</option>)}
+              {signedIn
+                ? hoods.map(h => <option key={h.slug} value={h.slug}>{h.name}</option>)
+                : hoodGroups.map(g => (
+                    <optgroup key={g.city} label={g.city}>
+                      {g.hoods.map(h => <option key={h.slug} value={h.slug}>{h.name}</option>)}
+                    </optgroup>
+                  ))}
             </select>
             <input type="text" value={spot} onChange={e => setSpot(e.target.value)}
               placeholder="e.g. Partners Coffee, Central Park east entrance…"
@@ -219,7 +295,17 @@ export default function PostPage() {
               }`}>
               {submitting ? <span className="spinner" /> : 'Put it out there →'}
             </button>
-            <p className="text-[11.5px] text-muted text-center mt-3">Free to post. Visible to people in your area.</p>
+            {!ready ? (
+              <p className="text-[11.5px] text-muted text-center mt-3">
+                Still needed: {missing.join(', ')}.
+              </p>
+            ) : signedIn === false ? (
+              <p className="text-[11.5px] text-muted text-center mt-3">
+                Next: a 30-second phone verification, then your plan goes live.
+              </p>
+            ) : (
+              <p className="text-[11.5px] text-muted text-center mt-3">Free to post. Visible to people in your area.</p>
+            )}
           </div>
         </div>
       </div>

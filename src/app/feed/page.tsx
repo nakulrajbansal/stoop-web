@@ -103,17 +103,24 @@ function FeedContent() {
           </h1>
         ) : (
           <>
-            <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
-              This week, <em className="italic text-accent">{planCount} {planCount === 1 ? 'plan' : 'plans'}.</em>
-            </h1>
             {planCount > 0 ? (
-              <p className="text-[13px] text-muted mb-8">
-                Posted by {hostCount} {hostCount === 1 ? 'host' : 'hosts'}
-                <span className="opacity-40 mx-1.5">·</span>
-                {totalSpots} {totalSpots === 1 ? 'spot' : 'spots'} open
-              </p>
+              <>
+                <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+                  This week, <em className="italic text-accent">{planCount} {planCount === 1 ? 'plan' : 'plans'}.</em>
+                </h1>
+                <p className="text-[13px] text-muted mb-8">
+                  Posted by {hostCount} {hostCount === 1 ? 'host' : 'hosts'}
+                  <span className="opacity-40 mx-1.5">·</span>
+                  {totalSpots} {totalSpots === 1 ? 'spot' : 'spots'} open
+                </p>
+              </>
             ) : (
-              <p className="text-[13px] text-muted mb-8">Nothing live in {cityLabel} yet.</p>
+              <>
+                <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+                  This week is <em className="italic text-accent">wide open.</em>
+                </h1>
+                <p className="text-[13px] text-muted mb-8">Whatever gets posted first sets the tone.</p>
+              </>
             )}
           </>
         )}
@@ -163,7 +170,7 @@ function FeedContent() {
           <div className="py-16 text-center">
             <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
             <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
-              Nothing here for {cityLabel.toLowerCase()} this week. The type of person who posts on Stoop is the same type who shows up.
+              Nothing here for {cityLabel} this week. The type of person who posts on Stoop is the same type who shows up.
             </p>
             <Link href="/post" className="btn btn-accent">Post a plan →</Link>
           </div>
