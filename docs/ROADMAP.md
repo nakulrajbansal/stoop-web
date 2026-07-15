@@ -124,3 +124,10 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
   headline replaced, landing shows an example plan). Disabled publish button now says
   what is missing. Phone-number reassurance added at signup. Em dashes removed from
   UI copy per the writing convention.
+- 2026-07-15 (wave 4, design polish): fonts moved to next/font self-hosting with
+  real 600/700 weights (no more faux bold or font flash). Muted gray darkened to
+  #6E675E for WCAG AA contrast in the app, all emails, and the OG image. Site-wide
+  keyboard focus ring. Sports category got its missing pill color; music, arts, and
+  plan-card pills reworked into one warm per-category palette so no tag looks like a
+  button. Success banner recolored to sage. Feed shows skeleton rows while loading.
+  Dead dark-mode CSS deleted.

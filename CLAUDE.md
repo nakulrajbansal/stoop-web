@@ -69,6 +69,11 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   Ops + safe testing: RUNBOOK "Weekly digest".
 - /admin/metrics (ADMIN_USER_ID-gated): plans/week, join rate, repeat posters,
   report SLA. PWA manifest live (Add to Home Screen works).
+- DESIGN SYSTEM (July 2026 polish): fonts self-hosted via next/font in
+  src/app/layout.tsx (Fraunces, DM Sans variable incl. real bold, DM Mono).
+  Muted gray is #6E675E (WCAG AA on cream; don't lighten). Per-category tag
+  colors live in globals.css (.tag-*, all 7 categories incl. sports). Success
+  UI uses sage, not green. Site-wide :focus-visible ring. No dark mode.
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and
 in docs/SAFETY_SPEC.md so the next session starts accurate.
