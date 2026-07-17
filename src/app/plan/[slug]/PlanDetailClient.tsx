@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Avatar from '@/components/Avatar';
+import { CalendarIcon, PinIcon, ShareIcon, CheckCircleIcon, NoteIcon } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { intentTagLabel } from '@/lib/utils';
 
@@ -95,15 +96,16 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
       <Nav />
       <div className="max-w-[720px] mx-auto px-6 py-10 pb-20">
         {justPosted && (
-          <div className="bg-[rgba(42,66,50,0.08)] border border-[rgba(42,66,50,0.3)] text-sage rounded-xl px-4 py-3 mb-6 text-[13.5px]">
-            🌃 You&apos;re out there. Your plan is live and someone in your city is going to see this.
+          <div className="bg-[rgba(42,66,50,0.08)] border border-[rgba(42,66,50,0.3)] text-sage rounded-xl px-4 py-3 mb-6 text-[13.5px] flex items-center gap-2">
+            <CheckCircleIcon className="flex-shrink-0" />
+            <span>You&apos;re out there. Your plan is live and someone in your city is going to see this.</span>
           </div>
         )}
 
         <div className="flex items-center justify-between mb-8">
           <Link href="/feed" className="text-[13px] text-muted hover:text-ink">← Back to plans</Link>
           <button onClick={share} className="text-[12px] text-muted hover:text-ink flex items-center gap-1.5">
-            <span>↗</span> Share
+            <ShareIcon /> Share
           </button>
         </div>
 
@@ -122,13 +124,13 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
 
         <div className="flex gap-2.5 flex-wrap mb-7">
           <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-            <span>📅</span>
+            <CalendarIcon className="text-muted flex-shrink-0" />
             {plan.when_day}
             {plan.when_time_specific ? ` · ${plan.when_time_specific}` : plan.when_time ? ` · ${plan.when_time}` : ''}
           </div>
           {plan.spot && (
             <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-              <span>📍</span>{plan.spot}{plan.neighborhood && `, ${plan.neighborhood.name}`}
+              <PinIcon className="text-muted flex-shrink-0" />{plan.spot}{plan.neighborhood && `, ${plan.neighborhood.name}`}
             </div>
           )}
         </div>
@@ -171,7 +173,7 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
         {isOwn ? (
           <div className="flex flex-col gap-2.5">
             <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted flex items-center gap-2">
-              <span>📋</span>
+              <NoteIcon className="flex-shrink-0" />
               <span>This is your plan. Wait for someone to message.</span>
             </div>
             <div className="flex gap-2">

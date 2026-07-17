@@ -39,7 +39,6 @@ export default function InboxPage() {
           <div className="text-center text-muted text-sm py-12">Loading…</div>
         ) : conversations.length === 0 ? (
           <div className="text-center py-16 text-muted">
-            <div className="text-4xl opacity-20 mb-3">💬</div>
             <p className="text-sm">No conversations yet.<br />Message someone&apos;s plan to get started.</p>
             <Link href="/feed" className="btn btn-primary btn-sm mt-4 inline-flex">Browse plans</Link>
           </div>

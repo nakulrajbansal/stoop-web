@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
 import type { Metadata } from 'next';
 
 // Evergreen guide pages: the honest, useful version of SEO content. Each one
@@ -125,6 +126,7 @@ export default async function GuidePage({ params }: { params: Params }) {
           <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
         </div>
       </article>
+      <Footer />
 
       <script
         type="application/ld+json"

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
 import { useCityPreference, setCityPreference } from '@/lib/city-preference';
 import { intentTagLabel } from '@/lib/utils';
@@ -274,6 +275,7 @@ function FeedContent() {
           </>
         )}
       </div>
+      <Footer />
     </>
   );
 }

@@ -35,9 +35,9 @@ export default async function Image({ params }: { params: { slug: string } }) {
           {text.length > 180 ? text.substring(0, 180) + '…' : text}
         </div>
         <div style={{ display: 'flex', gap: 30, fontSize: 22, color: '#4A4540', borderTop: '1px solid #14110D22', paddingTop: 30 }}>
-          <div>📅 {when}</div>
-          <div>📍 {where}</div>
-          {poster && <div style={{ marginLeft: 'auto' }}>↗ from {poster}</div>}
+          <div style={{ display: 'flex' }}>{when}</div>
+          <div style={{ display: 'flex' }}>{where}</div>
+          {poster && <div style={{ marginLeft: 'auto', display: 'flex' }}>from {poster}</div>}
         </div>
       </div>
     ),

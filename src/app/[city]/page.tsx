@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
 import { supabasePublic } from '@/lib/supabase/public';
 import type { Metadata } from 'next';
 
@@ -117,6 +118,7 @@ export default async function CityPage({ params }: { params: Params }) {
           <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
         </div>
       </div>
+      <Footer />
 
       <script
         type="application/ld+json"

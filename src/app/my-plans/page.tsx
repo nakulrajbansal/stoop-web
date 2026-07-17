@@ -141,7 +141,6 @@ export default function MyPlansPage() {
         ) : tab === 'posted' ? (
           posted.length === 0 ? (
             <div className="text-center py-12 text-muted">
-              <div className="text-3xl opacity-20 mb-3">📋</div>
               <p className="text-sm mb-4">No plans posted yet.</p>
               <Link href="/post" className="btn btn-accent btn-sm">Post your first plan</Link>
             </div>

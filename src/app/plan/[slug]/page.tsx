@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBlockedIds } from '@/lib/blocks';
+import Footer from '@/components/Footer';
 import PlanDetailClient from './PlanDetailClient';
 import type { Metadata } from 'next';
 
@@ -93,6 +94,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
       )}
       <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
+      <Footer />
     </Suspense>
   );
 }

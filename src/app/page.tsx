@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/server';
 import type { Metadata } from 'next';
@@ -208,7 +209,7 @@ export default async function HomePage() {
               { n: '03', h: 'You meet', p: 'A few people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
             ].map(step => (
               <div key={step.n} className="bg-cream p-8">
-                <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-cream-2 mb-3">{step.n}</div>
+                <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-[rgba(47,107,63,0.16)] mb-3">{step.n}</div>
                 <h3 className="font-serif text-[20px] font-bold tracking-tight mb-2">{step.h}</h3>
                 <p className="text-[13.5px] text-ink-2 leading-[1.65] font-light">{step.p}</p>
               </div>
@@ -279,20 +280,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-[var(--border)] py-6 px-6 sm:px-9 flex items-center justify-between flex-wrap gap-3">
-        <div className="font-serif text-[17px] font-bold">St<em className="not-italic italic text-accent">oo</em>p</div>
-        <div className="flex gap-5 flex-wrap">
-          <Link href="/feed" className="text-xs text-muted hover:text-ink">Browse</Link>
-          <Link href="/post" className="text-xs text-muted hover:text-ink">Post a plan</Link>
-          <Link href="/nyc" className="text-xs text-muted hover:text-ink">New York</Link>
-          <Link href="/austin" className="text-xs text-muted hover:text-ink">Austin</Link>
-          <Link href="/guides/how-to-make-friends-in-nyc" className="text-xs text-muted hover:text-ink">Making friends in NYC</Link>
-          <Link href="/guides/how-to-make-friends-in-austin" className="text-xs text-muted hover:text-ink">Making friends in Austin</Link>
-          <Link href="/terms" className="text-xs text-muted hover:text-ink">Terms</Link>
-        </div>
-        <div className="text-[11px] text-muted">NYC + Austin · 2026</div>
-      </footer>
+      <Footer />
     </>
   );
 }
