@@ -282,9 +282,13 @@ export default async function HomePage() {
       {/* Footer */}
       <footer className="border-t border-[var(--border)] py-6 px-6 sm:px-9 flex items-center justify-between flex-wrap gap-3">
         <div className="font-serif text-[17px] font-bold">St<em className="not-italic italic text-accent">oo</em>p</div>
-        <div className="flex gap-5">
+        <div className="flex gap-5 flex-wrap">
           <Link href="/feed" className="text-xs text-muted hover:text-ink">Browse</Link>
           <Link href="/post" className="text-xs text-muted hover:text-ink">Post a plan</Link>
+          <Link href="/nyc" className="text-xs text-muted hover:text-ink">New York</Link>
+          <Link href="/austin" className="text-xs text-muted hover:text-ink">Austin</Link>
+          <Link href="/guides/how-to-make-friends-in-nyc" className="text-xs text-muted hover:text-ink">Making friends in NYC</Link>
+          <Link href="/guides/how-to-make-friends-in-austin" className="text-xs text-muted hover:text-ink">Making friends in Austin</Link>
           <Link href="/terms" className="text-xs text-muted hover:text-ink">Terms</Link>
         </div>
         <div className="text-[11px] text-muted">NYC + Austin · 2026</div>

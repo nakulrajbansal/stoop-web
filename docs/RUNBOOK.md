@@ -120,6 +120,16 @@ NEVER enable Cloudflare proxy (orange cloud) on these — it breaks Vercel SSL/r
   property, DNS verification in Cloudflare), (2) submit
   https://www.stoop.house/sitemap.xml there, (3) request indexing for /, /nyc,
   and /austin.
+- INDEXNOW (Bing + DuckDuckGo, live since July 2026): the key file lives in
+  /public (4abc...b07.txt) and src/lib/indexnow.ts pings api.indexnow.org
+  automatically every time a plan is posted (plan URL + feed + city +
+  neighborhood pages). Bing already had stoop.house indexed as of 2026-07-16.
+  No founder action needed. If the key is ever rotated, change BOTH the file
+  name/content in /public and the constant in src/lib/indexnow.ts.
+- GUIDE PAGES: /guides/how-to-make-friends-in-nyc and -austin are evergreen
+  content targeting the highest-intent keyword. Linked from the landing footer
+  and city pages. Add more guides by extending GUIDES in
+  src/app/guides/[slug]/page.tsx (and the sitemap list).
 
 ## Supabase admin tasks (SQL Editor)
 - Clear OTP rate limits during testing: DELETE FROM otp_attempts;  (table name may vary)

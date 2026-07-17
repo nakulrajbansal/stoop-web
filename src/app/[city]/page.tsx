@@ -99,7 +99,13 @@ export default async function CityPage({ params }: { params: Params }) {
             Stoop is how neighbors in {found.name} turn ordinary weeks into company: someone posts the
             coffee, run, meal, or show they were already planning, and up to three people nearby join.
             Everyone is phone-verified, groups stay small, and plans happen in public places. Pick your
-            neighborhood above to see what&apos;s open this week.
+            neighborhood above to see what&apos;s open this week, or read our guide to{' '}
+            <Link
+              href={`/guides/how-to-make-friends-in-${found.slug}`}
+              className="underline underline-offset-2 hover:text-ink"
+            >
+              making friends in {found.name}
+            </Link>.
           </p>
         </div>
 

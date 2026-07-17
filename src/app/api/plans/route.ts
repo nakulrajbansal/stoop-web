@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
+import { pingIndexNow } from '@/lib/indexnow';
 
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
 
@@ -148,6 +149,26 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Tell Bing/DuckDuckGo about the new plan and its neighborhood page right
+  // away (fire-and-forget; a failed ping never fails the post).
+  try {
+    const [cityRes, hoodRes] = await Promise.all([
+      supabaseAdmin.from('cities').select('slug').eq('id', (profile as any).city_id).single(),
+      supabaseAdmin.from('neighborhoods').select('slug').eq('id', neighborhoodId).single()
+    ]);
+    const cityRow = cityRes.data as any;
+    const hoodRow = hoodRes.data as any;
+    const urls = [`https://www.stoop.house/plan/${(plan as any).slug}`, 'https://www.stoop.house/feed'];
+    if (cityRow?.slug) {
+      urls.push(`https://www.stoop.house/${cityRow.slug}`);
+      if (hoodRow?.slug) urls.push(`https://www.stoop.house/${cityRow.slug}/${hoodRow.slug}`);
+    }
+    await pingIndexNow(urls);
+  } catch (e) {
+    console.error('post-create indexnow failed (non-fatal):', e);
+  }
+
   return NextResponse.json({ plan });
 }
 
