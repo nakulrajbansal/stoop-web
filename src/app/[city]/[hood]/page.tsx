@@ -10,6 +10,26 @@ import type { Metadata } from 'next';
 // neighborhood's open plans. Re-rendered at most every 5 minutes.
 export const revalidate = 300;
 
+// Real local anchors per neighborhood, woven into the page copy. This is the
+// honest version of "popular locations and keywords": true statements about
+// real places, which is exactly what local search rewards.
+const LOCAL_COLOR: Record<string, string> = {
+  williamsburg: 'a slow loop in McCarren Park, coffee off Bedford Avenue, golden hour at Domino Park',
+  greenpoint: 'a morning in McGolrick Park, coffee on Franklin Street, sunset at Transmitter Park',
+  bushwick: 'coffee near the Jefferson Street murals, an afternoon in Maria Hernandez Park',
+  astoria: 'a walk through Astoria Park under the Hell Gate Bridge, coffee on Ditmars',
+  harlem: 'a morning in Marcus Garvey Park, a stroll down 125th Street, jazz on a weeknight',
+  'lower-east-side': 'coffee near Seward Park, a wander through Essex Market, the East River park at dusk',
+  'west-village': 'people-watching in Washington Square Park, a sunset walk on the Hudson River piers',
+  'park-slope': 'a Long Meadow loop in Prospect Park, coffee on Fifth Avenue, Grand Army Plaza greenmarket mornings',
+  'east-austin': 'breakfast tacos on East Sixth, a ride on the Lady Bird Lake trail, backyard shows',
+  'south-congress': 'coffee on South Congress Avenue, the bats at Congress Bridge, vintage shopping strolls',
+  mueller: 'a lap around Mueller Lake Park, the Sunday farmers market, food trailer dinners',
+  'hyde-park': 'coffee on Duval Street, an evening at Shipe Park, porch hangs',
+  'east-cesar-chavez': 'the Lady Bird Lake boardwalk, Festival Beach mornings, tacos on Cesar Chavez',
+  clarksville: 'coffee on West Lynn, a walk to the Lady Bird Lake trail, quiet street strolls'
+};
+
 type Params = Promise<{ city: string; hood: string }>;
 
 async function fetchHood(citySlug: string, hoodSlug: string) {
@@ -90,11 +110,19 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
         </p>
 
         {plans.length === 0 ? (
-          <div className="py-14 text-center border border-dashed border-[var(--border2)] rounded-2xl">
+          <div className="py-12 px-6 text-center border border-dashed border-[var(--border2)] rounded-2xl">
             <h2 className="font-serif text-[22px] font-bold mb-2">Nothing here yet this week.</h2>
-            <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
-              {found.hood.name} is quiet right now. The first plan posted is the one everyone sees.
+            <p className="text-[13.5px] text-muted leading-relaxed mb-6 max-w-[400px] mx-auto">
+              {found.hood.name} is quiet right now. The first plan posted is the one everyone sees,
+              and the first 50 hosts become Founding members.
             </p>
+            <div className="max-w-[420px] mx-auto text-left border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-6 bg-cream-2/40">
+              <div className="text-[10px] font-mono uppercase tracking-wide text-muted mb-2">Sample · what a plan looks like</div>
+              <p className="font-serif text-[15px] font-bold leading-snug mb-1.5 opacity-80">
+                getting a coffee saturday morning before the neighborhood wakes up, come sit
+              </p>
+              <div className="text-[11.5px] text-muted">Saturday, 9am · 1 spot · {found.hood.name}</div>
+            </div>
             <Link href="/post" className="btn btn-accent">Post the first plan →</Link>
           </div>
         ) : (
@@ -114,6 +142,9 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
             a thing they were already going to do this week: coffee before work, a slow run, a pickup
             game, a gallery or bookstore wander, live music, a long walk. Up to three neighbors join.
             That&apos;s the whole idea.
+            {LOCAL_COLOR[found.hood.slug] && (
+              <> In {found.hood.name} that tends to look like {LOCAL_COLOR[found.hood.slug]}.</>
+            )}
           </p>
           <p className="text-[13.5px] text-ink-2 leading-[1.75] font-light">
             Every plan is posted by a phone-verified neighbor, capped at four people total, and happens

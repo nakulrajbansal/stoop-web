@@ -11,6 +11,26 @@ import { intentTagLabel } from '@/lib/utils';
 
 const CATEGORIES = ['coffee', 'outdoors', 'sports', 'arts', 'food', 'books', 'music'];
 
+// Shown ONLY in the empty state, clearly labeled as samples. They demonstrate
+// the format without pretending to be real activity.
+const SAMPLE_PLANS = [
+  {
+    cat: 'coffee',
+    text: 'getting a flat white saturday morning before the market gets busy, come sit',
+    meta: 'Saturday, 9am · 1 spot'
+  },
+  {
+    cat: 'outdoors',
+    text: 'slow loop around the park sunday at 9, the kind of pace where you can actually talk',
+    meta: 'Sunday, 9am · 2 spots'
+  },
+  {
+    cat: 'music',
+    text: 'free show wednesday night, going alone unless someone joins',
+    meta: 'Wednesday, 8pm · 1 spot'
+  }
+];
+
 function weekOfLabel(): string {
   const now = new Date();
   const monday = new Date(now);
@@ -186,13 +206,28 @@ function FeedContent() {
             ))}
           </div>
         ) : plans.length === 0 ? (
-          <div className="py-16 text-center">
+          <div className="py-10">
+            <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-3">What plans here look like</div>
+            <div className="grid sm:grid-cols-3 gap-3 mb-12">
+              {SAMPLE_PLANS.map(s => (
+                <div key={s.cat} className="border border-dashed border-[var(--border2)] rounded-2xl px-4 py-4">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className={`tag tag-${s.cat}`}>{s.cat}</span>
+                    <span className="text-[10px] font-mono uppercase tracking-wide text-muted">Sample</span>
+                  </div>
+                  <p className="font-serif text-[15px] font-bold leading-snug mb-1.5 opacity-80">{s.text}</p>
+                  <div className="text-[11.5px] text-muted">{s.meta}</div>
+                </div>
+              ))}
+            </div>
+            <div className="text-center">
             <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
             <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
               Nothing here for {cityLabel} this week. The type of person who posts on Stoop is the same type who shows up.
               And the first 50 hosts become Founding members, badge and all.
             </p>
             <Link href="/post" className="btn btn-accent">Post a plan →</Link>
+            </div>
           </div>
         ) : (
           <>
