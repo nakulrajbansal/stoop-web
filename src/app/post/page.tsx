@@ -141,7 +141,7 @@ export default function PostPage() {
     const data = await res.json();
     if (!res.ok) { setError(data.error || 'Could not post plan'); setSubmitting(false); return; }
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
-    router.push(`/plan/${data.plan.slug}?posted=1`);
+    router.push(`/plan/${data.plan.slug}?posted=1${data.becameFounding ? '&founding=1' : ''}`);
   }
 
   return (
@@ -152,7 +152,8 @@ export default function PostPage() {
         <h1 className="font-serif text-[clamp(32px,4.5vw,44px)] font-bold tracking-[-1px] leading-[1.05] mb-1">
           What&apos;s the <em className="italic text-gold">plan?</em>
         </h1>
-        <p className="text-[14px] text-muted mb-10">Write it like you&apos;d text a friend. Specific time, specific place.</p>
+        <p className="text-[14px] text-muted mb-2">Write it like you&apos;d text a friend. Specific time, specific place.</p>
+        <p className="text-[12.5px] text-gold mb-10">The first 50 hosts become Founding members. The badge stays on everything you post.</p>
 
         {signedIn === false && (
           <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-8 -mt-6">

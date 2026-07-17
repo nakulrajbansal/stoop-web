@@ -46,6 +46,9 @@ Live at https://stoop.house. Two cities at launch: NYC and Austin.
   is the only way a user learns someone joined.
 - Categories (fixed set): coffee, outdoors, sports, arts, food, books, music.
 - URLs use plan SLUGS not ids: /plan/[slug].
+- Founding member badge: auto-granted to the first 50 members who PUBLISH a plan
+  (in /api/plans POST). Never seed fake profiles or fake plans; seeding is real
+  founder/friend plans only (see DECISIONS.md "Founding member badge").
 
 ## Current state
 See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing (July 2026):

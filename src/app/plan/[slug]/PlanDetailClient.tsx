@@ -14,6 +14,7 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
   const searchParams = useSearchParams();
   const supabase = createClient();
   const justPosted = searchParams.get('posted') === '1';
+  const justBecameFounding = searchParams.get('founding') === '1';
 
   const [plan] = useState<any>(initialPlan);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -98,7 +99,11 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
         {justPosted && (
           <div className="bg-[rgba(42,66,50,0.08)] border border-[rgba(42,66,50,0.3)] text-sage rounded-xl px-4 py-3 mb-6 text-[13.5px] flex items-center gap-2">
             <CheckCircleIcon className="flex-shrink-0" />
-            <span>You&apos;re out there. Your plan is live and someone in your city is going to see this.</span>
+            <span>
+              {justBecameFounding
+                ? 'Your plan is live, and that made you a Founding member. The badge is yours for good.'
+                : "You're out there. Your plan is live and someone in your city is going to see this."}
+            </span>
           </div>
         )}
 

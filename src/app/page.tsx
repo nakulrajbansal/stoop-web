@@ -148,7 +148,8 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <p className="text-[13px] text-muted leading-relaxed mb-4 text-center">
-                  This week is still wide open.<br />The first plan sets the tone.
+                  This week is still wide open.<br />The first plan sets the tone.<br />
+                  <span className="text-gold">First 50 hosts become Founding members.</span>
                 </p>
                 <div className="text-center">
                   <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>

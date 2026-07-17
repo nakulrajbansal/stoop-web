@@ -120,7 +120,10 @@ function FeedContent() {
                 <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
                   This week is <em className="italic text-gold">wide open.</em>
                 </h1>
-                <p className="text-[13px] text-muted mb-8">Whatever gets posted first sets the tone.</p>
+                <p className="text-[13px] text-muted mb-8">
+                  Whatever gets posted first sets the tone.
+                  <span className="text-gold"> The first 50 hosts become Founding members.</span>
+                </p>
               </>
             )}
           </>
@@ -187,6 +190,7 @@ function FeedContent() {
             <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
             <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
               Nothing here for {cityLabel} this week. The type of person who posts on Stoop is the same type who shows up.
+              And the first 50 hosts become Founding members, badge and all.
             </p>
             <Link href="/post" className="btn btn-accent">Post a plan →</Link>
           </div>

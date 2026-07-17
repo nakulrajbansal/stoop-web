@@ -70,6 +70,19 @@ moderation, panic features. Real for mature platforms; premature now. The block 
 guidance + manual review layer is the right amount of safety at small scale.
 
 ## Design language
-Editorial / print aesthetic, not typical-startup. Cream #F0EBE1, ink #14110D, coral #C8472A,
-sage #2A4232. Serif (Georgia) headlines, mono meta labels. Calm, warm, understated. No
+Editorial / print aesthetic, not typical-startup. Rebranded July 2026 to the neighborhood
+noticeboard direction: cream #F0EBE1, ink #14110D, civic green #2F6B3F (accent), mustard
+#8A681E (emphasis), danger red #B3402A (errors/delete only), sage #2A4232 (success).
+Serif (Fraunces) headlines, mono meta labels. Copy never defines Stoop against dating apps. Calm, warm, understated. No
 gradients, minimal emoji. Copy is warm and human, never corporate. No em dashes.
+
+## Founding member badge (settled July 2026)
+- The first 50 members who PUBLISH A PLAN automatically become Founding members
+  (profiles.is_founding_member, granted in /api/plans POST, permanent). Posting is the
+  qualifying act, not signing up: the scarce thing on Stoop is hosts.
+- Advertised on the post page, both empty feeds, and the landing example panel. The
+  just-posted banner celebrates it.
+- SEEDING RULE (reaffirmed): seed with REAL plans from the founder and friends, small spot
+  counts (1) so some genuinely fill. NEVER fake profiles or fake full plans; in a
+  hyperlocal product, staged activity is discoverable by neighbors and fatal to trust,
+  and it poisons metrics, the digest, follow-ups, and the SocialEvent SEO data.

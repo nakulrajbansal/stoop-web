@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('city_id, neighborhood_id')
+    .select('city_id, neighborhood_id, is_founding_member')
     .eq('id', user.id)
     .single();
 
@@ -150,6 +150,26 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Founding member mechanic: the first 50 people to publish a plan get the
+  // badge, automatically and permanently. Best-effort; never fails the post.
+  let becameFounding = false;
+  try {
+    if (!(profile as any).is_founding_member) {
+      const { count: foundingCount } = await supabaseAdmin
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_founding_member', true);
+      if ((foundingCount ?? 0) < 50) {
+        const { error: fmErr } = await (supabaseAdmin.from('profiles') as any)
+          .update({ is_founding_member: true })
+          .eq('id', user.id);
+        becameFounding = !fmErr;
+      }
+    }
+  } catch (e) {
+    console.error('founding badge grant failed (non-fatal):', e);
+  }
+
   // Tell Bing/DuckDuckGo about the new plan and its neighborhood page right
   // away (fire-and-forget; a failed ping never fails the post).
   try {
@@ -169,7 +189,7 @@ export async function POST(req: NextRequest) {
     console.error('post-create indexnow failed (non-fatal):', e);
   }
 
-  return NextResponse.json({ plan });
+  return NextResponse.json({ plan, becameFounding });
 }
 
 export async function PATCH(req: NextRequest) {
