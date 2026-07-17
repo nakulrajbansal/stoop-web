@@ -28,12 +28,14 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.stoop.house'),
   title: 'Stoop · Plans, not profiles.',
   description: 'Post what you\'re already doing this week. A few neighbors join you.',
   openGraph: {
     title: 'Stoop',
     description: 'Plans, not profiles.',
-    type: 'website'
+    type: 'website',
+    siteName: 'Stoop'
   }
 };
 

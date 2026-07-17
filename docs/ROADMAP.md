@@ -83,6 +83,11 @@ matters until these are done.
       step after launch: submit the sitemap in Google Search Console.
 - [x] **PWA basics.** Web app manifest + home-screen icons are live; "Add to Home
       Screen" now gives an app-like entry point. Runway toward push notifications later.
+- [x] **SEO layer.** Keyword-targeted titles and on-page copy (make friends in {city},
+      things to do in {neighborhood} this week), FAQ section on the landing page, and
+      structured data throughout (FAQPage, WebSite, BreadcrumbList, ItemList,
+      SocialEvent per dated plan). Founder steps and honest expectations: RUNBOOK
+      "Neighborhood pages and SEO".
 
 ## Phase 3: The comeback loop (the week-eight question)
 

@@ -2,8 +2,45 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/server';
+import type { Metadata } from 'next';
 
 export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: 'Stoop · Meet neighbors over real plans in NYC and Austin',
+  description:
+    "Post what you're already doing this week (coffee, a run, pickleball) and a few neighbors join you. A free, small-group way to make friends nearby in New York and Austin.",
+  alternates: { canonical: 'https://www.stoop.house/' }
+};
+
+// Visible on the page AND mirrored into FAQPage structured data below, so
+// Google can show these as rich results. Keep the two in sync.
+const FAQ = [
+  {
+    q: 'What is Stoop?',
+    a: 'Stoop is a neighborhood noticeboard for plans. You post something you are already doing this week, in your own words, and up to three neighbors can join you. No profiles to browse, no feed to scroll.'
+  },
+  {
+    q: 'How do I make friends on Stoop?',
+    a: 'Post a real plan (coffee before work, a park run, a gallery visit) or message someone else\'s. You meet in person, in a small group, over the thing itself. Most friendships here start as one ordinary Tuesday plan.'
+  },
+  {
+    q: 'What kinds of plans do people post?',
+    a: 'Coffee, runs and pickup sports, food, arts, books, live music, time outdoors. If you were going to do it anyway, it belongs on Stoop.'
+  },
+  {
+    q: 'Where does Stoop work?',
+    a: 'New York City and Austin, neighborhood by neighborhood. Every plan is local: posted by someone who lives nearby, happening somewhere you can walk or train to.'
+  },
+  {
+    q: 'Is Stoop free?',
+    a: 'Yes. Posting plans and joining them is free.'
+  },
+  {
+    q: 'Is it safe to meet people from Stoop?',
+    a: 'Every member verifies a real phone number, groups are capped at four people, plans happen in public places, and blocking and reporting are built in. Reports are reviewed within 24 hours.'
+  }
+];
 
 function weekOfLabel(): string {
   const now = new Date();
@@ -179,6 +216,55 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Common questions: real content for visitors, FAQPage data for Google */}
+      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 py-16 sm:py-20">
+        <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">Common questions</div>
+        <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-10">
+          Asked and <em className="italic text-gold">answered.</em>
+        </h2>
+        <div className="grid sm:grid-cols-2 gap-x-12 gap-y-8">
+          {FAQ.map(item => (
+            <div key={item.q}>
+              <h3 className="font-serif text-[18px] font-bold tracking-tight mb-1.5">{item.q}</h3>
+              <p className="text-[13.5px] text-ink-2 leading-[1.7] font-light">{item.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Structured data for search engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Stoop',
+            url: 'https://www.stoop.house',
+            description: 'A neighborhood noticeboard for plans in NYC and Austin. Post what you are already doing this week; a few neighbors join you.',
+            publisher: {
+              '@type': 'Organization',
+              name: 'Stoop',
+              url: 'https://www.stoop.house'
+            }
+          })
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: FAQ.map(item => ({
+              '@type': 'Question',
+              name: item.q,
+              acceptedAnswer: { '@type': 'Answer', text: item.a }
+            }))
+          })
+        }}
+      />
 
       {/* CTA */}
       <section className="px-6 sm:px-9 my-16 sm:my-20">

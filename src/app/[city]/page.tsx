@@ -23,8 +23,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { city } = await params;
   const found = await fetchCity(city);
   if (!found) return { title: 'Not found · Stoop' };
-  const title = `Stoop in ${found.name}: plans by neighborhood`;
-  const description = `What neighbors in ${found.name} are doing this week, one neighborhood at a time. Join a plan or post your own.`;
+  const title = `Make friends in ${found.name}, one plan at a time · Stoop`;
+  const description = `Meet neighbors in ${found.name} over real plans: coffee, runs, food, live music, posted by people nearby. Pick your neighborhood, join a plan, or post your own. Free and phone-verified.`;
   return {
     title,
     description,
@@ -90,6 +90,19 @@ export default async function CityPage({ params }: { params: Params }) {
           })}
         </div>
 
+        {/* Substantive copy so this page ranks for "make friends in {city}" searches */}
+        <div className="mt-12 max-w-[640px]">
+          <h2 className="font-serif text-[22px] font-bold tracking-tight mb-3">
+            Meeting people in {found.name}, without the apps feeling
+          </h2>
+          <p className="text-[13.5px] text-ink-2 leading-[1.75] font-light">
+            Stoop is how neighbors in {found.name} turn ordinary weeks into company: someone posts the
+            coffee, run, meal, or show they were already planning, and up to three people nearby join.
+            Everyone is phone-verified, groups stay small, and plans happen in public places. Pick your
+            neighborhood above to see what&apos;s open this week.
+          </p>
+        </div>
+
         <div className="mt-10 bg-cream-2 border border-[var(--border)] rounded-2xl px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="font-serif text-[17px] font-bold text-ink mb-0.5">Don&apos;t see yours?</div>
@@ -98,6 +111,20 @@ export default async function CityPage({ params }: { params: Params }) {
           <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
+              { '@type': 'ListItem', position: 2, name: found.name, item: `https://www.stoop.house/${found.slug}` }
+            ]
+          })
+        }}
+      />
     </>
   );
 }

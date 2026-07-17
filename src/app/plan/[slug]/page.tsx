@@ -62,8 +62,36 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
     .eq('user_id', plan.user_id)
     .neq('status', 'removed');
 
+  // Machine-readable event data for Google. Only when the plan has a real
+  // date; a dateless plan is not a valid Event for rich results.
+  const eventJsonLd = plan.when_date
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'SocialEvent',
+        name: plan.text.length > 110 ? plan.text.substring(0, 110) + '…' : plan.text,
+        startDate: plan.when_date,
+        eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+        eventStatus: 'https://schema.org/EventScheduled',
+        isAccessibleForFree: true,
+        maximumAttendeeCapacity: 4,
+        organizer: { '@type': 'Person', name: plan.poster?.name ?? 'A neighbor' },
+        location: {
+          '@type': 'Place',
+          name: plan.spot || plan.neighborhood?.name || plan.city?.name || 'Neighborhood spot',
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: plan.city?.name ?? undefined
+          }
+        },
+        url: `https://www.stoop.house/plan/${plan.slug}`
+      }
+    : null;
+
   return (
     <Suspense fallback={<div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
+      {eventJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
+      )}
       <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
     </Suspense>
   );

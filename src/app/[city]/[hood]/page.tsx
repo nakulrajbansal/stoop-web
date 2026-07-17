@@ -52,8 +52,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const found = await fetchHood(city, hood);
   if (!found) return { title: 'Not found · Stoop' };
 
-  const title = `This week in ${found.hood.name} · Stoop`;
-  const description = `Real plans posted by neighbors in ${found.hood.name}, ${found.city.name}: coffee, runs, food, whatever someone is already doing. Join one or post your own.`;
+  const title = `Things to do in ${found.hood.name} this week with neighbors · Stoop`;
+  const description = `Meet people in ${found.hood.name}, ${found.city.name} over real plans: coffee, runs, food, live music, whatever a neighbor is already doing. Join one or post your own. Free, small groups, phone-verified.`;
   return {
     title,
     description,
@@ -102,6 +102,25 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
           </div>
         )}
 
+        {/* Substantive copy so this page ranks for "things to do in X" and
+            "meet people in X" searches instead of being a thin listing */}
+        <div className="mt-12 max-w-[640px]">
+          <h2 className="font-serif text-[22px] font-bold tracking-tight mb-3">
+            How people use Stoop in {found.hood.name}
+          </h2>
+          <p className="text-[13.5px] text-ink-2 leading-[1.75] font-light mb-3">
+            Stoop is a neighborhood noticeboard, not an events site. Someone in {found.hood.name} posts
+            a thing they were already going to do this week: coffee before work, a slow run, a pickup
+            game, a gallery or bookstore wander, live music, a long walk. Up to three neighbors join.
+            That&apos;s the whole idea.
+          </p>
+          <p className="text-[13.5px] text-ink-2 leading-[1.75] font-light">
+            Every plan is posted by a phone-verified neighbor, capped at four people total, and happens
+            somewhere public in or near {found.hood.name}. It&apos;s a low-key way to meet people nearby
+            and make friends in {found.city.name} without profiles, swiping, or ticketed events.
+          </p>
+        </div>
+
         <div className="mt-10 bg-cream-2 border border-[var(--border)] rounded-2xl px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="font-serif text-[17px] font-bold text-ink mb-0.5">Live in {found.hood.name}?</div>
@@ -110,6 +129,38 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
           <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
+              { '@type': 'ListItem', position: 2, name: found.city.name, item: `https://www.stoop.house/${found.city.slug}` },
+              { '@type': 'ListItem', position: 3, name: found.hood.name, item: `https://www.stoop.house/${found.city.slug}/${found.hood.slug}` }
+            ]
+          })
+        }}
+      />
+      {plans.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'ItemList',
+              name: `Plans in ${found.hood.name} this week`,
+              itemListElement: plans.map((p, i) => ({
+                '@type': 'ListItem',
+                position: i + 1,
+                url: `https://www.stoop.house/plan/${p.slug}`
+              }))
+            })
+          }}
+        />
+      )}
     </>
   );
 }
