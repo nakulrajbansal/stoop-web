@@ -56,7 +56,9 @@ async function jr(res) { const t = await res.text(); try { return JSON.parse(t);
 
 async function teardown() {
   console.log('Teardown: removing sample data...');
-  const profs = await jr(await rest(`profiles?select=id&name=like.*${encodeURIComponent(MARK)}*`));
+  // Identify samples by their reserved non-dialable +1555010x phones (the
+  // visible [sample] name tag is intentionally not used, so it never shows).
+  const profs = await jr(await rest(`profiles?select=id&phone_e164=like.%2B155501%2A`));
   const ids = Array.isArray(profs) ? profs.map((p) => p.id) : [];
   if (ids.length) {
     await rest(`plans?user_id=in.(${ids.join(',')})`, { method: 'DELETE' });
@@ -67,8 +69,8 @@ async function teardown() {
 }
 
 async function seed() {
-  // guard: already seeded?
-  const existing = await jr(await rest(`profiles?select=id&name=like.*${encodeURIComponent(MARK)}*&limit=1`));
+  // guard: already seeded? (identify by reserved sample phone prefix)
+  const existing = await jr(await rest(`profiles?select=id&phone_e164=like.%2B155501%2A&limit=1`));
   if (Array.isArray(existing) && existing.length) { console.log('Samples already present. Nothing to do (run --teardown to remove).'); return; }
 
   // neighborhood id (Williamsburg / NYC)
@@ -89,7 +91,7 @@ async function seed() {
 
   // 2. profiles
   const profRows = USERS.map((u) => ({
-    id: u.id, name: `${u.name} ${MARK}`, phone_e164: u.phone, phone_verified_at: new Date().toISOString(),
+    id: u.id, name: u.name, phone_e164: u.phone, phone_verified_at: new Date().toISOString(),
     city_id, neighborhood_id, about: 'sample profile, remove at launch', initials: u.initials,
     avatar_bg: u.bg, avatar_fg: u.fg, is_founding_member: false,
   }));
