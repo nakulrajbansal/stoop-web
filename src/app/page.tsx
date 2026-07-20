@@ -62,17 +62,34 @@ export default async function HomePage() {
       neighborhood:neighborhoods(name),
       city:cities(slug, name)
     `, { count: 'exact' })
-    .eq('status', 'open')
+    .in('status', ['open', 'full'])
     .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(3);
+    .order('when_date', { ascending: true, nullsFirst: false })
+    .limit(4);
 
   const planCount = count ?? 0;
   const totalSpots = plans?.reduce((acc, p) => acc + (p.spots_left ?? 0), 0) ?? 0;
   const week = weekOfLabel();
 
+  // ItemList structured data: lets Google read the featured plans as a
+  // ranked list on the homepage (carousel-eligible rich result).
+  const itemListJsonLd = plans && plans.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Featured neighbor plans this week',
+    itemListElement: plans.map((p: any, i: number) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://www.stoop.house/plan/${p.slug}`,
+      name: p.text.length > 90 ? p.text.substring(0, 90) + '…' : p.text,
+    })),
+  } : null;
+
   return (
     <>
+      {itemListJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
+      )}
       <Nav />
 
       {/* Editorial masthead */}
@@ -184,8 +201,12 @@ export default async function HomePage() {
                         {plan.neighborhood?.name}
                       </div>
                     </div>
-                    <div className="text-[11px] text-accent font-medium whitespace-nowrap mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {plan.spots_left} open →
+                    <div className="text-[11px] font-medium whitespace-nowrap mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {plan.status === 'full' || plan.spots_left === 0 ? (
+                        <span className="text-muted">Full ✓</span>
+                      ) : (
+                        <span className="text-accent">{plan.spots_left} open →</span>
+                      )}
                     </div>
                   </Link>
                 ))}
