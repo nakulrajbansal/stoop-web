@@ -77,6 +77,32 @@ export type Database = {
         Insert: { reporter_id: string; reported_user_id: string; reason: string; details?: string | null };
         Update: { status?: 'open' | 'reviewed' | 'actioned' | 'dismissed' };
       };
+      ops_items: {
+        Row: {
+          id: string; kind: 'task' | 'approval'; title: string; summary: string | null;
+          status: 'backlog' | 'in_progress' | 'blocked' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
+          owner: 'user' | 'curio' | 'shared'; priority: 'low' | 'medium' | 'high' | 'urgent';
+          due_at: string | null; next_action: string | null; approval_question: string | null;
+          decision_notes: string | null; source_url: string | null; sort_order: number;
+          created_at: string; updated_at: string; completed_at: string | null;
+        };
+        Insert: {
+          id?: string; kind: 'task' | 'approval'; title: string; summary?: string | null;
+          status: 'backlog' | 'in_progress' | 'blocked' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
+          owner: 'user' | 'curio' | 'shared'; priority?: 'low' | 'medium' | 'high' | 'urgent';
+          due_at?: string | null; next_action?: string | null; approval_question?: string | null;
+          decision_notes?: string | null; source_url?: string | null; sort_order?: number;
+          completed_at?: string | null;
+        };
+        Update: {
+          title?: string; summary?: string | null;
+          status?: 'backlog' | 'in_progress' | 'blocked' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
+          owner?: 'user' | 'curio' | 'shared'; priority?: 'low' | 'medium' | 'high' | 'urgent';
+          due_at?: string | null; next_action?: string | null; approval_question?: string | null;
+          decision_notes?: string | null; source_url?: string | null; sort_order?: number;
+          completed_at?: string | null;
+        };
+      };
       otp_attempts: {
         Row: { id: string; phone_e164: string; ip_address: string | null; succeeded: boolean; created_at: string };
         Insert: { phone_e164: string; ip_address?: string | null; succeeded?: boolean };

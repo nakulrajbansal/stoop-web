@@ -72,6 +72,12 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   Ops + safe testing: RUNBOOK "Weekly digest".
 - /admin/metrics (ADMIN_USER_ID-gated): plans/week, join rate, repeat posters,
   report SLA. PWA manifest live (Add to Home Screen works).
+- /admin/ops built but DARK until migration 0006 is run: owner-only board of
+  high-level tasks and pending approvals (create, edit, approve/reject,
+  complete, reopen) via /api/admin/ops. Same ADMIN_USER_ID gate, 404 for
+  everyone else. Domain rules and transitions live in src/lib/ops.ts with
+  tests in src/lib/ops.test.ts. Migration 0006 seeds the real work in flight
+  and is safe to re-run.
 - POST-PLAN FOLLOW-UP built but DARK: daily cron (16:00 UTC) emails both people
   the day after a confirmed plan; one tap on /followup records great/fine/noshow
   into plan_feedback (service-role only). Activates when migration 0005 is run

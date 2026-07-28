@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import Nav from '@/components/Nav';
+import AdminNav from '@/components/AdminNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,6 +96,7 @@ export default async function AdminMetricsPage() {
     <>
       <Nav />
       <div className="max-w-[680px] mx-auto px-6 py-10">
+        <AdminNav current="/admin/metrics" />
         <div className="flex items-baseline justify-between mb-1">
           <h1 className="text-[18px] font-semibold text-ink">Metrics</h1>
           <Link href="/admin/reports" className="text-[12px] text-muted hover:text-ink underline underline-offset-2">Reports queue →</Link>

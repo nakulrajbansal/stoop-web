@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import Nav from '@/components/Nav';
+import AdminNav from '@/components/AdminNav';
 import ReportActions from './ReportActions';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,7 @@ export default async function AdminReportsPage() {
     <>
       <Nav />
       <div className="max-w-[680px] mx-auto px-6 py-10">
+        <AdminNav current="/admin/reports" />
         <h1 className="text-[18px] font-semibold text-ink mb-1">Reports</h1>
         <p className="text-[13px] text-muted mb-7">
           {list.length} open {list.length === 1 ? 'report' : 'reports'}. Review within 24 hours.
