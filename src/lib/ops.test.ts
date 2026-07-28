@@ -86,7 +86,7 @@ describe('parseOpsItemCreate', () => {
   it('accepts a due date as a timestamp and rejects an unparseable one', () => {
     const parsed = parseOpsItemCreate({
       kind: 'task',
-      title: 'Prepare for the C3 offer negotiation call',
+      title: 'Prepare the neighborhood launch review',
       status: 'in_progress',
       owner: 'user',
       priority: 'high',

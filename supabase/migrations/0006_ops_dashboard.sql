@@ -74,18 +74,6 @@ VALUES
     10
   ),
   (
-    '0e7f2a10-0000-4000-8000-000000000002',
-    'task',
-    'Prepare for C3 offer negotiation call',
-    'Package review and negotiation prep ahead of the scheduled call.',
-    'in_progress',
-    'user',
-    'high',
-    TIMESTAMPTZ '2026-07-28 14:00:00 America/Chicago',
-    'Hold the call and record the package outcome.',
-    20
-  ),
-  (
     '0e7f2a10-0000-4000-8000-000000000003',
     'task',
     'Build shared operations dashboard',
@@ -96,17 +84,5 @@ VALUES
     NULL,
     'Review the diff, run this migration, then deploy and confirm the board loads on mobile.',
     30
-  ),
-  (
-    '0e7f2a10-0000-4000-8000-000000000004',
-    'task',
-    'NYC apartment search',
-    'Surface verified standout candidates only, under the existing hard gates. Anything that fails a gate or cannot be verified does not get shown.',
-    'in_progress',
-    'curio',
-    'high',
-    NULL,
-    'Bring forward the next verified standout candidate that clears every hard gate.',
-    40
   )
 ON CONFLICT (id) DO NOTHING;
