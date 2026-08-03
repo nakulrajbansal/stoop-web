@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
+import { notifyUser } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
   }
 
   const { planId, firstMessage } = await req.json();
@@ -91,13 +91,16 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('join-email failed (non-fatal):', e);
     }
+
+    // Same event, native channel. Generic copy only: the message itself is
+    // fetched in-app, never put on a lock screen. Email is unaffected.
+    await notifyUser((plan as any).user_id, 'join_request', { conversationId: convId });
   }
   return NextResponse.json({ ok: true, conversationId: convId });
 }
 
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { conversationId, action } = await req.json();
@@ -141,6 +144,8 @@ export async function PATCH(req: NextRequest) {
       } catch (e) {
         console.error('confirm-email failed (non-fatal):', e);
       }
+
+      await notifyUser((conv as any).joiner_id, 'confirmed', { conversationId });
     }
 
 
@@ -152,8 +157,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: convs, error } = await supabase

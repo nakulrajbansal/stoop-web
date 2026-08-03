@@ -1,9 +1,8 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 
-export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function GET(req: NextRequest) {
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ count: 0 });
 
   // All conversations the user is part of, with their latest message time

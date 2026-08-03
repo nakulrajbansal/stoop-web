@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
 import { getBlockedIds } from '@/lib/blocks';
@@ -9,8 +9,7 @@ import { pingIndexNow } from '@/lib/indexnow';
 const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
 
   // Blocked users (either direction) are filtered out of the feed entirely
   const blockedIds = user ? await getBlockedIds(supabase, user.id) : [];
@@ -62,11 +61,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
   }
 
   const body = await req.json();
@@ -193,8 +191,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { planId, text, whenDate, whenDayLabel, whenTime, whenTimeSpecific, intentTags } = await req.json();
@@ -238,8 +235,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(req.url);

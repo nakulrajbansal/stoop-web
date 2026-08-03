@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Their profile photo lives in storage, outside the FK cascade,

@@ -108,6 +108,27 @@ export type Database = {
         Insert: { phone_e164: string; ip_address?: string | null; succeeded?: boolean };
         Update: { succeeded?: boolean };
       };
+      // Native push tokens (migration 0007). Service-role only: not granted to
+      // the anon or authenticated API roles.
+      push_tokens: {
+        Row: {
+          id: string; user_id: string; expo_push_token: string;
+          platform: 'ios' | 'android'; installation_id: string; app_version: string | null;
+          created_at: string; updated_at: string;
+          last_used_at: string | null; revoked_at: string | null;
+        };
+        Insert: {
+          id?: string; user_id: string; expo_push_token: string;
+          platform: 'ios' | 'android'; installation_id: string; app_version?: string | null;
+          created_at?: string; updated_at?: string;
+          last_used_at?: string | null; revoked_at?: string | null;
+        };
+        Update: {
+          user_id?: string; expo_push_token?: string;
+          platform?: 'ios' | 'android'; installation_id?: string; app_version?: string | null;
+          updated_at?: string; last_used_at?: string | null; revoked_at?: string | null;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

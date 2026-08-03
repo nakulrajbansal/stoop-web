@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isSuspended } from '@/lib/moderation';
 
@@ -22,12 +22,11 @@ async function ensureBucket() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
   }
 
   let file: Blob | null = null;
@@ -69,9 +68,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, version: Date.now() });
 }
 
-export async function DELETE() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function DELETE(req: NextRequest) {
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await supabaseAdmin.storage.from(BUCKET).remove([`${user.id}.jpg`]);

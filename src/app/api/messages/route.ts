@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendReplyAlert } from '@/lib/resend';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
+import { notifyUser } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRouteAuth(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
+    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
   }
 
   const { conversationId, text } = await req.json();
@@ -92,6 +92,10 @@ export async function POST(req: NextRequest) {
       if (recipient?.notify_email) {
         await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
       }
+      // Native push rides the same "they stepped away" gate as the email, so
+      // an active conversation does not buzz the phone on every line. The
+      // reply text itself stays out of the notification.
+      await notifyUser(recipientId, 'reply', { conversationId });
     }
   } catch (e) {
     console.error('reply-email failed (non-fatal):', e);
