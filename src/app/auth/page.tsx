@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toE164 } from '@/lib/utils';
 import { toAvatarJpeg } from '@/lib/avatar-image';
+import { neighborhoodsForCity } from '@/lib/neighborhoods';
 import Nav from '@/components/Nav';
 
 type Step = 'phone' | 'otp' | 'profile' | 'photo';
@@ -37,9 +38,7 @@ function AuthContent() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  const hoods = city === 'austin'
-    ? ['east-austin', 'south-congress', 'mueller', 'hyde-park', 'east-cesar-chavez', 'clarksville']
-    : ['williamsburg', 'west-village', 'park-slope', 'lower-east-side', 'astoria', 'bushwick', 'greenpoint', 'harlem'];
+  const hoods = neighborhoodsForCity(city);
 
   async function sendOtp() {
     setError('');
@@ -246,7 +245,7 @@ function AuthContent() {
               <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your neighborhood</label>
               <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="input cursor-pointer">
                 <option value="">Where are you based?</option>
-                {hoods.map(h => <option key={h} value={h} className="capitalize">{h.replace(/-/g, ' ')}</option>)}
+                {hoods.map(hood => <option key={hood.slug} value={hood.slug}>{hood.name}</option>)}
               </select>
             </div>
             <div>
