@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteAuth } from '@/lib/supabase/route';
+import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { isSuspended } from '@/lib/moderation';
+import { suspensionGate } from '@/lib/moderation';
+import { MAX_UPLOAD_BYTES, processAvatar } from '@/lib/avatar-processing';
 
 const BUCKET = 'avatars';
-const MAX_BYTES = 2 * 1024 * 1024;
+
+// sharp is a native module; this route cannot run on the edge runtime.
+export const runtime = 'nodejs';
 
 // The bucket is created by the app on first use so there is no manual
 // Supabase setup step. Public read; writes only happen through this route,
@@ -14,7 +17,7 @@ async function ensureBucket() {
   if (data) return;
   const { error } = await supabaseAdmin.storage.createBucket(BUCKET, {
     public: true,
-    fileSizeLimit: MAX_BYTES,
+    fileSizeLimit: MAX_UPLOAD_BYTES,
     allowedMimeTypes: ['image/jpeg']
   });
   // A concurrent first upload can lose the create race; that is fine.
@@ -22,12 +25,13 @@ async function ensureBucket() {
 }
 
 export async function POST(req: NextRequest) {
-  const { supabase, user } = await getRouteAuth(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
 
-  if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
-  }
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   let file: Blob | null = null;
   try {
@@ -38,22 +42,23 @@ export async function POST(req: NextRequest) {
     // fall through to the invalid-input response
   }
   if (!file) return NextResponse.json({ error: 'No photo received' }, { status: 400 });
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'Photo too large (2 MB max)' }, { status: 413 });
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json({ error: 'Photo too large (6 MB max)' }, { status: 413 });
   }
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  // The client always sends a canvas-produced JPEG; verify the magic bytes
-  // so nothing else can be parked in the public bucket.
-  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) {
-    return NextResponse.json({ error: 'Not a valid photo' }, { status: 400 });
+  // Decode and re-encode server side. Nothing the client sent is stored: what
+  // lands in the public bucket is a JPEG this process produced, stripped of
+  // metadata and bounded in size. See @/lib/avatar-processing.
+  const processed = await processAvatar(Buffer.from(await file.arrayBuffer()));
+  if (!processed.ok) {
+    return NextResponse.json({ error: processed.error }, { status: processed.status });
   }
 
   try {
     await ensureBucket();
     const { error } = await supabaseAdmin.storage
       .from(BUCKET)
-      .upload(`${user.id}.jpg`, buf, {
+      .upload(`${user.id}.jpg`, processed.buffer, {
         contentType: 'image/jpeg',
         upsert: true,
         cacheControl: '300'
@@ -69,8 +74,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { supabase, user } = await getRouteAuth(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
 
   const { error } = await supabaseAdmin.storage.from(BUCKET).remove([`${user.id}.jpg`]);
   if (error) {

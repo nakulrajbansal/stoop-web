@@ -54,7 +54,10 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-ink font-medium">A profile photo, if you add one.</strong>{' '}
-                Optional, one per person, visible to other members. You can remove it at any time.
+                Optional, one per person. It is served from a public web address, so anyone holding
+                that address can load it without signing in — the same as a photo on a public web
+                page. We re-encode every upload on our servers and strip its metadata, including any
+                location the camera recorded. You can remove it at any time.
               </li>
               <li>
                 <strong className="text-ink font-medium">Your plans and messages.</strong> A plan is
@@ -64,8 +67,9 @@ export default function PrivacyPage() {
               <li>
                 <strong className="text-ink font-medium">A notification token, on the iOS app
                 only.</strong> If you turn on notifications, we store a token for that install so
-                Apple can deliver them. It is stored server side only and is deleted when you sign
-                out, turn notifications off, or delete your account.
+                Apple can deliver them. It is stored server side only, is never readable by other
+                members, and the row is deleted — not just marked inactive — when you sign out, turn
+                notifications off, delete your account, or Apple tells us the install is gone.
               </li>
             </ul>
           </section>
@@ -73,9 +77,15 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">What we do not collect</h2>
             <p className="text-muted">
-              No location from your device. No contacts. No advertising identifier. No third-party
-              analytics or advertising SDK in the iOS app. The neighborhood on your profile is one
-              you picked from a list, not something read from your phone.
+              No location from your device. Stoop never asks iOS for your position, and there is no
+              location permission in the app. No contacts. No advertising identifier. No third-party
+              analytics or advertising SDK.
+            </p>
+            <p className="text-muted mt-3">
+              The city and neighborhood on your profile are ones you picked from a list, not read
+              from your phone. They are still coarse location information about you, and they are
+              shown next to your plans, so we declare them that way on the App Store listing rather
+              than arguing the point.
             </p>
           </section>
 
@@ -93,11 +103,20 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">Who can see what</h2>
             <p className="text-muted">
-              Other members see your name, neighborhood, about line, photo, plans, and the messages
-              you send them. They cannot see your phone number or your email; those columns are
-              locked away from the public API and are only ever read by our servers to send you an
-              alert. If you block someone, the two of you disappear from each other everywhere: the
-              feed, plan pages, and messaging, in both directions.
+              Your name, neighborhood, about line and photo appear next to your plans, and a plan
+              page is public — readable by anyone on the web, signed in or not, and indexable by
+              search engines. Treat what you put in a plan as public writing. Messages are different:
+              only the two people in a conversation can read them.
+            </p>
+            <p className="text-muted mt-3">
+              Nobody can see your phone number or your notification email. Those columns are revoked
+              from the public API entirely and are read only by our servers, to send you an alert.
+            </p>
+            <p className="text-muted mt-3">
+              If you block someone, the two of you disappear from each other everywhere: the feed,
+              plan pages, conversations, live message delivery, and notifications, in both
+              directions. That rule is enforced by the database itself, not only by the app, so it
+              holds however the data is asked for.
             </p>
           </section>
 
@@ -108,6 +127,23 @@ export default function PrivacyPage() {
               verification text), Resend (notification email), Vercel (hosting), and Expo (delivering
               iOS notifications). Each one sees only what it needs to do its job. We do not sell
               personal information and we do not share it for advertising.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-[15px] font-semibold mb-1.5">Moderation</h2>
+            <p className="text-muted">
+              Plans, messages, and the name and about line on your profile are checked against a
+              blocklist of slurs, explicit solicitation and direct threats before they are saved.
+              That check runs in our database, so it applies however the text was sent. It is a
+              blocklist, not a judgment: it will not catch everything, and it is deliberately narrow
+              so that ordinary posts are not rejected. Reporting is what catches the rest, and a
+              person reviews every report within 24 hours.
+            </p>
+            <p className="text-muted mt-3">
+              Profile photos are re-encoded and stripped of metadata, and are size- and
+              dimension-limited, but their <em>content</em> is not automatically classified. A photo
+              that should not be on Stoop is handled through reporting, like anything else.
             </p>
           </section>
 
@@ -154,6 +190,9 @@ export default function PrivacyPage() {
         <div className="mt-10 pt-6 border-t border-[var(--border)] flex items-center gap-5">
           <Link href="/terms" className="text-[13px] text-muted hover:text-ink">
             Terms &amp; Community Standard
+          </Link>
+          <Link href="/support" className="text-[13px] text-muted hover:text-ink">
+            Support
           </Link>
           <Link href="/feed" className="text-[13px] text-muted hover:text-ink">
             Back to Stoop

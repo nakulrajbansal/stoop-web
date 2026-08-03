@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePushRegistration } from './push-registration';
+import { parsePushRegistration, parsePushRevocation } from './push-registration';
 
 const TOKEN = 'ExponentPushToken[aaaaaaaaaaaaaaaaaaaaaa]';
 
@@ -68,5 +68,54 @@ describe('parsePushRegistration', () => {
     expect(parsePushRegistration(null).ok).toBe(false);
     expect(parsePushRegistration('token').ok).toBe(false);
     expect(parsePushRegistration(undefined).ok).toBe(false);
+  });
+});
+
+/**
+ * Revocation used to take the token from the query string, which wrote a device
+ * credential into every access log between the phone and the server. It now
+ * comes in the body and is validated the same way a registration is.
+ */
+describe('parsePushRevocation', () => {
+  it('accepts a token on its own', () => {
+    expect(parsePushRevocation({ token: TOKEN })).toEqual({
+      ok: true,
+      value: { token: TOKEN, installationId: null }
+    });
+  });
+
+  it('accepts an installation id on its own', () => {
+    expect(parsePushRevocation({ installationId: ' install-123 ' })).toEqual({
+      ok: true,
+      value: { token: null, installationId: 'install-123' }
+    });
+  });
+
+  it('accepts both together', () => {
+    expect(parsePushRevocation({ token: TOKEN, installationId: 'install-123' })).toEqual({
+      ok: true,
+      value: { token: TOKEN, installationId: 'install-123' }
+    });
+  });
+
+  it('refuses a request that names nothing, so a bare DELETE cannot wipe every token', () => {
+    expect(parsePushRevocation({})).toEqual({ ok: false, error: 'token or installationId required' });
+    expect(parsePushRevocation({ installationId: '   ' })).toEqual({
+      ok: false,
+      error: 'token or installationId required'
+    });
+    expect(parsePushRevocation(null)).toEqual({ ok: false, error: 'Invalid request' });
+  });
+
+  it('refuses anything that is not an Expo push token', () => {
+    expect(parsePushRevocation({ token: 'not-a-token' })).toEqual({ ok: false, error: 'Invalid push token' });
+    expect(parsePushRevocation({ token: '' })).toEqual({ ok: false, error: 'Invalid push token' });
+  });
+
+  it('refuses an over-long installation id', () => {
+    expect(parsePushRevocation({ installationId: 'x'.repeat(129) })).toEqual({
+      ok: false,
+      error: 'Invalid installation id'
+    });
   });
 });

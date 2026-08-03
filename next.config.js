@@ -2,12 +2,15 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  serverExternalPackages: ['twilio'],
+  serverExternalPackages: ['twilio', 'sharp'],
+  // Both of these used to be `true`, because `tsc --noEmit` reported 143 errors
+  // and there was no ESLint config at all. Both are now clean, so the build
+  // checks them again and a regression stops the build instead of shipping.
   typescript: {
-    ignoreBuildErrors: true
+    ignoreBuildErrors: false
   },
   eslint: {
-    ignoreDuringBuilds: true
+    ignoreDuringBuilds: false
   },
   async rewrites() {
     return [

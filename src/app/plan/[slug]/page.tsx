@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     `meet people ${plan.city?.name}`,
     `${plan.city?.name} ${plan.category} meetup`,
     'make friends nearby', plan.spot,
-  ].filter(Boolean);
+  ].filter((keyword): keyword is string => Boolean(keyword));
 
   return {
     title,

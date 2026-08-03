@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteAuth } from '@/lib/supabase/route';
+import { getRouteAuth, unauthorized } from '@/lib/supabase/route';
 import { getBlockedIds } from '@/lib/blocks';
 
 /**
@@ -9,13 +9,17 @@ import { getBlockedIds } from '@/lib/blocks';
  * same query and the SAME block enforcement, exposed over HTTP. A plan whose
  * host is blocked in either direction returns 404, exactly like the web page,
  * so the app cannot render a plan the web would hide. Removed plans are
- * already invisible via the RLS policy on plans.
+ * already invisible via the RLS policy on plans, and since migration 0008 the
+ * block filter is in RLS too, so this check is defence in depth rather than
+ * the only thing standing in the way.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!slug) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { supabase, user } = await getRouteAuth(req);
+  const auth = await getRouteAuth(req);
+  if (auth.rejected) return unauthorized();
+  const { supabase, user } = auth;
 
   const { data: plan } = await supabase
     .from('plans')
@@ -31,23 +35,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   if (!plan) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let existingConversationId: string | null = null;
+  let canReport = false;
 
   if (user) {
     const blockedIds = await getBlockedIds(supabase, user.id);
-    if (blockedIds.includes((plan as any).user_id)) {
+    if (blockedIds.includes(plan.user_id)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if ((plan as any).user_id !== user.id) {
+    // Someone can report or block a host straight from the plan, before any
+    // conversation exists. The server still derives the target from the plan,
+    // so the app only needs to know whether to offer it.
+    canReport = plan.user_id !== user.id;
+
+    if (plan.user_id !== user.id) {
       const { data: conv } = await supabase
         .from('conversations')
         .select('id')
-        .eq('plan_id', (plan as any).id)
+        .eq('plan_id', plan.id)
         .eq('joiner_id', user.id)
         .maybeSingle();
-      // Narrow cast: the generated Supabase types infer `never` for embedded
-      // selects (known repo issue, see docs/ARCHITECTURE.md gotcha 3).
-      existingConversationId = (conv as any)?.id ?? null;
+      existingConversationId = conv?.id ?? null;
     }
   }
 
@@ -55,12 +63,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { count: hostPlanCount } = await supabase
     .from('plans')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', (plan as any).user_id)
+    .eq('user_id', plan.user_id)
     .neq('status', 'removed');
 
   return NextResponse.json({
     plan,
     hostPlanCount: hostPlanCount ?? 0,
-    existingConversationId
+    existingConversationId,
+    canReport
   });
 }

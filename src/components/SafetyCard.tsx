@@ -37,9 +37,9 @@ export default function SafetyCard({ plan, otherName }: { plan: PlanLite; otherN
 
   return (
     <div className="border border-[rgba(42,66,50,0.18)] bg-[rgba(42,66,50,0.05)] rounded-[14px] px-4 py-3.5 mb-3">
-      <div className="text-[13px] font-medium text-sage mb-1.5">You're set to meet up.</div>
+      <div className="text-[13px] font-medium text-sage mb-1.5">You&apos;re set to meet up.</div>
       <p className="text-[12.5px] text-ink leading-[1.6] mb-3">
-        A few gentle reminders: pick a public spot, let a friend know where you're going,
+        A few gentle reminders: pick a public spot, let a friend know where you&apos;re going,
         trust your gut, and know you can cancel anytime.
       </p>
       <button onClick={shareDetails}

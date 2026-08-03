@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteAuth } from '@/lib/supabase/route';
+import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { isSuspended } from '@/lib/moderation';
-import { parsePushRegistration } from '@/lib/push-registration';
+import { suspensionGate } from '@/lib/moderation';
+import { parsePushRegistration, parsePushRevocation } from '@/lib/push-registration';
 
 /**
  * Register / revoke this device's Expo push token.
@@ -10,14 +10,24 @@ import { parsePushRegistration } from '@/lib/push-registration';
  * Used only by the native app (bearer auth). push_tokens is service-role only,
  * so every read and write here goes through the admin client AFTER the caller
  * has been verified, the same pattern the rest of the API uses.
+ *
+ * Registration goes through `register_push_token` (migration 0008) rather than
+ * a client-steerable upsert. Both keys the client supplies - the installation
+ * id and the token - used to be treated as authority: any caller could revoke
+ * every row sharing a guessed installation id, or point a known token at their
+ * own account so that person's phone started receiving the caller's
+ * notifications. The function scopes the revoke to the caller's own rows and
+ * refuses to rebind a token that is live under someone else.
  */
 
 export async function POST(req: NextRequest) {
-  const { user } = await getRouteAuth(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended', code: 'account_suspended' }, { status: 403 });
-  }
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
+
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   let body: unknown;
   try {
@@ -28,65 +38,77 @@ export async function POST(req: NextRequest) {
 
   const parsed = parsePushRegistration(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-
-  const now = new Date().toISOString();
   const registration = parsed.value;
 
-  // This install is re-registering: retire any earlier token it had, whoever
-  // it belonged to. Stops a shared or reinstalled phone from receiving the
-  // previous account's notifications.
-  const { error: revokeErr } = await (supabaseAdmin as any)
-    .from('push_tokens')
-    .update({ revoked_at: now, updated_at: now })
-    .eq('installation_id', registration.installation_id)
-    .neq('expo_push_token', registration.expo_push_token)
-    .is('revoked_at', null);
-  if (revokeErr) console.error('push token cleanup failed (non-fatal):', revokeErr);
-
-  const { error } = await (supabaseAdmin as any)
-    .from('push_tokens')
-    .upsert(
-      {
-        user_id: user.id,
-        expo_push_token: registration.expo_push_token,
-        platform: registration.platform,
-        installation_id: registration.installation_id,
-        app_version: registration.app_version,
-        updated_at: now,
-        last_used_at: now,
-        revoked_at: null
-      },
-      { onConflict: 'expo_push_token' }
-    );
+  const { data: outcome, error } = await supabaseAdmin.rpc('register_push_token', {
+    p_user_id: user.id,
+    p_token: registration.expo_push_token,
+    p_platform: registration.platform,
+    p_installation_id: registration.installation_id,
+    p_app_version: registration.app_version
+  });
 
   if (error) {
     console.error('push token register failed:', error);
     return NextResponse.json({ error: 'Could not register for notifications' }, { status: 500 });
   }
 
+  if (outcome === 'conflict') {
+    // This token is live under another account. Refusing is the safe answer:
+    // rebinding it would send this caller's notifications to that person's
+    // phone. The app treats it as "notifications unavailable on this device".
+    return NextResponse.json(
+      {
+        error: 'This device is still registered to another Stoop account. Sign out of that account first.',
+        code: 'token_owned_elsewhere'
+      },
+      { status: 409 }
+    );
+  }
+
   return NextResponse.json({ ok: true });
 }
 
+/**
+ * Revoke. The token arrives in the JSON body, never the query string: a URL is
+ * written to access logs, proxy logs and error trackers, and a push token is a
+ * device credential.
+ *
+ * Deliberately reachable while suspended - a suspended member must still be
+ * able to sign out and stop the notifications.
+ */
 export async function DELETE(req: NextRequest) {
-  const { user } = await getRouteAuth(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
 
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get('token');
-  const installationId = searchParams.get('installationId');
-  if (!token && !installationId) {
-    return NextResponse.json({ error: 'token or installationId required' }, { status: 400 });
+  let body: unknown = null;
+  try {
+    const raw = await req.text();
+    body = raw ? JSON.parse(raw) : null;
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  const now = new Date().toISOString();
+  const parsed = parsePushRevocation(body);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
+  // Deleted, not flagged. Migration 0007 set revoked_at and kept the row "for
+  // an audit trail", but the privacy policy tells members their notification
+  // token is removed when they sign out or turn notifications off — and a
+  // retained device identifier is exactly the kind of thing that promise is
+  // about. There is no operational need for the row: a device that registers
+  // again simply inserts a fresh one.
+  //
   // Scoped to this user's rows: a token you do not own cannot be revoked.
-  let query = (supabaseAdmin as any)
+  let query = supabaseAdmin
     .from('push_tokens')
-    .update({ revoked_at: now, updated_at: now })
+    .delete()
     .eq('user_id', user.id);
 
-  if (token) query = query.eq('expo_push_token', token);
-  if (installationId) query = query.eq('installation_id', installationId);
+  if (parsed.value.token) query = query.eq('expo_push_token', parsed.value.token);
+  if (parsed.value.installationId) query = query.eq('installation_id', parsed.value.installationId);
 
   const { error } = await query;
   if (error) {

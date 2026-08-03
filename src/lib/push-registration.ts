@@ -45,3 +45,40 @@ export function parsePushRegistration(input: unknown): ParseResult<PushRegistrat
     }
   };
 }
+
+export type PushRevocation = {
+  token: string | null;
+  installationId: string | null;
+};
+
+/**
+ * Validation for the revoke endpoint. The token used to travel in the query
+ * string, which put a device credential into every access log between the
+ * phone and the server; it now comes in the body and is validated the same way
+ * a registration is.
+ */
+export function parsePushRevocation(input: unknown): ParseResult<PushRevocation> {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'Invalid request' };
+  const body = input as Record<string, unknown>;
+
+  const rawToken = body.token ?? body.expoPushToken;
+  let token: string | null = null;
+  if (rawToken !== undefined && rawToken !== null) {
+    if (!isExpoPushToken(rawToken)) return { ok: false, error: 'Invalid push token' };
+    token = rawToken;
+  }
+
+  let installationId: string | null = null;
+  if (typeof body.installationId === 'string' && body.installationId.trim()) {
+    installationId = body.installationId.trim();
+    if (installationId.length > MAX_INSTALLATION_ID) {
+      return { ok: false, error: 'Invalid installation id' };
+    }
+  }
+
+  if (!token && !installationId) {
+    return { ok: false, error: 'token or installationId required' };
+  }
+
+  return { ok: true, value: { token, installationId } };
+}

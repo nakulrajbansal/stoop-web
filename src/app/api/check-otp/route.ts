@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkVerification } from '@/lib/twilio';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { isValidE164 } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
@@ -56,21 +55,14 @@ export async function POST(req: NextRequest) {
       userId = created.user.id;
     }
 
-    // Generate a session for this user
-    const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: `${userId}@phone.stoop.internal`
-    });
-
-    // For phone-only auth, we sign in via the admin client by creating a session
-    // and returning tokens for the browser client to set
-    const { data: session, error: sessErr } = await supabaseAdmin.auth.admin.createSession?.({
-      user_id: userId
-    } as any) ?? { data: null, error: null };
-
-    // Fallback: use the OTP-verified flow on the client side via setSession
-    // We return the user id and phone; client will call signInWithOtp confirmation
-    const supabase = await createClient();
+    // Phone-only auth finishes on the client: it calls verifyOtp with the code
+    // it already has, which is what actually mints the session. Nothing is
+    // minted here.
+    //
+    // Two calls used to sit here — a generateLink() and an optional-chained
+    // auth.admin.createSession() — whose results were never read. createSession
+    // has never existed on GoTrueAdminApi, so `?.` made it a permanent no-op
+    // that only served to keep a type error alive. Both are gone.
 
     return NextResponse.json({
       ok: true,

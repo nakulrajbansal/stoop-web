@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { createClient } from '@/lib/supabase/client';
 
@@ -20,17 +21,20 @@ function ReportForm() {
   const supabase = createClient();
 
   const [otherName, setOtherName] = useState('this person');
-  const [otherId, setOtherId] = useState<string | null>(null);
   const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState('');
   const [alsoBlock, setAlsoBlock] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  /** What the server actually did, not what was asked for. */
+  const [blockConfirmed, setBlockConfirmed] = useState(false);
 
   useEffect(() => {
     const convId = conversationId;
     if (!convId) return;
-    async function load() {
+    // An arrow function defined after the guard keeps convId narrowed to
+    // string; a hoisted `function load()` does not.
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth'); return; }
       const { data } = await supabase
@@ -44,31 +48,39 @@ function ReportForm() {
         .single();
       if (!data) return;
       const isPoster = data.poster_id === user.id;
-      const other: any = isPoster ? data.joiner : data.poster;
-      setOtherId(other?.id ?? null);
+      const other = isPoster ? data.joiner : data.poster;
       setOtherName(other?.name ?? 'this person');
-    }
-    load();
+    };
+    void load();
   }, [conversationId]);
 
   async function submit() {
     if (!reason || submitting) return;
     setSubmitting(true);
 
-    const res = await fetch('/api/reports', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId, reason, details: details.trim() || null })
-    });
-
-    if (res.ok && alsoBlock && otherId) {
-      await fetch('/api/block', {
+    // One call does both legs. It used to be two, with the block's failure
+    // swallowed by .catch(() => {}) while the confirmation still told the
+    // reporter the person was blocked. Now the server reports what happened
+    // and the screen says only that.
+    let blocked = false;
+    let ok = false;
+    try {
+      const res = await fetch('/api/reports', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blockedId: otherId })
-      }).catch(() => {});
+        body: JSON.stringify({ conversationId, reason, details: details.trim() || null, alsoBlock })
+      });
+      ok = res.ok;
+      if (res.ok) {
+        const body = await res.json().catch(() => ({}));
+        blocked = body?.blocked === true;
+      }
+    } catch {
+      ok = false;
     }
 
     setSubmitting(false);
-    if (res.ok) {
+    if (ok) {
+      setBlockConfirmed(blocked);
       setDone(true);
     } else {
       alert('Could not send the report. Try again.');
@@ -80,9 +92,14 @@ function ReportForm() {
       <>
         <Nav />
         <div className="max-w-[560px] mx-auto px-6 py-16 text-center">
-          <div className="text-[15px] font-medium text-ink mb-2">Thank you. We've got it.</div>
+          <div className="text-[15px] font-medium text-ink mb-2">Thank you. We&apos;ve got it.</div>
           <p className="text-[13.5px] text-muted leading-[1.6] mb-6">
-            Our team reviews reports within 24 hours. {alsoBlock ? `We've also blocked ${otherName}, so you won't see or hear from them.` : ''}
+            Our team reviews reports within 24 hours.{' '}
+            {blockConfirmed
+              ? `${otherName} is blocked, so you will not see or hear from them.`
+              : alsoBlock
+                ? `We could not block ${otherName} just now. Your report is filed — you can block them from the conversation.`
+                : ''}
           </p>
           <button onClick={() => router.push('/inbox')} className="btn btn-sm">Back to inbox</button>
         </div>
@@ -96,7 +113,7 @@ function ReportForm() {
       <div className="max-w-[560px] mx-auto px-6 py-10">
         <h1 className="text-[18px] font-semibold text-ink mb-1">Report {otherName}</h1>
         <p className="text-[13px] text-muted leading-[1.6] mb-6">
-          Tell us what happened. Reports are private; the other person isn't told who reported them.
+          Tell us what happened. Reports are private; the other person isn&apos;t told who reported them.
         </p>
 
         <div className="flex flex-col gap-2 mb-6">
@@ -139,7 +156,7 @@ function ReportForm() {
 
         <p className="text-[11.5px] text-muted mt-6 leading-[1.6]">
           We review every report within 24 hours. See our{' '}
-          <a href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</a>.
+          <Link href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</Link>.
         </p>
       </div>
     </>

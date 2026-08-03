@@ -169,7 +169,7 @@ export async function sendExpoPush(
  */
 async function admin() {
   const { supabaseAdmin } = await import('@/lib/supabase/admin');
-  return supabaseAdmin as any;
+  return supabaseAdmin;
 }
 
 /** Active (not revoked) push tokens for a user. Service role only. */
@@ -181,14 +181,20 @@ export async function activeTokensForUser(userId: string): Promise<string[]> {
     .is('revoked_at', null);
 
   if (error || !data) return [];
-  return (data as { expo_push_token: string }[]).map(r => r.expo_push_token).filter(isExpoPushToken);
+  return data.map(r => r.expo_push_token).filter(isExpoPushToken);
 }
 
+/**
+ * Drop tokens Expo told us are dead. Deleted rather than flagged, for the same
+ * reason as a user-initiated revoke: the row is a device identifier tied to a
+ * person, it has no further use once the device is gone, and the privacy policy
+ * says it is removed.
+ */
 export async function revokeTokens(tokens: string[]): Promise<void> {
   if (tokens.length === 0) return;
   await (await admin())
     .from('push_tokens')
-    .update({ revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .delete()
     .in('expo_push_token', tokens);
 }
 

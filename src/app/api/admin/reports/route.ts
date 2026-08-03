@@ -31,30 +31,30 @@ export async function POST(req: NextRequest) {
 
   if (action === 'dismiss') {
     await supabaseAdmin.from('reports')
-      .update({ status: 'dismissed', resolved_at: now } as any)
+      .update({ status: 'dismissed' as const, resolved_at: now })
       .eq('id', reportId);
   }
 
   if (action === 'warn') {
     await supabaseAdmin.from('profiles')
-      .update({ warned_at: now } as any)
+      .update({ warned_at: now })
       .eq('id', report.reported_user_id);
     await supabaseAdmin.from('reports')
-      .update({ status: 'reviewed', resolved_at: now } as any)
+      .update({ status: 'reviewed' as const, resolved_at: now })
       .eq('id', reportId);
   }
 
   if (action === 'suspend') {
     // Block sign-in + posting + messaging, and hide all their plans from view.
     await supabaseAdmin.from('profiles')
-      .update({ blocked_at: now } as any)
+      .update({ blocked_at: now })
       .eq('id', report.reported_user_id);
     await supabaseAdmin.from('plans')
       .update({ status: 'removed' })
       .eq('user_id', report.reported_user_id)
       .neq('status', 'removed');
     await supabaseAdmin.from('reports')
-      .update({ status: 'actioned', resolved_at: now } as any)
+      .update({ status: 'actioned' as const, resolved_at: now })
       .eq('id', reportId);
   }
 

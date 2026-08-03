@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   // Activation gate: dark until migration 0005 creates plan_feedback and
   // conversations.followup_sent_at.
-  const gate = await supabaseAdmin.from('plan_feedback' as any).select('id').limit(1);
+  const gate = await supabaseAdmin.from('plan_feedback').select('id').limit(1);
   if (gate.error) {
     return NextResponse.json(
       { error: 'Follow-up inactive: run migration 0005 (plan_feedback) first.' },
@@ -49,10 +49,10 @@ export async function GET(req: NextRequest) {
       plan:plans(id, text, when_date, status, spots_left)
     `)
     .eq('status', 'confirmed')
-    .is('followup_sent_at' as any, null);
+    .is('followup_sent_at', null);
   if (convErr) return NextResponse.json({ error: convErr.message }, { status: 500 });
 
-  const due = ((convs ?? []) as any[]).filter(c =>
+  const due = (convs ?? []).filter(c =>
     c.plan && c.plan.when_date === yesterday && c.plan.status !== 'removed'
   );
 
@@ -62,10 +62,10 @@ export async function GET(req: NextRequest) {
   if (userIds.length > 0) {
     const { data: profiles, error: profErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, notify_email, blocked_at' as any)
+      .select('id, notify_email, blocked_at')
       .in('id', userIds);
     if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
-    for (const p of (profiles ?? []) as any[]) {
+    for (const p of profiles ?? []) {
       // Suspended people get no mail.
       if (p.notify_email && !p.blocked_at) emailFor.set(p.id, p.notify_email);
     }
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
         }
       }
       // Mark asked even if a send failed: never risk double-emailing people.
-      await (supabaseAdmin.from('conversations') as any)
+      await supabaseAdmin.from('conversations')
         .update({ followup_sent_at: new Date().toISOString() })
         .eq('id', conv.id);
     } else {

@@ -21,13 +21,13 @@ export async function POST(req: NextRequest) {
     .eq('id', conversationId)
     .single();
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const conv = data as any;
+  const conv = data;
 
   if (conv.status !== 'confirmed' || (conv.poster_id !== userId && conv.joiner_id !== userId)) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
-  const { error: upsertErr } = await (supabaseAdmin.from('plan_feedback' as any) as any)
+  const { error: upsertErr } = await supabaseAdmin.from('plan_feedback')
     .upsert(
       {
         conversation_id: conv.id,

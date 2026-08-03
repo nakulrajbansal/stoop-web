@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRouteAuth } from '@/lib/supabase/route';
+import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 
 export async function POST(req: NextRequest) {
-  const { supabase, user } = await getRouteAuth(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const { supabase } = auth;
+  const user = auth.user!;
 
   const { conversationId } = await req.json();
   if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
