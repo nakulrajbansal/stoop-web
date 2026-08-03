@@ -12,11 +12,23 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+      TWILIO_ACCOUNT_SID: AC00000000000000000000000000000000
+      TWILIO_AUTH_TOKEN: ci-placeholder
+      TWILIO_VERIFY_SERVICE_SID: VA00000000000000000000000000000000
+      RESEND_API_KEY: re_ci_placeholder
+      RESEND_FROM_EMAIL: hi@stoop.house
+      NEXT_PUBLIC_APP_URL: https://www.stoop.house
+      ADMIN_USER_ID: 00000000-0000-0000-0000-000000000000
+      CRON_SECRET: ci-placeholder
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
