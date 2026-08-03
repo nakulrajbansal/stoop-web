@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendReplyAlert } from '@/lib/resend';
-import { getBlockedIds } from '@/lib/blocks';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
 import { suspensionGate } from '@/lib/moderation';
 import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
 import { notifyUser } from '@/lib/push';
@@ -49,7 +49,13 @@ export async function POST(req: NextRequest) {
 
   // Refuse if either party has blocked the other
   const otherId = conv.poster_id === user.id ? conv.joiner_id : conv.poster_id;
-  const blockedIds = await getBlockedIds(supabase, user.id);
+  let blockedIds: string[];
+  try {
+    blockedIds = await getBlockedIds(user.id);
+  } catch (caught) {
+    if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+    throw caught;
+  }
   if (blockedIds.includes(otherId)) {
     return NextResponse.json({ error: 'This conversation is no longer available.' }, { status: 403 });
   }

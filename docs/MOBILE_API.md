@@ -68,6 +68,32 @@ conversation read, or push revocation. Suspension exists to stop someone
 reaching other members, not to trap them in the product or take away the
 protective controls while they are under review.
 
+**And the routes are not the boundary.** A suspended member keeps a perfectly
+valid Supabase access token until it expires, so every gate above could be
+walked around by talking to PostgREST directly — post a plan, open a
+conversation, send a message, rename the public profile. 0008 adds
+`is_active_member()` and puts it in the WITH CHECK of every direct authenticated
+write that publishes or changes something another member can see:
+
+| Policy | Table | Why it is gated |
+| --- | --- | --- |
+| `Users insert own plans` | plans | publishing |
+| `Users update own plans` | plans | editing a live plan; `status = 'removed'` is exempt so a suspended member can still take their own plan down |
+| `Joiner starts conversation` | conversations | reaching another member |
+| `Poster updates conversation status` | conversations | confirming or declining |
+| `Send to own conversations` | messages | reaching another member |
+| `Users update own profile` | profiles | name and about are shown next to every plan |
+
+The exact boundary, and it is deliberate: **account deletion, blocking,
+reporting, read marks, push revocation and taking your own plan down all still
+work while suspended.** Deletion and revocation run through the service role and
+never touch these policies; blocks, reports and `conversation_reads` have no
+standing condition on them at all; `Users delete own plans` is untouched by 0008.
+`is_active_member()` is also true for a caller with no profile row, which is
+someone mid-signup — otherwise signup itself would be impossible.
+
+`database-contract.test.ts` asserts each row of that table and each escape route.
+
 ### `GET /api/plans/[slug]`
 The native equivalent of the `/plan/[slug]` server component: same query, same
 block enforcement (404 when either party has blocked the other), plus
@@ -102,6 +128,14 @@ because `blocked_at` is not granted to the API roles (migration 0003). Returns
 at launch instead of discovering it one action at a time. `phone_e164` and
 `notify_email` are never returned.
 
+A missing row and a failed query are different answers, and this route now says
+so at both levels. The profile read already did; the city and neighborhood
+lookups did not, so a database failure came back as a 200 with `city: null` and
+the app showed a fully signed-up member as having no neighborhood.
+`@/lib/location-lookup` tells them apart and a lookup failure is the same
+retryable **503 `profile_unavailable`**. A member who genuinely has no
+neighborhood is still a 200 with `neighborhood: null`.
+
 Every suspension response across the API now carries
 `code: 'account_suspended'` alongside the existing message. Additive field, web
 ignores it.
@@ -115,7 +149,7 @@ Supabase project built from them alone was missing `profiles.notify_email`, four
 which the running product uses on every request. Production had them because
 they were applied by hand; nothing else did, and nothing checked.
 
-0008 closes that gap and adds three things that were never enforced in the
+0008 closes that gap and adds five things that were never enforced in the
 database at all:
 
 1. **Blocks in row level security.** Until now a block was enforced only by the
@@ -124,22 +158,55 @@ database at all:
    PostgREST, and receive their messages over Realtime, which evaluates the same
    SELECT policies. `is_blocked_with(other)` is now part of the SELECT and
    INSERT policies on profiles, plans, conversations and messages.
-2. **An objectionable-language filter**, as `BEFORE INSERT OR UPDATE` triggers on
+2. **Suspension in row level security**, via `is_active_member()`. See the
+   suspension section above for the exact set of policies and the escape routes
+   that stay open.
+3. **An objectionable-language filter**, as `BEFORE INSERT OR UPDATE` triggers on
    plans, messages and profiles. In the database rather than in a route, because
    the website and any anon-key client write to those tables directly.
    `src/lib/text-moderation.ts` mirrors the rule only so the API can answer with
    a readable sentence; `text-moderation.test.ts` fails if the two lists drift.
-3. **Atomic transitions.** `resolve_conversation()` puts the `status = 'pending'`
-   guard inside the UPDATE, so two racing confirms cannot both "win" and send
-   two confirmation emails. `register_push_token()` does ownership-checked
-   registration in one statement.
+4. **Atomic transitions with real preconditions.** `resolve_conversation()` locks
+   the conversation and then the plan and checks ownership, pending status and
+   remaining capacity while both locks are held. The earlier version moved the
+   `status = 'pending'` guard into the UPDATE, which stopped two racing confirms
+   from both notifying — but it still confirmed *any* pending conversation, and
+   0001's trigger decremented `spots_left` with a `GREATEST(0, ...)` floor. A
+   one-spot plan with three pending requests confirmed all three and the count
+   bottomed out at zero. It now returns `updated`, `already_resolved`, `full`,
+   `closed`, `not_found` or `invalid`, and the route maps each one. Declining
+   never touches the plan: it consumes no capacity and has to keep working on a
+   plan that is full, closed or expired.
+5. **Push registration that is actually serialised.** `register_push_token()`
+   takes a transaction-scoped advisory lock on the token before it reads
+   anything. `SELECT ... FOR UPDATE` locks nothing when the row does not exist,
+   which is every first registration of a token, so two accounts registering the
+   same token at the same moment both saw "no owner" — and the unconditional
+   `ON CONFLICT DO UPDATE` then let the second one take it. The upsert also
+   carries the ownership condition itself now, and a zero-row upsert is reported
+   as `conflict`.
 
-Every statement is idempotent and none drops a table or a column.
+Also in 0008: `blocked_user_ids(for_user)` is **service-role only**. It takes an
+arbitrary user id and answers with that person's block relationships in both
+directions — including who has blocked them, which is the one thing the product
+promises nobody can see — so granting it to `authenticated` let any signed-in
+member enumerate anyone's block graph. Every caller was already a server route
+or the cron. And `welcome_emails` plus `claim_welcome_email` /
+`mark_welcome_email_sent` give /api/welcome a real idempotency key; see below.
+
+Every statement is idempotent and none drops a table or a column, but **0008 is
+not purely additive** — four statements change existing rows, and the file's
+header names each one along with the preflight queries to run against a restored
+copy of production first. See the deploy section.
+
 `src/lib/database-contract.test.ts` checks the parts a test can check without a
 live database: that every table and function the code calls exists in some
 migration, that the CHECK constraints match what the API validates, that the
-block policies actually consult `is_blocked_with`, and that no private column is
-granted to the API roles.
+block policies consult `is_blocked_with` and the write policies consult
+`is_active_member`, that the capacity check is locked and is skipped for a
+decline, that the registration serialises on the token, that no private column
+is granted to the API roles, and that the header still describes what the file
+actually does.
 
 ### Push notifications
 - `supabase/migrations/0007_push_tokens.sql` creates `push_tokens`
@@ -157,6 +224,13 @@ granted to the API roles.
   the message is not reaped until that device registers again or the account is
   deleted. That is an operational follow-up, not a finished feature; any claim
   that dead-token cleanup is complete is wrong.
+  Every request to Expo carries an `AbortSignal` bounded by
+  `EXPO_PUSH_TIMEOUT_MS` (10s), covering the body read as well as the connect. It
+  has to: `notifyUser` runs *after* its database transaction has committed, so an
+  unbounded fetch does not delay a notification — it holds the member's own HTTP
+  response open behind a third party, and the person who just tapped Accept
+  watches a spinner. A timed-out chunk becomes error tickets and the remaining
+  chunks still go.
 - `POST /api/push/register` goes through `register_push_token()` (0008) rather
   than a client-steerable upsert. Both keys the client supplies used to be
   treated as authority: any caller could revoke every row sharing a guessed
@@ -164,10 +238,30 @@ granted to the API roles.
   person's phone started receiving the caller's notifications. The function
   scopes the same-install revoke to the caller's own rows and returns
   `conflict` (409 to the client) rather than rebinding a token that is live
-  under someone else.
+  under someone else — including when two first registrations race, which the
+  advisory lock and the ownership-conditional upsert now cover.
 - `DELETE /api/push/register` takes the token in the **body**, not the query
   string. A URL is written to access logs, proxy logs and error trackers along
   the whole path, and a push token is a device credential.
+
+  It has two rules, and the difference between them is the point:
+
+  - **Token AND installation id together are proof of device possession.** Both
+    live in that phone's keychain and neither is guessable, so the pair revokes
+    that registration whoever owned it. This is what makes a shared phone work.
+    The old owner-scoped rule made it unfixable: sign out with no signal, hand
+    the phone over, the new account signs in, and the retry matched nothing —
+    and the pending record was then deleted anyway, leaving a live registration
+    delivering the first person's notifications to a phone that was not theirs.
+  - **An installation id on its own stays scoped to the caller's rows**, exactly
+    as before, so a guessed one cannot switch off a stranger's notifications. A
+    lone token is owner-scoped too: half the pair proves nothing.
+
+  The response is `{ ok, revoked, tokenCleared }`. `tokenCleared` is answered by
+  looking — the route re-reads the table — because the pair matches nothing when
+  the stored row carries a different installation id, and telling a phone to
+  forget a registration that is still live is the bug being fixed. The app keeps
+  its pending record unless `tokenCleared` is true.
 - Revocation **deletes** the row rather than setting `revoked_at`. The privacy
   policy tells members their notification token is removed when they sign out or
   turn notifications off, and a retained device identifier is exactly what that
@@ -177,6 +271,16 @@ granted to the API roles.
   recipient has not sent a message in 15 minutes, the same gate the reply email
   already used), **confirmed**. Every send is best effort and wrapped so it can
   never break posting, messaging, or confirming. **Email behavior is unchanged.**
+
+  **Best effort means best effort, and is not exactly-once.** The transaction
+  that changes a conversation's status now guarantees that at most one caller
+  can notify — no number of racing taps produces a second push or a second
+  confirmation email. It guarantees nothing in the other direction: the
+  transaction is already committed by the time the send runs, so a process that
+  dies in between simply misses the notification. Making that exactly-once needs
+  a transactional outbox and a worker draining it. There isn't one, and an
+  in-memory retry queue would be a worse lie than the honest gap, because it
+  would disappear with the same process. Email is the primary channel.
 
 ### Avatar uploads
 `POST /api/avatar` used to check two magic bytes (`FF D8`) and store whatever
@@ -201,10 +305,43 @@ signed-in account could post an arbitrary address and an arbitrary display name,
 as often as it liked, and Stoop would deliver mail on its behalf with
 stoop.house's sender reputation attached — an open relay for one template.
 
-The recipient is now the caller's own `notify_email`, read server side, and
-`src/lib/welcome.ts` caps it: the welcome email belongs to the first 15 minutes
-of an account's life, so a replayed or repeated call sends nothing. Long enough
-to survive a retry, short enough that the route cannot be used as a send button.
+The recipient is the caller's own `notify_email`, read server side. What was
+still missing is the "once" part: `WELCOME_WINDOW_MS` bounds the *window*, not
+the number of sends, so every call inside the first fifteen minutes delivered
+another email and fifty concurrent calls delivered fifty.
+
+`claim_welcome_email()` (0008) is the real bound. It inserts the marker row into
+`welcome_emails` and returns `claimed` to exactly one caller; everyone else
+contends on the primary key and is told `already_claimed`. The claim is taken
+**before** the send, so a crash mid-send cannot become a second email.
+
+Provider failure is handled without re-opening that window:
+
+- The claim is **not** released. We cannot tell a dropped message from a dropped
+  connection, and releasing it would put the route back where it started.
+- It ages out on its own after five minutes, and `attempts` caps the whole thing
+  at five. The 15-minute age check still gates the outside.
+- The send carries a Resend **idempotency key** derived from the user id
+  (`welcome:<uuid>`), so a retry that races the provider's own recovery still
+  delivers one email.
+- `sendWelcome` now returns whether the provider accepted it. The SDK reports
+  API-level failures in `error` rather than throwing, so a rejected send used to
+  look exactly like a delivered one — the route would have marked the account
+  welcomed and burned its one send on nothing.
+
+### `DELETE /api/account`
+The profile photo lives in a public storage bucket, outside the foreign-key
+cascade. Removing it was wrapped in a try/catch described as non-fatal, but
+Supabase Storage's `remove()` reports failure by resolving with `{ error }`
+rather than throwing, so the catch never fired. A storage outage looked exactly
+like a clean delete, the auth user — the row every other delete cascades from —
+was destroyed anyway, and the member's face stayed on a public URL with no
+account left to retry from.
+
+`@/lib/avatar-storage` checks the result. The photo goes first; an operational
+failure answers **503 `avatar_delete_failed`** with nothing irreversible done, so
+the caller can simply try again. An object that was never there is success, so
+somebody who never uploaded a photo can still delete their account.
 
 ### Universal links
 `GET /api/apple-app-site-association`, served at
@@ -238,21 +375,54 @@ the Expo project, never in this repo.
    - `0007_push_tokens.sql` — until it runs, `POST /api/push/register` returns
      500 and push is simply off; every other route is unaffected.
    - `0008_mobile_contract.sql` — **not optional.** It is what puts block
-     enforcement and the language filter into the database, and what makes a
-     fresh environment match the code. On production most of it is a no-op
-     because the columns and tables already exist by hand; the parts that are
-     not are the RLS policies, the triggers, and the four functions.
+     enforcement, suspension enforcement and the language filter into the
+     database, and what makes a fresh environment match the code. On production
+     much of it is a no-op because the columns and tables already exist by hand;
+     the parts that are not are the RLS policies, the triggers, the functions and
+     the `welcome_emails` table.
 
-   Two things in 0008 worth reading before running it, because they are the only
-   statements that touch existing rows:
+   **0008 is not purely additive, and this step is a manual gate for that
+   reason.** Four statements change existing rows or can abort the migration:
 
-   - It de-duplicates `plans.slug` before adding a unique index. The oldest row
-     of any duplicate pair keeps its slug (its URL may already be shared); the
-     others get a short suffix.
-   - It deletes rows from `plan_feedback` whose `responder_id` no longer matches
-     a profile, so a foreign key with `ON DELETE CASCADE` can be added. Those are
-     rows belonging to already-deleted accounts — data that account deletion
-     should have removed and did not, because the column had no foreign key.
+   - It **backfills** `plans.slug` for every row where it is NULL, then sets the
+     column NOT NULL.
+   - It **de-duplicates** `plans.slug` before adding a unique index. The oldest
+     row of any duplicate group keeps its slug (its URL may already be shared);
+     the others get a short suffix, which changes those plans' URLs.
+   - It **replaces three CHECK constraints** on `plans` (category, spots_total,
+     intent_tags). `ADD CONSTRAINT` validates the existing rows, so a single
+     violating row aborts the whole migration part-way through.
+   - It **deletes** rows from `plan_feedback` whose `responder_id` no longer
+     matches a profile, so a foreign key with `ON DELETE CASCADE` can be added.
+     Those are rows belonging to already-deleted accounts — data that account
+     deletion should have removed and did not, because the column had no foreign
+     key.
+
+   **Run it against a restored copy of production before production.** Postgres
+   was not available locally while this branch was written, so nothing here has
+   been executed anywhere; a staging run is the only thing that has actually
+   tested the SQL. Count what it will touch first — each of the first three must
+   return 0, or the matching `ADD CONSTRAINT` will abort:
+
+   ```sql
+   select count(*) from plans
+    where category not in ('coffee','outdoors','arts','food','books','music','sports');
+   select count(*) from plans where spots_total not in (1,2,3);
+   select count(*) from plans
+    where array_length(intent_tags,1) > 2
+       or not (intent_tags <@ array['just-social','dog-friendly','bring-something',
+                                    'quiet','loud','free','paid']::text[]);
+
+   select count(*) from plans where slug is null;                  -- will be backfilled
+   select count(*) from (select slug from plans
+                          group by slug having count(*) > 1) d;    -- will be de-duplicated
+   select count(*) from plan_feedback
+    where responder_id not in (select id from profiles);           -- will be deleted
+   ```
+
+   A non-zero count on one of the first three is not a reason to weaken the
+   constraint: it means production holds a value the API would refuse, and that
+   row needs a decision before the migration runs.
 
    After running it, spot-check in the SQL editor:
    ```sql
@@ -260,7 +430,30 @@ the Expo project, never in this repo.
    select count(*) from pg_policies
     where schemaname = 'public'
       and coalesce(qual, '') || coalesce(with_check, '') like '%is_blocked_with%';  -- 7
+   select count(*) from pg_policies
+    where schemaname = 'public'
+      and coalesce(with_check, '') like '%is_active_member%';                       -- 6
+
+   -- Every SECURITY DEFINER function here reads a table whose RLS or column
+   -- grants the calling role does not have, so they all depend on being owned
+   -- by a role that can. That is the same assumption `is_blocked_with` and
+   -- `blocked_user_ids` already make, but it is worth confirming once rather
+   -- than discovering it as a silent `false` from `is_active_member()`.
+   select p.proname, r.rolname as owner, r.rolbypassrls
+     from pg_proc p
+     join pg_roles r on r.oid = p.proowner
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('is_active_member','is_blocked_with','blocked_user_ids',
+                        'register_push_token','resolve_conversation',
+                        'claim_welcome_email','mark_welcome_email_sent');
    ```
+
+   Then, on staging with a real suspended test account, confirm the boundary end
+   to end: signed in as that account, a direct PostgREST insert into `plans` or
+   `messages` and a direct update of `profiles.name` are all refused, while
+   deleting the account, blocking, reporting, marking a conversation read and
+   revoking a push token still work.
 3. **Set `APPLE_TEAM_ID`** in Vercel (Production, Preview) once the Apple
    Developer account exists. Redeploy. Then verify:
    ```
@@ -312,6 +505,15 @@ The mobile surface is additive. To disable it without reverting code:
 
 ## 7. What is not done
 
+- **No migration has been run anywhere.** Docker and Postgres were unavailable
+  on the machine this branch was written on, so 0008 has never executed. Its
+  correctness rests on review and on `database-contract.test.ts`, which reads the
+  SQL as text. The staging run in step 2 of the deploy order is the first real
+  test of it and is a hard gate, not a formality.
+- **Notifications are best effort, not exactly-once.** At most one send per
+  status change is guaranteed; a missed one after a process death is not
+  prevented. A transactional outbox and a worker would be the real fix. See the
+  push section.
 - **Expo delivery receipts are not polled.** See the push section above. Tokens
   rejected at send time are deleted; tokens that die later are not.
 - **Text moderation is a blocklist.** It runs in the database so it cannot be

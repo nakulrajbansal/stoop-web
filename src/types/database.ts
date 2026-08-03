@@ -505,6 +505,39 @@ export type Database = {
           }
         ];
       };
+      /**
+       * One row per account that has been offered a welcome email (0008).
+       * Service-role only, and only ever touched through
+       * `claim_welcome_email` / `mark_welcome_email_sent`.
+       */
+      welcome_emails: {
+        Row: {
+          user_id: string;
+          claimed_at: string;
+          sent_at: string | null;
+          attempts: number;
+        };
+        Insert: {
+          user_id: string;
+          claimed_at?: string;
+          sent_at?: string | null;
+          attempts?: number;
+        };
+        Update: {
+          claimed_at?: string;
+          sent_at?: string | null;
+          attempts?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'welcome_emails_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -517,6 +550,21 @@ export type Database = {
       is_blocked_with: {
         Args: { other: string };
         Returns: boolean;
+      };
+      /** 0008. RLS predicate for suspension. Not called from code. */
+      is_active_member: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      /** 0008. Takes the one welcome-email send for an account, or refuses. */
+      claim_welcome_email: {
+        Args: { p_user_id: string; p_retry_after?: string; p_max_attempts?: number };
+        Returns: string;
+      };
+      /** 0008. Records that the welcome email actually went out. */
+      mark_welcome_email_sent: {
+        Args: { p_user_id: string };
+        Returns: undefined;
       };
       /** 0008. Atomic, ownership-checked push registration. */
       register_push_token: {

@@ -17,6 +17,18 @@ export const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 /** Expo accepts at most 100 messages per request. */
 export const EXPO_PUSH_CHUNK_SIZE = 100;
 
+/**
+ * Ceiling on one request to Expo.
+ *
+ * Every caller of `notifyUser` runs AFTER the database transaction it is
+ * telling people about has committed — a plan joined, a message sent, a request
+ * confirmed. An unbounded fetch there does not delay a notification, it holds
+ * the whole HTTP response open behind a third party we do not control, so the
+ * member who just tapped Accept watches a spinner until their own client gives
+ * up. Ten seconds is well past Expo's normal response and well short of that.
+ */
+export const EXPO_PUSH_TIMEOUT_MS = 10_000;
+
 export type PushEventKind = 'join_request' | 'reply' | 'confirmed';
 
 export type PushContext = {
@@ -145,19 +157,41 @@ export async function sendExpoPush(
 
   const tickets: ExpoPushTicket[] = [];
   for (const batch of chunk(messages)) {
-    const res = await fetchImpl(EXPO_PUSH_ENDPOINT, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(batch)
-    });
-    if (!res.ok) {
-      // Expo is down or rejecting us. Email already covers this event.
-      console.error('expo push send failed:', res.status);
-      batch.forEach(() => tickets.push({ status: 'error', message: `HTTP ${res.status}` }));
+    // One controller per batch: a timeout on the first chunk must not abort the
+    // rest, and an aborted request has to land as error tickets rather than as
+    // a throw that skips the remaining chunks.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), EXPO_PUSH_TIMEOUT_MS);
+
+    let batchTickets: ExpoPushTicket[] = [];
+    try {
+      const res = await fetchImpl(EXPO_PUSH_ENDPOINT, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(batch),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        // Expo is down or rejecting us. Email already covers this event.
+        console.error('expo push send failed:', res.status);
+        batch.forEach(() => tickets.push({ status: 'error', message: `HTTP ${res.status}` }));
+        continue;
+      }
+
+      // Still inside the timeout: fetch resolves when the headers arrive, so
+      // reading the body is its own chance to hang forever.
+      const json = (await res.json()) as { data?: ExpoPushTicket[] };
+      batchTickets = Array.isArray(json?.data) ? json.data : [];
+    } catch (e) {
+      // Timed out, refused, or answered with something that is not JSON.
+      console.error('expo push send failed:', e);
+      batch.forEach(() => tickets.push({ status: 'error', message: 'Request failed' }));
       continue;
+    } finally {
+      clearTimeout(timer);
     }
-    const json = (await res.json()) as { data?: ExpoPushTicket[] };
-    const batchTickets = Array.isArray(json?.data) ? json.data : [];
+
     batch.forEach((_, i) => tickets.push(batchTickets[i] ?? { status: 'error', message: 'No ticket' }));
   }
   return tickets;

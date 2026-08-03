@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRouteAuth, requireUser, unauthorized } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS, isPlanCategory } from '@/lib/utils';
-import { getBlockedIds } from '@/lib/blocks';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
 import { suspensionGate } from '@/lib/moderation';
 import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
 import { pingIndexNow } from '@/lib/indexnow';
@@ -17,8 +17,19 @@ export async function GET(req: NextRequest) {
   if (auth.rejected) return unauthorized();
   const { supabase, user } = auth;
 
-  // Blocked users (either direction) are filtered out of the feed entirely
-  const blockedIds = user ? await getBlockedIds(supabase, user.id) : [];
+  // Blocked users (either direction) are filtered out of the feed entirely.
+  // If that list cannot be read there is no safe feed to serve: returning an
+  // unfiltered one puts a blocked member's plans back in front of the person
+  // who blocked them. Fail closed and let the app retry.
+  let blockedIds: string[] = [];
+  if (user) {
+    try {
+      blockedIds = await getBlockedIds(user.id);
+    } catch (caught) {
+      if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+      throw caught;
+    }
+  }
   const { searchParams } = new URL(req.url);
   const citySlug = searchParams.get('city');
   const neighborhoodSlug = searchParams.get('neighborhood');

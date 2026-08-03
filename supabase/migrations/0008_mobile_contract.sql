@@ -10,20 +10,59 @@
 --
 -- This migration closes that gap and is the one to run on a fresh environment
 -- after 0001-0007. Every statement is idempotent (IF EXISTS / IF NOT EXISTS /
--- CREATE OR REPLACE / DROP POLICY then CREATE POLICY), so running it against
--- production - where most of this already exists - changes nothing except the
--- parts that were genuinely missing.
+-- CREATE OR REPLACE / DROP POLICY then CREATE POLICY), so re-running it is safe.
 --
--- It also does three things that were never enforced in the database at all:
+-- It also does five things that were never enforced in the database at all:
 --   1. Blocks are enforced in RLS, not only in the HTTP routes, so a blocked
 --      user holding a valid Supabase JWT cannot read around the API - via
 --      PostgREST or via Realtime.
---   2. Objectionable text is rejected by a trigger, so a direct-to-Supabase
+--   2. Suspension is enforced in RLS. A suspended member keeps a perfectly
+--      valid Supabase JWT until it expires, so the route-level gate alone left
+--      PostgREST and Realtime open to them.
+--   3. Objectionable text is rejected by a trigger, so a direct-to-Supabase
 --      write cannot publish what the API would refuse.
---   3. Push-token registration is an atomic, ownership-checked function
+--   4. Push-token registration is an atomic, ownership-checked function
 --      rather than a client-steerable upsert.
+--   5. Confirming a join request checks plan capacity inside the same locked
+--      transaction that moves the status, so racing confirms cannot oversell
+--      a plan.
 --
--- ORDER: run AFTER 0001-0007. Nothing here drops or rewrites user data.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- IT IS NOT PURELY ADDITIVE. Four statements change existing rows, and they
+-- are the reason this file needs a staging run before production:
+--
+--   * §2 BACKFILLS `plans.slug` for every row where it is NULL, then sets the
+--     column NOT NULL.
+--   * §2 DE-DUPLICATES `plans.slug` by appending a suffix to every row but the
+--     oldest of each duplicate group, so a unique index can be created. A
+--     changed slug changes that plan's URL.
+--   * §2 REPLACES three CHECK constraints on `plans`. Each ADD CONSTRAINT
+--     validates the existing rows and will ERROR OUT, aborting the migration,
+--     if any row violates it. See the preflight queries below.
+--   * §9 DELETES rows from `plan_feedback` whose `responder_id` no longer
+--     matches a profile, so a cascading foreign key can be added. Those rows
+--     belong to already-deleted accounts.
+--
+-- PREFLIGHT - run these against a restored copy of production first. Every one
+-- must return 0, or the corresponding ADD CONSTRAINT in §2 will abort:
+--
+--   select count(*) from plans
+--    where category not in ('coffee','outdoors','arts','food','books','music','sports');
+--   select count(*) from plans where spots_total not in (1,2,3);
+--   select count(*) from plans
+--    where array_length(intent_tags,1) > 2
+--       or not (intent_tags <@ array['just-social','dog-friendly','bring-something',
+--                                    'quiet','loud','free','paid']::text[]);
+--
+-- And these two report what the mutating statements will touch:
+--
+--   select count(*) from plans where slug is null;                  -- backfilled
+--   select count(*) from (select slug from plans group by slug
+--                          having count(*) > 1) d;                  -- de-duplicated
+--   select count(*) from plan_feedback
+--    where responder_id not in (select id from profiles);           -- deleted
+--
+-- ORDER: run AFTER 0001-0007. Nothing here drops a table or a column.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -167,7 +206,7 @@ CREATE POLICY "Members update their own read marks"
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 4 · BLOCK LOOKUP FUNCTIONS
+-- 4 · BLOCK AND STANDING LOOKUP FUNCTIONS
 -- ───────────────────────────────────────────────────────────────────────────
 
 -- Every id in a block relationship with `for_user`, in either direction. This
@@ -185,8 +224,52 @@ AS $$
   SELECT blocker_id FROM public.blocks WHERE blocked_id = for_user;
 $$;
 
+-- Service role only. This takes an ARBITRARY user id and answers with that
+-- person's block relationships in both directions - including who has blocked
+-- them, which is the one thing the product promises nobody can see. Granting it
+-- to `authenticated` let any signed-in member enumerate any other member's
+-- block graph one id at a time. Every caller is a server route or the cron, all
+-- of which hold the service role, so nothing loses a capability here.
+--
+-- The RLS predicate below (`is_blocked_with`) is the self-scoped question and
+-- stays available to ordinary clients.
 REVOKE ALL ON FUNCTION public.blocked_user_ids(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.blocked_user_ids(UUID) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.blocked_user_ids(UUID) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.blocked_user_ids(UUID) TO service_role;
+
+-- Is the CURRENT caller an account in good standing?
+--
+-- Suspension (`profiles.blocked_at`) was enforced only by `suspensionGate` in
+-- the HTTP routes. A suspended member keeps a valid Supabase access token until
+-- it expires, and can post plans, start conversations, send messages and edit
+-- their public profile straight through PostgREST with it. This predicate is
+-- what the write policies below consult so the suspension holds at the source.
+--
+-- SECURITY DEFINER because `profiles.blocked_at` is deliberately not readable
+-- by the API roles (0003), so an ordinary caller cannot evaluate this for
+-- themselves.
+--
+-- A caller with no profile row is `true`: they verified their phone and have
+-- not finished signup. Returning false there would make signup impossible.
+-- This matches `accountStanding()` in `@/lib/moderation` exactly.
+CREATE OR REPLACE FUNCTION public.is_active_member()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE
+    WHEN auth.uid() IS NULL THEN false
+    ELSE NOT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND blocked_at IS NOT NULL
+    )
+  END;
+$$;
+
+REVOKE ALL ON FUNCTION public.is_active_member() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_active_member() TO authenticated, service_role;
 
 -- The RLS predicate: is the CURRENT caller in a block relationship with
 -- `other`, in either direction? Returns false for anonymous callers, which
@@ -213,19 +296,50 @@ GRANT EXECUTE ON FUNCTION public.is_blocked_with(UUID) TO anon, authenticated, s
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 5 · BLOCKS ENFORCED IN RLS
+-- 5 · BLOCKS AND SUSPENSION ENFORCED IN RLS
 --
 -- Until now a block was enforced only by the HTTP routes. Anyone holding their
 -- own Supabase access token could read the other person's profile, plans,
 -- conversations and messages straight from PostgREST, and receive their
 -- messages over Realtime, because Realtime evaluates the same SELECT policies.
--- These policies close that hole at the source.
+--
+-- Suspension had the same shape of hole on the write side. `suspensionGate`
+-- runs in the routes, and a suspended member's JWT keeps working against
+-- PostgREST until it expires, so they could still publish a plan, open a
+-- conversation, send a message and rename their public profile.
+--
+-- The rule below: every direct authenticated write that publishes or changes
+-- something another member can see requires `is_active_member()`. The
+-- protective, self-service paths deliberately do NOT - a suspension stops
+-- someone reaching other members, it does not trap them in the product:
+--
+--   * account deletion         - service role, no RLS involved
+--   * blocking and reporting   - `blocks` / `reports` writes, untouched
+--   * read marks               - `conversation_reads`, untouched (§3)
+--   * push revocation          - service role, and the route has no gate
+--   * taking your own plan down - DELETE stays open, and the UPDATE policy
+--     admits `status = 'removed'` while suspended
 -- ───────────────────────────────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "Profiles readable by authenticated" ON public.profiles;
 CREATE POLICY "Profiles readable by authenticated"
   ON public.profiles FOR SELECT TO authenticated
   USING (id = auth.uid() OR NOT public.is_blocked_with(id));
+
+-- name and about are shown next to every plan and in every conversation, so a
+-- suspended member editing them is publishing. 0001 had no WITH CHECK at all
+-- (it defaults to the USING clause); this states both.
+--
+-- Deliberately covers the whole row rather than only name/about: the columns an
+-- ordinary client may write here ARE the public ones. `notify_email` is set
+-- once at signup by the INSERT policy below, and `digest_opt_out_at` is written
+-- by the unsubscribe route through the service role, so neither escape route
+-- passes through this policy.
+DROP POLICY IF EXISTS "Users update own profile" ON public.profiles;
+CREATE POLICY "Users update own profile"
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id AND public.is_active_member());
 
 DROP POLICY IF EXISTS "Plans readable by all" ON public.plans;
 CREATE POLICY "Plans readable by all"
@@ -235,7 +349,19 @@ CREATE POLICY "Plans readable by all"
 DROP POLICY IF EXISTS "Users insert own plans" ON public.plans;
 CREATE POLICY "Users insert own plans"
   ON public.plans FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid() = user_id AND public.is_active_member());
+
+-- Editing a plan is publishing. Taking it down is not: `status = 'removed'`
+-- hides the row from the SELECT policy above, so a suspended member can always
+-- withdraw their own plan even though they cannot change a live one.
+DROP POLICY IF EXISTS "Users update own plans" ON public.plans;
+CREATE POLICY "Users update own plans"
+  ON public.plans FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (
+    auth.uid() = user_id
+    AND (public.is_active_member() OR status = 'removed')
+  );
 
 DROP POLICY IF EXISTS "Participants read conversations" ON public.conversations;
 CREATE POLICY "Participants read conversations"
@@ -248,13 +374,17 @@ CREATE POLICY "Participants read conversations"
 DROP POLICY IF EXISTS "Joiner starts conversation" ON public.conversations;
 CREATE POLICY "Joiner starts conversation"
   ON public.conversations FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = joiner_id AND NOT public.is_blocked_with(poster_id));
+  WITH CHECK (
+    auth.uid() = joiner_id
+    AND NOT public.is_blocked_with(poster_id)
+    AND public.is_active_member()
+  );
 
 DROP POLICY IF EXISTS "Poster updates conversation status" ON public.conversations;
 CREATE POLICY "Poster updates conversation status"
   ON public.conversations FOR UPDATE TO authenticated
   USING (auth.uid() = poster_id AND NOT public.is_blocked_with(joiner_id))
-  WITH CHECK (auth.uid() = poster_id);
+  WITH CHECK (auth.uid() = poster_id AND public.is_active_member());
 
 DROP POLICY IF EXISTS "Read messages in own conversations" ON public.messages;
 CREATE POLICY "Read messages in own conversations"
@@ -272,6 +402,7 @@ CREATE POLICY "Send to own conversations"
   ON public.messages FOR INSERT TO authenticated
   WITH CHECK (
     auth.uid() = from_user_id
+    AND public.is_active_member()
     AND conversation_id IN (
       SELECT id FROM public.conversations
       WHERE (auth.uid() = poster_id AND NOT public.is_blocked_with(joiner_id))
@@ -432,8 +563,24 @@ CREATE TRIGGER profiles_reject_blocked_language
 -- id, or point a known token at their own account and have that person's phone
 -- start receiving the caller's notifications.
 --
--- This function does the whole thing in one statement-level transaction and
--- refuses the second case outright.
+-- This function does the whole thing in one transaction and refuses the second
+-- case outright.
+--
+-- Two things the first version got wrong, both only visible under concurrency:
+--
+--   * `SELECT ... FOR UPDATE` locks nothing when the row does not exist yet.
+--     For a token nobody has registered before - which is every first
+--     registration - the ownership read and the upsert were not serialised
+--     against each other at all.
+--   * The `ON CONFLICT DO UPDATE` was unconditional, so whatever the ownership
+--     read had decided, the write itself would happily rebind the row. Two
+--     accounts registering the same token at the same moment therefore both saw
+--     "no owner", and the second one took it.
+--
+-- Both are closed here. A transaction-scoped advisory lock keyed on the token
+-- serialises everything touching one token, and the upsert carries the
+-- ownership condition itself, so the invariant holds even if the lock is ever
+-- removed. A zero-row upsert is the conflict.
 -- ───────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.register_push_token(
@@ -451,8 +598,13 @@ AS $$
 DECLARE
   owner UUID;
   revoked TIMESTAMPTZ;
+  affected INT;
   now_ts TIMESTAMPTZ := now();
 BEGIN
+  -- Serialise every registration of THIS token, whether or not a row exists
+  -- yet. Released automatically at the end of the transaction.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_token, 0));
+
   SELECT user_id, revoked_at INTO owner, revoked
   FROM public.push_tokens
   WHERE expo_push_token = p_token
@@ -488,7 +640,18 @@ BEGIN
       app_version = EXCLUDED.app_version,
       updated_at = now_ts,
       last_used_at = now_ts,
-      revoked_at = NULL;
+      revoked_at = NULL
+  -- The ownership check, restated where the write actually happens: take the
+  -- row only if it is already ours, or if its owner has retired it.
+  -- `push_tokens.x` is the EXISTING row here, which is what ON CONFLICT gives
+  -- the WHERE clause. `EXCLUDED.x` above is the row we tried to insert.
+  WHERE push_tokens.user_id = p_user_id
+     OR push_tokens.revoked_at IS NOT NULL;
+
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  IF affected = 0 THEN
+    RETURN 'conflict';
+  END IF;
 
   RETURN 'ok';
 END;
@@ -500,13 +663,36 @@ GRANT EXECUTE ON FUNCTION public.register_push_token(UUID, TEXT, TEXT, TEXT, TEX
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 8 · ATOMIC CONFIRM / DECLINE
+-- 8 · ATOMIC CONFIRM / DECLINE, WITH CAPACITY
 --
 -- Confirming used to be "read the row, check status, write the new status".
 -- Two taps racing each other both saw `pending`, both wrote, and both sent a
--- confirmation email and push. This makes the transition the check: exactly
--- one caller can move a conversation out of `pending`, and the caller learns
--- whether it was them.
+-- confirmation email and push.
+--
+-- Moving the status guard into the UPDATE fixed the double-notify but not the
+-- thing underneath it: the function confirmed ANY pending conversation, and the
+-- AFTER UPDATE trigger from 0001 then decremented `spots_left` with a
+-- GREATEST(0, ...) floor. So a plan with one spot and three pending requests
+-- confirmed all three, each one a promise to a real person, and the count
+-- simply bottomed out at zero. Nothing in the product ever checked that a plan
+-- still had room at the moment of confirmation.
+--
+-- Now the conversation row is locked first, then the plan row, always in that
+-- order (so two confirmations can never deadlock against each other), and the
+-- capacity check happens while both locks are held. Two callers racing for the
+-- last spot serialise on the plan's row lock; the loser re-reads the committed
+-- `spots_left` of 0 and is told 'full'.
+--
+-- Outcomes, all mapped in `src/app/api/conversations/route.ts`:
+--   updated          - this caller made the transition. The only one that may notify.
+--   already_resolved - somebody (possibly this caller, retrying) got there first.
+--   full             - the plan has no spots left.
+--   closed           - the plan is removed, expired, or past `expires_at`.
+--   not_found        - no such conversation for this poster.
+--   invalid          - not a status this function will write.
+--
+-- Declining never consults the plan: turning someone down consumes no capacity
+-- and must keep working on a full, closed or expired plan.
 -- ───────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.resolve_conversation(
@@ -520,11 +706,49 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  conv_plan_id UUID;
+  conv_status TEXT;
+  plan_status TEXT;
+  plan_spots_left INT;
+  plan_expires_at TIMESTAMPTZ;
   updated INT;
-  existing TEXT;
 BEGIN
   IF p_status NOT IN ('confirmed', 'declined') THEN
     RETURN 'invalid';
+  END IF;
+
+  -- Lock order, everywhere: conversation, then plan.
+  SELECT plan_id, status INTO conv_plan_id, conv_status
+  FROM public.conversations
+  WHERE id = p_conversation_id AND poster_id = p_poster_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+  IF conv_status <> 'pending' THEN
+    RETURN 'already_resolved';
+  END IF;
+
+  IF p_status = 'confirmed' THEN
+    SELECT status, spots_left, expires_at
+      INTO plan_status, plan_spots_left, plan_expires_at
+    FROM public.plans
+    WHERE id = conv_plan_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RETURN 'not_found';
+    END IF;
+
+    -- Closed before full: an expired plan should say so rather than report a
+    -- capacity problem it does not have.
+    IF plan_status IN ('removed', 'expired') OR plan_expires_at < now() THEN
+      RETURN 'closed';
+    END IF;
+    IF plan_status <> 'open' OR plan_spots_left < 1 THEN
+      RETURN 'full';
+    END IF;
   END IF;
 
   UPDATE public.conversations
@@ -534,19 +758,13 @@ BEGIN
     AND status = 'pending';
 
   GET DIAGNOSTICS updated = ROW_COUNT;
-  IF updated = 1 THEN
-    RETURN 'updated';
+  IF updated <> 1 THEN
+    -- Unreachable while the row lock above is held; kept so a future caller
+    -- that drops the lock still fails closed rather than reporting success.
+    RETURN 'already_resolved';
   END IF;
 
-  SELECT status INTO existing
-  FROM public.conversations
-  WHERE id = p_conversation_id AND poster_id = p_poster_id;
-
-  IF existing IS NULL THEN
-    RETURN 'not_found';
-  END IF;
-
-  RETURN 'already_resolved';
+  RETURN 'updated';
 END;
 $$;
 
@@ -561,6 +779,11 @@ GRANT EXECUTE ON FUNCTION public.resolve_conversation(UUID, UUID, TEXT) TO servi
 -- conversations, messages, reports, blocks, conversation_reads and
 -- push_tokens. plan_feedback.responder_id had no foreign key at all, so a
 -- deleted member's feedback rows outlived them. Add it, cascading.
+--
+-- MUTATING: the DELETE below removes plan_feedback rows whose responder no
+-- longer exists. They belong to accounts that were already deleted and should
+-- have taken this data with them; the missing foreign key is why they did not.
+-- Count them first with the preflight query in the header.
 -- ───────────────────────────────────────────────────────────────────────────
 
 DELETE FROM public.plan_feedback
@@ -574,7 +797,92 @@ ALTER TABLE public.plan_feedback
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 10 · REALTIME
+-- 10 · WELCOME EMAIL, SENT AT MOST ONCE
+--
+-- /api/welcome decided whether to send from `profiles.created_at` alone: any
+-- account younger than fifteen minutes got a welcome email, every time the
+-- route was called. The app calls it once, but nothing enforced that - a
+-- retried request, a double tap, or fifty concurrent calls all delivered mail.
+-- "Age-bounded" is a bound on the window, not on the number of sends.
+--
+-- The claim below is the bound. `claim_welcome_email` inserts the marker row
+-- and returns 'claimed' only to the caller that actually created it; everyone
+-- else gets 'already_claimed'. Concurrent callers serialise on the primary key,
+-- so exactly one send attempt is made.
+--
+-- If the provider then fails, the claim is deliberately NOT released. It
+-- expires on its own after `p_retry_after`, which keeps a failed send
+-- retryable without opening a window where two callers both hold a claim. The
+-- send itself also carries a Resend idempotency key derived from the user id,
+-- so even a retry that races the provider's own recovery delivers one email.
+-- `attempts` caps the whole thing at five tries no matter what.
+-- ───────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.welcome_emails (
+  user_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
+  claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at TIMESTAMPTZ,
+  attempts INT NOT NULL DEFAULT 0
+);
+
+-- Same treatment as push_tokens: RLS on, no policies, grants revoked. Only the
+-- service role reaches it, and only through the two functions below.
+ALTER TABLE public.welcome_emails ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.welcome_emails FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.claim_welcome_email(
+  p_user_id UUID,
+  p_retry_after INTERVAL DEFAULT INTERVAL '5 minutes',
+  p_max_attempts INT DEFAULT 5
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  claimed UUID;
+BEGIN
+  INSERT INTO public.welcome_emails (user_id, claimed_at, sent_at, attempts)
+  VALUES (p_user_id, now(), NULL, 1)
+  ON CONFLICT (user_id) DO UPDATE
+  SET claimed_at = now(),
+      attempts = welcome_emails.attempts + 1
+  -- Re-claim only an unsent row whose previous claim has aged out, and only
+  -- while there are attempts left. A row with sent_at set is never re-claimed.
+  -- `welcome_emails.x` is the EXISTING row, which is what makes this a check on
+  -- what is already there rather than on what we just tried to insert.
+  WHERE welcome_emails.sent_at IS NULL
+    AND welcome_emails.claimed_at < now() - p_retry_after
+    AND welcome_emails.attempts < p_max_attempts
+  RETURNING user_id INTO claimed;
+
+  IF claimed IS NULL THEN
+    RETURN 'already_claimed';
+  END IF;
+  RETURN 'claimed';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.mark_welcome_email_sent(p_user_id UUID)
+RETURNS VOID
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  UPDATE public.welcome_emails
+  SET sent_at = now()
+  WHERE user_id = p_user_id AND sent_at IS NULL;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_welcome_email(UUID, INTERVAL, INT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_welcome_email(UUID, INTERVAL, INT) TO service_role;
+REVOKE ALL ON FUNCTION public.mark_welcome_email_sent(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.mark_welcome_email_sent(UUID) TO service_role;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 11 · REALTIME
 --
 -- 0001 adds messages and conversations to the publication. Repeat it safely so
 -- a fresh project that ran 0001 before these policies existed still ends up

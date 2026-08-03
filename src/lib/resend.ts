@@ -46,10 +46,22 @@ ${meta ? `<p style="font-family:'Courier New',monospace;font-size:11px;color:${C
 </td></tr></table>`;
 }
 
-export async function sendWelcome(to: string, name: string) {
+/**
+ * Returns whether the provider accepted the message.
+ *
+ * Every other sender here swallows its failure, which is right for them: a
+ * missed reply alert must not fail the message that caused it. The welcome
+ * email is different, because /api/welcome marks the account as welcomed before
+ * it sends. Swallowing a failure there would burn the one send on nothing, so
+ * this one reports.
+ *
+ * `idempotencyKey` is passed to Resend when supplied, so a retry after an
+ * ambiguous failure cannot deliver a second copy.
+ */
+export async function sendWelcome(to: string, name: string, idempotencyKey?: string): Promise<boolean> {
   const first = name.split(' ')[0];
   try {
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: FROM_SYSTEM,
       to,
       subject: `Welcome to Stoop, ${escape(first)}`,
@@ -64,8 +76,19 @@ export async function sendWelcome(to: string, name: string) {
         ctaUrl: `${APP_URL}/post`,
         ctaText: 'Post your first plan →'
       })
-    });
-  } catch (e) { console.error('sendWelcome failed:', e); }
+    }, idempotencyKey ? { idempotencyKey } : undefined);
+
+    // The SDK reports API-level failures in `error` rather than throwing, so a
+    // rejected send used to look exactly like a delivered one.
+    if (error) {
+      console.error('sendWelcome rejected by provider:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('sendWelcome failed:', e);
+    return false;
+  }
 }
 
 export async function sendMessageAlert(to: string, fromName: string, planText: string, convId: string, messagePreview?: string) {

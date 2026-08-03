@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteAuth, unauthorized } from '@/lib/supabase/route';
-import { getBlockedIds } from '@/lib/blocks';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
 
 /**
  * One plan by slug, for the native app.
@@ -38,7 +38,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   let canReport = false;
 
   if (user) {
-    const blockedIds = await getBlockedIds(supabase, user.id);
+    let blockedIds: string[];
+    try {
+      blockedIds = await getBlockedIds(user.id);
+    } catch (caught) {
+      // Not 404: "we cannot tell whether you may see this" is a different
+      // answer from "this is not here", and only one of them is worth retrying.
+      if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+      throw caught;
+    }
     if (blockedIds.includes(plan.user_id)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

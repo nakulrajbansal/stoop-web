@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildPushMessages,
   buildPushPayload,
   chunk,
   deadTokensFromTickets,
   EXPO_PUSH_ENDPOINT,
+  EXPO_PUSH_TIMEOUT_MS,
   isExpoPushToken,
   sendExpoPush,
   type ExpoPushMessage,
@@ -205,5 +206,121 @@ describe('sendExpoPush', () => {
     for (const secret of SECRETS) {
       expect(body.toLowerCase()).not.toContain(secret.toLowerCase());
     }
+  });
+});
+
+/**
+ * Every caller of `notifyUser` runs after its database transaction has already
+ * committed — a plan joined, a message sent, a request confirmed. An unbounded
+ * fetch to Expo there does not delay a notification, it holds the member's own
+ * HTTP response open behind a third party, so the person who just tapped Accept
+ * watches a spinner until their client gives up.
+ */
+describe('sendExpoPush timeouts', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('passes an abort signal on every request', async () => {
+    const messages = buildPushMessages([TOKEN_A], buildPushPayload('reply'));
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      expect(init.signal?.aborted).toBe(false);
+      return { ok: true, json: async () => ({ data: [{ status: 'ok' }] }) };
+    });
+
+    await sendExpoPush(messages, fetchImpl as unknown as typeof fetch);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts a request that never answers, and returns error tickets', async () => {
+    vi.useFakeTimers();
+    const messages = buildPushMessages([TOKEN_A, TOKEN_B], buildPushPayload('reply'));
+
+    // A fetch that only ever settles when its signal aborts, which is exactly
+    // what a hung connection looks like.
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new Error('The operation was aborted')));
+      })
+    );
+
+    const pending = sendExpoPush(messages, fetchImpl as unknown as typeof fetch);
+    await vi.advanceTimersByTimeAsync(EXPO_PUSH_TIMEOUT_MS + 1);
+
+    const tickets = await pending;
+    expect(tickets).toHaveLength(2);
+    expect(tickets.every(t => t.status === 'error')).toBe(true);
+  });
+
+  it('bounds the body read too, not only the connect', async () => {
+    vi.useFakeTimers();
+    const messages = buildPushMessages([TOKEN_A], buildPushPayload('reply'));
+
+    // Expo answers with headers and then stalls forever on the body.
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => ({
+      ok: true,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        })
+    }));
+
+    const pending = sendExpoPush(messages, fetchImpl as unknown as typeof fetch);
+    await vi.advanceTimersByTimeAsync(EXPO_PUSH_TIMEOUT_MS + 1);
+
+    await expect(pending).resolves.toEqual([{ status: 'error', message: 'Request failed' }]);
+  });
+
+  it('does not let one timed-out chunk skip the rest', async () => {
+    vi.useFakeTimers();
+    const tokens = Array.from({ length: 101 }, (_, i) => `ExponentPushToken[t${String(i).padStart(4, '0')}]`);
+    const messages = buildPushMessages(tokens, buildPushPayload('reply'));
+
+    let call = 0;
+    const fetchImpl = vi.fn((_url: string, init: RequestInit) => {
+      call += 1;
+      if (call === 1) {
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+      }
+      const sent = JSON.parse(String(init.body));
+      return Promise.resolve({ ok: true, json: async () => ({ data: sent.map(() => ({ status: 'ok' })) }) });
+    });
+
+    const pending = sendExpoPush(messages, fetchImpl as unknown as typeof fetch);
+    await vi.advanceTimersByTimeAsync(EXPO_PUSH_TIMEOUT_MS + 1);
+
+    const tickets = await pending;
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(tickets).toHaveLength(101);
+    expect(tickets.slice(0, 100).every(t => t.status === 'error')).toBe(true);
+    expect(tickets[100]?.status).toBe('ok');
+  });
+
+  it('turns a refused connection into error tickets rather than throwing', async () => {
+    const messages = buildPushMessages([TOKEN_A], buildPushPayload('reply'));
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('ECONNREFUSED');
+    });
+
+    await expect(sendExpoPush(messages, fetchImpl as unknown as typeof fetch))
+      .resolves.toEqual([{ status: 'error', message: 'Request failed' }]);
+  });
+
+  it('clears its timer when the request succeeds, so nothing keeps the process alive', async () => {
+    vi.useFakeTimers();
+    const clear = vi.spyOn(globalThis, 'clearTimeout');
+    const messages = buildPushMessages([TOKEN_A], buildPushPayload('reply'));
+    const fetchImpl = vi.fn(async () => ({ ok: true, json: async () => ({ data: [{ status: 'ok' }] }) }));
+
+    await sendExpoPush(messages, fetchImpl as unknown as typeof fetch);
+    expect(clear).toHaveBeenCalled();
   });
 });

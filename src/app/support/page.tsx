@@ -55,9 +55,13 @@ export default function SupportPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">Blocking someone</h2>
             <p className="text-muted">
-              Blocking is one tap and takes effect at once. You disappear from each other everywhere:
-              the feed, plan pages, conversations, and notifications. It is permanent unless you
-              unblock them.
+              Blocking is one tap and takes effect at once. While either of you is signed in, you
+              disappear from each other: the feed, plan pages, profiles, conversations, and
+              notifications, in both directions, and neither of you can start a new conversation.
+              The rule is enforced by our database, not just the app. It does not hide a public plan
+              page from someone who is not signed in — plan pages are public so plans can be shared,
+              and a signed-out visitor has no account for us to recognise. It is permanent unless
+              you unblock them.
             </p>
           </section>
 
@@ -66,7 +70,9 @@ export default function SupportPage() {
             <p className="text-muted">
               In the app: <strong className="text-ink font-medium">Profile → Delete account</strong>.
               It is immediate and permanent, with no waiting period and nobody to email. Your profile,
-              plans, conversations, messages, photo, and notification tokens go with it.
+              plans, conversations, messages, photo, and notification tokens go with it. It is all or
+              nothing: if any part of it cannot be done right then, we tell you and delete nothing, so
+              you can try again rather than being left half-deleted.
             </p>
           </section>
 

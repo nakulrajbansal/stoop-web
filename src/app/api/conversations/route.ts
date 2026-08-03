@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
-import { getBlockedIds } from '@/lib/blocks';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
 import { suspensionGate } from '@/lib/moderation';
 import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
 import { notifyUser } from '@/lib/push';
@@ -44,7 +44,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Refuse if either party has blocked the other
-  const blockedIds = await getBlockedIds(supabase, user.id);
+  let blockedIds: string[];
+  try {
+    blockedIds = await getBlockedIds(user.id);
+  } catch (caught) {
+    if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+    throw caught;
+  }
   if (blockedIds.includes(plan.user_id)) {
     return NextResponse.json({ error: 'This plan is unavailable.' }, { status: 403 });
   }
@@ -113,12 +119,18 @@ export async function POST(req: NextRequest) {
 /**
  * Confirm or decline a join request.
  *
- * The transition itself is the permission check and the concurrency check. It
- * used to be read-then-write: two taps (or a retried request) both read
- * `pending`, both wrote, and both sent a confirmation email and a push. The
- * `resolve_conversation` function in migration 0008 moves the status guard into
- * the UPDATE's WHERE clause, so exactly one caller can win, and only the winner
- * notifies anybody.
+ * The transition itself is the permission check, the concurrency check and the
+ * capacity check. It used to be read-then-write: two taps (or a retried
+ * request) both read `pending`, both wrote, and both sent a confirmation email
+ * and a push. Worse, nothing looked at the plan at all, so a one-spot plan with
+ * three pending requests confirmed all three — three promises to three real
+ * people — while `spots_left` quietly bottomed out at zero.
+ *
+ * `resolve_conversation` (migration 0008) now locks the conversation and then
+ * the plan, checks ownership, pending status and remaining capacity while both
+ * locks are held, and reports which of those failed. Declining skips the plan
+ * entirely: turning someone down consumes no capacity and has to keep working
+ * on a plan that is full, closed or expired.
  */
 export async function PATCH(req: NextRequest) {
   const auth = await getRouteAuth(req);
@@ -166,14 +178,35 @@ export async function PATCH(req: NextRequest) {
 
   if (outcome === 'not_found') return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   if (outcome === 'already_resolved') {
-    return NextResponse.json({ error: 'Already resolved' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'This request has already been answered.', code: 'already_resolved' },
+      { status: 409 }
+    );
+  }
+  if (outcome === 'full') {
+    return NextResponse.json(
+      { error: 'This plan is already full. Nobody else can be confirmed.', code: 'plan_full' },
+      { status: 409 }
+    );
+  }
+  if (outcome === 'closed') {
+    return NextResponse.json(
+      { error: 'This plan is closed, so nobody else can be confirmed.', code: 'plan_closed' },
+      { status: 409 }
+    );
   }
   if (outcome !== 'updated') {
     return NextResponse.json({ error: 'Could not update this request.' }, { status: 500 });
   }
 
-  // Past this point exactly one caller moved the row out of `pending`, so the
-  // email and the push happen exactly once no matter how many taps raced.
+  // Past this point exactly one caller moved the row out of `pending`, so no
+  // number of racing taps can produce a second confirmation email or push.
+  //
+  // The reverse is not guaranteed and is not claimed: the transaction is
+  // already committed here, so if this process dies before the send the
+  // notification is simply missed. Notifications are best effort by design and
+  // the email is the primary channel; making them exactly-once would take a
+  // transactional outbox and a worker, which this does not have.
   if (newStatus === 'confirmed') {
     try {
       // Same as above: private column, admin client only.

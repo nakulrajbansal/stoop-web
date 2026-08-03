@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { locationLookupFailed } from '@/lib/location-lookup';
 
 /**
  * The signed-in person's own profile, plus whether they still have an account
@@ -15,6 +16,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
  * the database is merely unreachable sent a fully signed-up member back into
  * the signup flow, so the two cases are now told apart and a read failure is a
  * 503 the client can retry.
+ *
+ * The same rule applies one level down, to the city and neighborhood lookups:
+ * an absent row is a real answer, a failed query is not. See
+ * `@/lib/location-lookup`.
  */
 export async function GET(req: NextRequest) {
   const auth = await getRouteAuth(req);
@@ -55,6 +60,15 @@ export async function GET(req: NextRequest) {
       ? supabaseAdmin.from('neighborhoods').select('id, slug, name').eq('id', profile.neighborhood_id).maybeSingle()
       : Promise.resolve({ data: null, error: null })
   ]);
+
+  const lookupFailure = locationLookupFailed(cityResult, neighborhoodResult);
+  if (lookupFailure) {
+    console.error('me: location read failed:', lookupFailure);
+    return NextResponse.json(
+      { error: 'Stoop could not reach your profile just now.', code: 'profile_unavailable' },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({
     needsProfile: false,

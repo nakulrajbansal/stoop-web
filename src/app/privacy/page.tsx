@@ -69,7 +69,10 @@ export default function PrivacyPage() {
                 only.</strong> If you turn on notifications, we store a token for that install so
                 Apple can deliver them. It is stored server side only, is never readable by other
                 members, and the row is deleted — not just marked inactive — when you sign out, turn
-                notifications off, delete your account, or Apple tells us the install is gone.
+                notifications off, delete your account, or Apple tells us the install is gone. If
+                your phone is offline at the moment you sign out, it cannot reach us to say so; it
+                remembers what still needs deleting and finishes the job the next time it has a
+                connection, even if somebody else has signed in on that phone since.
               </li>
             </ul>
           </section>
@@ -113,10 +116,17 @@ export default function PrivacyPage() {
               from the public API entirely and are read only by our servers, to send you an alert.
             </p>
             <p className="text-muted mt-3">
-              If you block someone, the two of you disappear from each other everywhere: the feed,
-              plan pages, conversations, live message delivery, and notifications, in both
-              directions. That rule is enforced by the database itself, not only by the app, so it
-              holds however the data is asked for.
+              If you block someone, the two of you disappear from each other while signed in, in
+              both directions: the feed, plan pages, profiles, conversations, live message
+              delivery, and notifications. Neither of you can start a conversation with the other.
+              That rule lives in the database itself, not only in the app, so it holds however a
+              signed-in account asks for the data.
+            </p>
+            <p className="text-muted mt-3">
+              What a block cannot do is hide a public plan page from someone who is not signed in.
+              Plan pages are public so they can be shared, and a signed-out visitor presents no
+              account for us to recognise. So blocking is about what an account can reach, and what
+              you put in a plan stays public writing.
             </p>
           </section>
 
@@ -162,7 +172,10 @@ export default function PrivacyPage() {
               You can delete your account from the app or the website (Profile, then Delete account).
               It is immediate and permanent: your profile, plans, conversations, messages, photo, and
               notification tokens are removed. There is no waiting period and you do not have to
-              email anyone.
+              email anyone. Your photo lives in public file storage rather than in the database, so
+              it is deleted first and the rest only goes ahead once that has worked. If it cannot,
+              nothing is deleted and you are asked to try again — we would rather you retry than have
+              a photo of you outlive the account it belonged to.
             </p>
           </section>
 
