@@ -266,7 +266,7 @@ export function welcomeEmail(args: {
 
 export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: string; from: string }> = {
   'new-message': () => newMessageEmail({
-    recipientName: 'Nakul',
+    recipientName: 'Neighbor',
     senderName: 'Hannah',
     messagePreview: "Hey! I saw your plan and I'd love to join. I work nearby and have been wanting to check out Cosmic forever. Free anytime after 10.",
     plan: {
@@ -278,7 +278,7 @@ export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: st
     conversationUrl: `${APP_URL}/inbox/preview-123`
   }),
   'reply': () => replyEmail({
-    recipientName: 'Nakul',
+    recipientName: 'Neighbor',
     senderName: 'Theo',
     messagePreview: "Works for me. Want to meet at the entrance? I'll be the one with the red beanie.",
     plan: {
@@ -290,7 +290,7 @@ export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: st
     conversationUrl: `${APP_URL}/inbox/preview-456`
   }),
   'confirmed': () => confirmedEmail({
-    recipientName: 'Nakul',
+    recipientName: 'Neighbor',
     posterName: 'Cleo',
     plan: {
       text: "Reading at Spoonbill before they close at 8. Just want to sit, drink coffee, finish my book. Don't have to talk much.",
@@ -301,7 +301,7 @@ export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: st
     conversationUrl: `${APP_URL}/inbox/preview-789`
   }),
   'expiring': () => expiringSoonEmail({
-    recipientName: 'Nakul',
+    recipientName: 'Neighbor',
     plan: {
       text: "Pottery class drop-in Saturday afternoon. Never done it. Looking for someone equally clueless and willing to laugh.",
       when_day: 'Saturday',
@@ -311,7 +311,7 @@ export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: st
     planUrl: `${APP_URL}/plan/preview-slug`
   }),
   'welcome': () => welcomeEmail({
-    name: 'Nakul',
+    name: 'Neighbor',
     postUrl: `${APP_URL}/post`
   })
 };
