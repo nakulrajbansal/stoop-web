@@ -38,7 +38,14 @@ REMAINING TO FULLY SHIP THE SAFETY LAYER:
 ---
 
 ## PUSH 1 — BLOCK (highest priority)
-One-tap, silent, permanent. Make another user disappear from your experience entirely.
+One-tap, silent, permanent. Make another ACCOUNT disappear from your experience.
+
+Scope, stated exactly, because the copy has to match it (privacy page, App Store
+listing, PRIVACY_DATA_MAP.md in the app repo): a block governs what a signed-in
+account can reach. It does not, and cannot, hide a public plan page from someone
+who is not signed in — plan pages are public so a plan can be shared, and a
+signed-out visitor presents no identity to recognise. Nothing here claims
+universal disappearance.
 
 Requirements:
 - Any signed-in user can block any other from a conversation or a plan.
@@ -51,6 +58,13 @@ Requirements:
 Design / implementation:
 - Table `blocks` (blocker_id, blocked_id, unique) + RPC `blocked_user_ids(for_user)`
   (SECURITY DEFINER, returns both directions). Helper `getBlockedIds()` in `@/lib/blocks`.
+  Since 0008 that RPC is **service-role only**: it takes an arbitrary user id and
+  answers with that person's blocks in both directions, including who has
+  blocked them, so granting it to `authenticated` let any member enumerate
+  anyone's block graph. `getBlockedIds` goes through the admin client, and it
+  THROWS on a lookup failure rather than returning `[]` — an empty list reads as
+  "nobody is blocked", which un-blocked everyone for the duration of any
+  Supabase blip. Routes turn the throw into a retryable 503.
 - API `/api/block` POST (record block + close open convos via admin client) and DELETE (unblock).
 - ENFORCEMENT SURFACES (all required):
   1. Feed: `/api/plans` GET excludes blocked user_ids.

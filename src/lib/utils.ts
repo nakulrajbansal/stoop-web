@@ -86,6 +86,20 @@ export function timeAgo(iso: string): string {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+/**
+ * The categories a plan may have. Must match the plans_category_check
+ * constraint in migration 0008 — `database-contract.test.ts` checks that.
+ */
+export const PLAN_CATEGORIES = [
+  'coffee', 'outdoors', 'arts', 'food', 'books', 'music', 'sports'
+] as const;
+
+export type PlanCategoryId = typeof PLAN_CATEGORIES[number];
+
+export function isPlanCategory(value: unknown): value is PlanCategoryId {
+  return typeof value === 'string' && (PLAN_CATEGORIES as readonly string[]).includes(value);
+}
+
 export const INTENT_TAGS = [
   { id: 'just-social', label: 'Just social' },
   { id: 'dog-friendly', label: 'Dog-friendly' },

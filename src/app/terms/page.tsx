@@ -29,8 +29,8 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-semibold mb-1.5">What Stoop is</h2>
             <p className="text-muted">
               Stoop helps neighbors meet up around real plans (a coffee, a run, a show). You post
-              something you're already doing, and a few people can join. There are no profiles to
-              browse and no algorithm. We're a small platform that makes introductions; the plans
+              something you&apos;re already doing, and a few people can join. There are no profiles to
+              browse and no algorithm. We&apos;re a small platform that makes introductions; the plans
               themselves are yours.
             </p>
           </section>
@@ -39,7 +39,7 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-semibold mb-1.5">Who can use it</h2>
             <p className="text-muted">
               You must be 18 or older and use a real mobile number and a name people would recognize.
-              One account per person. Don't impersonate anyone.
+              One account per person. Don&apos;t impersonate anyone.
             </p>
           </section>
 
@@ -47,8 +47,8 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-semibold mb-1.5">How to behave</h2>
             <p className="text-muted">
               Post plans you actually intend to keep. Be respectful in messages. No harassment,
-              threats, hate, sexual solicitation, spam, scams, or commercial promotion. Don't use
-              Stoop to sell things or push a business. If you say you'll show up, show up; if plans
+              threats, hate, sexual solicitation, spam, scams, or commercial promotion. Don&apos;t use
+              Stoop to sell things or push a business. If you say you&apos;ll show up, show up; if plans
               change, let the other person know.
             </p>
           </section>
@@ -56,9 +56,9 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">Meeting in person</h2>
             <p className="text-muted">
-              Use your judgment. Meet in public, tell a friend where you're going, and trust your
+              Use your judgment. Meet in public, tell a friend where you&apos;re going, and trust your
               gut. You can cancel any plan at any time, for any reason. Stoop does not run background
-              checks or verify identities beyond a phone number, and we aren't responsible for what
+              checks or verify identities beyond a phone number, and we aren&apos;t responsible for what
               happens when people meet offline.
             </p>
           </section>
@@ -66,8 +66,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">Blocking and reporting</h2>
             <p className="text-muted">
-              You can block anyone at any time; it's silent and it's mutual (you each disappear from
-              the other's experience). You can also report someone. We review every report within
+              You can block anyone at any time; it&apos;s silent and it&apos;s mutual (you each disappear from
+              the other&apos;s experience). You can also report someone. We review every report within
               24 hours and can warn, suspend, or remove accounts. Reports are private; the person
               you report is not told who reported them.
             </p>
@@ -78,7 +78,7 @@ export default function TermsPage() {
             <p className="text-muted">
               Breaking the Community Standard can get your account suspended or removed, which ends
               your access to sign in, post, and message, and hides your plans. We may act without
-              notice when someone's safety is at stake.
+              notice when someone&apos;s safety is at stake.
             </p>
           </section>
 
@@ -94,7 +94,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[15px] font-semibold mb-1.5">Changes and contact</h2>
             <p className="text-muted">
-              We may update these terms as Stoop grows; we'll change the date above when we do.
+              We may update these terms as Stoop grows; we&apos;ll change the date above when we do.
               Questions, or something feels off? Email{' '}
               <a href="mailto:hi@stoop.house" className="text-accent underline underline-offset-2">hi@stoop.house</a>.
             </p>

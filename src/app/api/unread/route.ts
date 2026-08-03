@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getRouteAuth, unauthorized } from '@/lib/supabase/route';
 
-export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function GET(req: NextRequest) {
+  const auth = await getRouteAuth(req);
+  // Signed out reads zero; a broken credential is an error, not signed out.
+  if (auth.rejected) return unauthorized();
+  const { supabase, user } = auth;
   if (!user) return NextResponse.json({ count: 0 });
 
   // All conversations the user is part of, with their latest message time

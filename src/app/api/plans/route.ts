@@ -1,23 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth, requireUser, unauthorized } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
-import { getBlockedIds } from '@/lib/blocks';
-import { isSuspended } from '@/lib/moderation';
+import { calculateExpiry, slugify, INTENT_TAGS, isPlanCategory } from '@/lib/utils';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
+import { suspensionGate } from '@/lib/moderation';
+import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
 import { pingIndexNow } from '@/lib/indexnow';
+import type { TablesUpdate } from '@/types/database';
 
-const VALID_TAG_IDS = new Set(INTENT_TAGS.map(t => t.id));
+const VALID_TAG_IDS = new Set<string>(INTENT_TAGS.map(t => t.id));
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const auth = await getRouteAuth(req);
+  // The feed is readable signed out, but a request that presented a broken
+  // credential is an error, not an anonymous visitor.
+  if (auth.rejected) return unauthorized();
+  const { supabase, user } = auth;
 
-  // Blocked users (either direction) are filtered out of the feed entirely
-  const blockedIds = user ? await getBlockedIds(supabase, user.id) : [];
+  // Blocked users (either direction) are filtered out of the feed entirely.
+  // If that list cannot be read there is no safe feed to serve: returning an
+  // unfiltered one puts a blocked member's plans back in front of the person
+  // who blocked them. Fail closed and let the app retry.
+  let blockedIds: string[] = [];
+  if (user) {
+    try {
+      blockedIds = await getBlockedIds(user.id);
+    } catch (caught) {
+      if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+      throw caught;
+    }
+  }
   const { searchParams } = new URL(req.url);
   const citySlug = searchParams.get('city');
   const neighborhoodSlug = searchParams.get('neighborhood');
   const category = searchParams.get('category');
+
+  // An unknown category filters everything out rather than being ignored,
+  // which is what the old `.eq('category', <anything>)` did.
+  if (category && !isPlanCategory(category)) return NextResponse.json({ plans: [] });
 
   let cityId: string | null = null;
   if (citySlug) {
@@ -40,7 +60,7 @@ export async function GET(req: NextRequest) {
     .limit(60);
 
   if (cityId) query = query.eq('city_id', cityId);
-  if (category) query = query.eq('category', category);
+  if (isPlanCategory(category)) query = query.eq('category', category);
 
   if (blockedIds.length > 0) {
     query = query.not('user_id', 'in', `(${blockedIds.join(',')})`);
@@ -62,12 +82,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
-  }
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
+
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   const body = await req.json();
   const { text, category, spot, whenDate, whenDayLabel, whenTime, whenTimeSpecific, spots, neighborhoodSlug, intentTags } = body;
@@ -75,7 +96,7 @@ export async function POST(req: NextRequest) {
   if (!text || typeof text !== 'string' || text.length < 25 || text.length > 220) {
     return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
   }
-  if (!['coffee','outdoors','arts','food','books','music','sports'].includes(category)) {
+  if (!isPlanCategory(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
   }
   if (![1, 2, 3].includes(spots)) {
@@ -87,9 +108,13 @@ export async function POST(req: NextRequest) {
   if (!whenDayLabel || typeof whenDayLabel !== 'string') {
     return NextResponse.json({ error: 'Date label required' }, { status: 400 });
   }
+  const cleanSpot = typeof spot === 'string' && spot.trim() ? spot.trim() : null;
+  if (containsBlockedLanguage(text) || containsBlockedLanguage(cleanSpot)) {
+    return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+  }
 
   const cleanTags: string[] = Array.isArray(intentTags)
-    ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
+    ? intentTags.filter((t: unknown): t is string => typeof t === 'string' && VALID_TAG_IDS.has(t)).slice(0, 2)
     : [];
 
   const { data: profile } = await supabaseAdmin
@@ -122,9 +147,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'You can post up to 10 plans per week.' }, { status: 429 });
   }
 
+  // slug is unique (0008). Re-roll on a genuine collision rather than assuming
+  // the second roll is free.
   let slug = slugify(text);
-  const { data: existing } = await supabaseAdmin.from('plans').select('id').eq('slug', slug).maybeSingle();
-  if (existing) slug = slugify(text);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: taken } = await supabaseAdmin.from('plans').select('id').eq('slug', slug).maybeSingle();
+    if (!taken) break;
+    slug = slugify(text);
+  }
 
   const { data: plan, error } = await supabaseAdmin
     .from('plans')
@@ -135,11 +165,11 @@ export async function POST(req: NextRequest) {
       neighborhood_id: neighborhoodId,
       text,
       category,
-      spot: spot ?? null,
+      spot: cleanSpot,
       when_day: whenDayLabel,
       when_date: whenDate,
-      when_time: whenTime ?? null,
-      when_time_specific: whenTimeSpecific ?? null,
+      when_time: typeof whenTime === 'string' && whenTime ? whenTime : null,
+      when_time_specific: typeof whenTimeSpecific === 'string' && whenTimeSpecific ? whenTimeSpecific : null,
       spots_total: spots,
       spots_left: spots,
       intent_tags: cleanTags,
@@ -148,19 +178,25 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (isBlockedLanguageError(error)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Founding member mechanic: the first 50 people to publish a plan get the
   // badge, automatically and permanently. Best-effort; never fails the post.
   let becameFounding = false;
   try {
-    if (!(profile as any).is_founding_member) {
+    if (!profile.is_founding_member) {
       const { count: foundingCount } = await supabaseAdmin
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .eq('is_founding_member', true);
       if ((foundingCount ?? 0) < 50) {
-        const { error: fmErr } = await (supabaseAdmin.from('profiles') as any)
+        const { error: fmErr } = await supabaseAdmin
+          .from('profiles')
           .update({ is_founding_member: true })
           .eq('id', user.id);
         becameFounding = !fmErr;
@@ -174,15 +210,13 @@ export async function POST(req: NextRequest) {
   // away (fire-and-forget; a failed ping never fails the post).
   try {
     const [cityRes, hoodRes] = await Promise.all([
-      supabaseAdmin.from('cities').select('slug').eq('id', (profile as any).city_id).single(),
+      supabaseAdmin.from('cities').select('slug').eq('id', profile.city_id).single(),
       supabaseAdmin.from('neighborhoods').select('slug').eq('id', neighborhoodId).single()
     ]);
-    const cityRow = cityRes.data as any;
-    const hoodRow = hoodRes.data as any;
-    const urls = [`https://www.stoop.house/plan/${(plan as any).slug}`, 'https://www.stoop.house/feed'];
-    if (cityRow?.slug) {
-      urls.push(`https://www.stoop.house/${cityRow.slug}`);
-      if (hoodRow?.slug) urls.push(`https://www.stoop.house/${cityRow.slug}/${hoodRow.slug}`);
+    const urls = [`https://www.stoop.house/plan/${plan.slug}`, 'https://www.stoop.house/feed'];
+    if (cityRes.data?.slug) {
+      urls.push(`https://www.stoop.house/${cityRes.data.slug}`);
+      if (hoodRes.data?.slug) urls.push(`https://www.stoop.house/${cityRes.data.slug}/${hoodRes.data.slug}`);
     }
     await pingIndexNow(urls);
   } catch (e) {
@@ -192,55 +226,133 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ plan, becameFounding });
 }
 
+/**
+ * Edit a plan you posted.
+ *
+ * `null` is meaningful here: clearing the optional time on a plan is a real
+ * edit, so `whenTime: null` and `whenTimeSpecific: null` are honoured, while
+ * `undefined` (the field simply not sent) leaves the column alone. Those are
+ * different intentions and the route no longer conflates them.
+ */
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
 
-  const { planId, text, whenDate, whenDayLabel, whenTime, whenTimeSpecific, intentTags } = await req.json();
-  if (!planId) return NextResponse.json({ error: 'planId required' }, { status: 400 });
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
+
+  const body = await req.json();
+  const { planId, text, whenDate, whenDayLabel, whenTime, whenTimeSpecific, spot, intentTags } = body;
+  if (!planId || typeof planId !== 'string') {
+    return NextResponse.json({ error: 'planId required' }, { status: 400 });
+  }
 
   // Verify ownership BEFORE updating, using admin client
   const { data: plan } = await supabaseAdmin
     .from('plans')
-    .select('user_id')
+    .select('user_id, status')
     .eq('id', planId)
-    .single();
+    .maybeSingle();
 
   if (!plan || plan.user_id !== user.id) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-
-  const cleanTags: string[] | undefined = Array.isArray(intentTags)
-    ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
-    : undefined;
-
-  const updates: any = {};
-  if (typeof text === 'string' && text.length >= 25 && text.length <= 220) updates.text = text;
-  if (typeof whenDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
-    updates.when_date = whenDate;
-    if (typeof whenDayLabel === 'string' && whenDayLabel) {
-      updates.when_day = whenDayLabel;
-    }
-    updates.expires_at = calculateExpiry(whenDate);
+  // Editing a plan nobody can join any more would silently do nothing useful.
+  if (plan.status === 'removed' || plan.status === 'expired') {
+    return NextResponse.json(
+      { error: 'This plan is closed and can no longer be edited.', code: 'plan_closed' },
+      { status: 409 }
+    );
   }
-  if (typeof whenTime === 'string') updates.when_time = whenTime || null;
-  if (typeof whenTimeSpecific === 'string') updates.when_time_specific = whenTimeSpecific || null;
-  if (cleanTags !== undefined) updates.intent_tags = cleanTags;
 
-  const { error } = await supabaseAdmin
+  const updates: TablesUpdate<'plans'> = {};
+
+  if (text !== undefined) {
+    if (typeof text !== 'string' || text.length < 25 || text.length > 220) {
+      return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
+    }
+    if (containsBlockedLanguage(text)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    updates.text = text;
+  }
+
+  if (whenDate !== undefined) {
+    if (typeof whenDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
+      return NextResponse.json({ error: 'Date must be YYYY-MM-DD' }, { status: 400 });
+    }
+    updates.when_date = whenDate;
+    updates.expires_at = calculateExpiry(whenDate);
+    if (typeof whenDayLabel === 'string' && whenDayLabel) updates.when_day = whenDayLabel;
+  }
+
+  if (whenTime !== undefined) {
+    if (whenTime !== null && typeof whenTime !== 'string') {
+      return NextResponse.json({ error: 'Invalid time' }, { status: 400 });
+    }
+    updates.when_time = whenTime || null;
+  }
+
+  if (whenTimeSpecific !== undefined) {
+    if (whenTimeSpecific !== null && typeof whenTimeSpecific !== 'string') {
+      return NextResponse.json({ error: 'Invalid time' }, { status: 400 });
+    }
+    updates.when_time_specific = whenTimeSpecific || null;
+  }
+
+  if (spot !== undefined) {
+    if (spot !== null && typeof spot !== 'string') {
+      return NextResponse.json({ error: 'Invalid spot' }, { status: 400 });
+    }
+    const cleanSpot = typeof spot === 'string' && spot.trim() ? spot.trim() : null;
+    if (containsBlockedLanguage(cleanSpot)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    updates.spot = cleanSpot;
+  }
+
+  if (intentTags !== undefined) {
+    if (!Array.isArray(intentTags)) {
+      return NextResponse.json({ error: 'Invalid tags' }, { status: 400 });
+    }
+    updates.intent_tags = intentTags
+      .filter((t: unknown): t is string => typeof t === 'string' && VALID_TAG_IDS.has(t))
+      .slice(0, 2);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nothing to change' }, { status: 400 });
+  }
+
+  const { data: updated, error } = await supabaseAdmin
     .from('plans')
     .update(updates)
-    .eq('id', planId);
+    .eq('id', planId)
+    .eq('user_id', user.id)
+    .select('id, slug, text, when_day, when_date, when_time, when_time_specific, spot, intent_tags, status')
+    .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (error) {
+    if (isBlockedLanguageError(error)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!updated) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+
+  return NextResponse.json({ ok: true, plan: updated });
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const user = auth.user!;
+
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   const { searchParams } = new URL(req.url);
   const planId = searchParams.get('planId');
@@ -251,7 +363,7 @@ export async function DELETE(req: NextRequest) {
     .from('plans')
     .select('user_id')
     .eq('id', planId)
-    .single();
+    .maybeSingle();
 
   if (!plan || plan.user_id !== user.id) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
@@ -260,7 +372,8 @@ export async function DELETE(req: NextRequest) {
   const { error } = await supabaseAdmin
     .from('plans')
     .update({ status: 'removed' })
-    .eq('id', planId);
+    .eq('id', planId)
+    .eq('user_id', user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

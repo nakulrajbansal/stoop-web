@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   // Cast needed: digest_opt_out_at arrives with migration 0004 and is not in
   // the generated types (which are weak anyway; see ARCHITECTURE.md gotcha 3).
-  const { error } = await (supabaseAdmin.from('profiles') as any)
+  const { error } = await supabaseAdmin.from('profiles')
     .update({ digest_opt_out_at: new Date().toISOString() })
     .eq('id', uid);
 

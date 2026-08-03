@@ -22,6 +22,8 @@ export default function Footer() {
                 <Link href="/feed" className="text-[12.5px] text-ink-2 hover:text-ink">Browse plans</Link>
                 <Link href="/post" className="text-[12.5px] text-ink-2 hover:text-ink">Post a plan</Link>
                 <Link href="/terms" className="text-[12.5px] text-ink-2 hover:text-ink">Terms</Link>
+                <Link href="/privacy" className="text-[12.5px] text-ink-2 hover:text-ink">Privacy</Link>
+                <Link href="/support" className="text-[12.5px] text-ink-2 hover:text-ink">Support</Link>
               </div>
             </div>
             <div>

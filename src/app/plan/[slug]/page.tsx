@@ -23,11 +23,18 @@ async function fetchPlan(slug: string) {
 
   if (!data) return null;
 
-  // If the viewer and the poster are blocked (either direction), hide the plan
+  // If the viewer and the poster are blocked (either direction), hide the plan.
+  // A lookup that fails hides it too: showing a plan we could not check is the
+  // one outcome that breaks the promise, and this page has no retry state to
+  // offer beyond reloading.
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
-    const blockedIds = await getBlockedIds(supabase, user.id);
-    if (blockedIds.includes(data.user_id)) return null;
+    try {
+      const blockedIds = await getBlockedIds(user.id);
+      if (blockedIds.includes(data.user_id)) return null;
+    } catch {
+      return null;
+    }
   }
 
   return data;
@@ -52,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     `meet people ${plan.city?.name}`,
     `${plan.city?.name} ${plan.category} meetup`,
     'make friends nearby', plan.spot,
-  ].filter(Boolean);
+  ].filter((keyword): keyword is string => Boolean(keyword));
 
   return {
     title,

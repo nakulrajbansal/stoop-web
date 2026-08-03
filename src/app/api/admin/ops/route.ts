@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     .from('ops_items')
     // Creation is restricted to nonterminal entry statuses, so a new row is
     // never born already finished and completed_at always starts empty.
-    .insert({ ...parsed.value, completed_at: null } as any)
+    .insert({ ...parsed.value, completed_at: null })
     .select(SELECT)
     .single();
 

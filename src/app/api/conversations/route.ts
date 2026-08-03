@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendMessageAlert, sendConfirmed } from '@/lib/resend';
-import { getBlockedIds } from '@/lib/blocks';
-import { isSuspended } from '@/lib/moderation';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
+import { suspensionGate } from '@/lib/moderation';
+import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
+import { notifyUser } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const { supabase } = auth;
+  const user = auth.user!;
 
-  if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
-  }
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   const { planId, firstMessage } = await req.json();
   if (!planId || !firstMessage || typeof firstMessage !== 'string') {
@@ -20,6 +23,9 @@ export async function POST(req: NextRequest) {
   }
   if (firstMessage.length < 5 || firstMessage.length > 2000) {
     return NextResponse.json({ error: 'Message must be 5-2000 characters' }, { status: 400 });
+  }
+  if (containsBlockedLanguage(firstMessage)) {
+    return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
   }
 
   // Look up plan
@@ -38,7 +44,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Refuse if either party has blocked the other
-  const blockedIds = await getBlockedIds(supabase, user.id);
+  let blockedIds: string[];
+  try {
+    blockedIds = await getBlockedIds(user.id);
+  } catch (caught) {
+    if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+    throw caught;
+  }
   if (blockedIds.includes(plan.user_id)) {
     return NextResponse.json({ error: 'This plan is unavailable.' }, { status: 403 });
   }
@@ -71,7 +83,12 @@ export async function POST(req: NextRequest) {
     .from('messages')
     .insert({ conversation_id: convId, from_user_id: user.id, text: firstMessage });
 
-  if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
+  if (msgErr) {
+    if (isBlockedLanguageError(msgErr)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    return NextResponse.json({ error: msgErr.message }, { status: 500 });
+  }
 
   // Notify the poster by email (only on a brand-new conversation, not repeat messages)
   if (!existing) {
@@ -91,21 +108,47 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('join-email failed (non-fatal):', e);
     }
+
+    // Same event, native channel. Generic copy only: the message itself is
+    // fetched in-app, never put on a lock screen. Email is unaffected.
+    await notifyUser(plan.user_id, 'join_request', { conversationId: convId });
   }
   return NextResponse.json({ ok: true, conversationId: convId });
 }
 
+/**
+ * Confirm or decline a join request.
+ *
+ * The transition itself is the permission check, the concurrency check and the
+ * capacity check. It used to be read-then-write: two taps (or a retried
+ * request) both read `pending`, both wrote, and both sent a confirmation email
+ * and a push. Worse, nothing looked at the plan at all, so a one-spot plan with
+ * three pending requests confirmed all three — three promises to three real
+ * people — while `spots_left` quietly bottomed out at zero.
+ *
+ * `resolve_conversation` (migration 0008) now locks the conversation and then
+ * the plan, checks ownership, pending status and remaining capacity while both
+ * locks are held, and reports which of those failed. Declining skips the plan
+ * entirely: turning someone down consumes no capacity and has to keep working
+ * on a plan that is full, closed or expired.
+ */
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const { supabase } = auth;
+  const user = auth.user!;
+
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   const { conversationId, action } = await req.json();
   if (!conversationId || !['confirm', 'decline'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  // Only the poster can confirm/decline
+  // Only the poster can confirm/decline. Read through the caller's own client,
+  // so RLS (including the block rules from 0008) applies to the read.
   const { data: conv } = await supabase
     .from('conversations')
     .select(`
@@ -114,37 +157,72 @@ export async function PATCH(req: NextRequest) {
       poster:profiles!conversations_poster_id_fkey(name)
     `)
     .eq('id', conversationId)
-    .single();
+    .maybeSingle();
 
   if (!conv || conv.poster_id !== user.id) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
-  if (conv.status !== 'pending') {
-    return NextResponse.json({ error: 'Already resolved' }, { status: 400 });
-  }
 
   const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
-  const { error } = await supabase
-    .from('conversations')
-    .update({ status: newStatus })
-    .eq('id', conversationId);
-    if (newStatus === 'confirmed') {
-      try {
-        // Same as above: private column, admin client only.
-        const { data: joiner } = await supabaseAdmin
-          .from('profiles').select('notify_email').eq('id', conv.joiner_id).single();
-        const planText = (conv.plan as any)?.text ?? 'your plan';
-        const posterName = (conv.poster as any)?.name ?? 'The host';
-        if (joiner?.notify_email) {
-          await sendConfirmed(joiner.notify_email, planText, posterName, conversationId);
-        }
-      } catch (e) {
-        console.error('confirm-email failed (non-fatal):', e);
+
+  const { data: outcome, error } = await supabaseAdmin.rpc('resolve_conversation', {
+    p_conversation_id: conversationId,
+    p_poster_id: user.id,
+    p_status: newStatus
+  });
+
+  if (error) {
+    console.error('resolve_conversation failed:', error);
+    return NextResponse.json({ error: 'Could not update this request.' }, { status: 500 });
+  }
+
+  if (outcome === 'not_found') return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  if (outcome === 'already_resolved') {
+    return NextResponse.json(
+      { error: 'This request has already been answered.', code: 'already_resolved' },
+      { status: 409 }
+    );
+  }
+  if (outcome === 'full') {
+    return NextResponse.json(
+      { error: 'This plan is already full. Nobody else can be confirmed.', code: 'plan_full' },
+      { status: 409 }
+    );
+  }
+  if (outcome === 'closed') {
+    return NextResponse.json(
+      { error: 'This plan is closed, so nobody else can be confirmed.', code: 'plan_closed' },
+      { status: 409 }
+    );
+  }
+  if (outcome !== 'updated') {
+    return NextResponse.json({ error: 'Could not update this request.' }, { status: 500 });
+  }
+
+  // Past this point exactly one caller moved the row out of `pending`, so no
+  // number of racing taps can produce a second confirmation email or push.
+  //
+  // The reverse is not guaranteed and is not claimed: the transaction is
+  // already committed here, so if this process dies before the send the
+  // notification is simply missed. Notifications are best effort by design and
+  // the email is the primary channel; making them exactly-once would take a
+  // transactional outbox and a worker, which this does not have.
+  if (newStatus === 'confirmed') {
+    try {
+      // Same as above: private column, admin client only.
+      const { data: joiner } = await supabaseAdmin
+        .from('profiles').select('notify_email').eq('id', conv.joiner_id).single();
+      const planText = conv.plan?.text ?? 'your plan';
+      const posterName = conv.poster?.name ?? 'The host';
+      if (joiner?.notify_email) {
+        await sendConfirmed(joiner.notify_email, planText, posterName, conversationId);
       }
+    } catch (e) {
+      console.error('confirm-email failed (non-fatal):', e);
     }
 
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await notifyUser(conv.joiner_id, 'confirmed', { conversationId });
+  }
 
   // The DB trigger automatically decrements spots_left when confirmed.
 
@@ -152,15 +230,20 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const { supabase } = auth;
+  const user = auth.user!;
 
+  // `slug` is named explicitly: the native app's Conversation type declares it
+  // and uses it to open the plan behind a conversation. It was missing from the
+  // embedded select, so every plan link in the app's inbox was undefined.
   const { data: convs, error } = await supabase
     .from('conversations')
     .select(`
       *,
-      plan:plans(id, text, when_day, when_time, status),
+      plan:plans(id, slug, text, when_day, when_time, when_time_specific, spot, status),
       poster:profiles!conversations_poster_id_fkey(id, name, initials, avatar_bg, avatar_fg),
       joiner:profiles!conversations_joiner_id_fkey(id, name, initials, avatar_bg, avatar_fg),
       messages(id, text, from_user_id, created_at)

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   // Activation gate: until migration 0004 adds digest_opt_out_at, there is no
   // opt-out mechanism, so the digest refuses to run at all.
-  const gate = await supabaseAdmin.from('profiles').select('digest_opt_out_at' as any).limit(1);
+  const gate = await supabaseAdmin.from('profiles').select('digest_opt_out_at').limit(1);
   if (gate.error) {
     return NextResponse.json(
       { error: 'Digest inactive: run migration 0004 (digest_opt_out_at) first.' },
@@ -52,11 +52,15 @@ export async function GET(req: NextRequest) {
     .limit(60);
   if (plansErr) return NextResponse.json({ error: plansErr.message }, { status: 500 });
 
-  const { data: cities } = await supabaseAdmin.from('cities').select('id, name');
-  const cityName = new Map((cities ?? []).map((c: any) => [c.id, c.name]));
+  // The row shape the query above actually returns, inferred rather than
+  // re-declared, so a change to the select cannot drift from this type.
+  type DigestRow = NonNullable<typeof rawPlans>[number];
 
-  const plansByCity = new Map<string, any[]>();
-  for (const p of (rawPlans ?? []) as any[]) {
+  const { data: cities } = await supabaseAdmin.from('cities').select('id, name');
+  const cityName = new Map((cities ?? []).map(c => [c.id, c.name] as const));
+
+  const plansByCity = new Map<string, DigestRow[]>();
+  for (const p of rawPlans ?? []) {
     const list = plansByCity.get(p.city_id) ?? [];
     list.push(p);
     plansByCity.set(p.city_id, list);
@@ -66,13 +70,13 @@ export async function GET(req: NextRequest) {
   // and living in a city that has at least one open plan.
   const { data: recipients, error: recErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, name, notify_email, city_id' as any)
-    .is('digest_opt_out_at' as any, null)
+    .select('id, name, notify_email, city_id')
+    .is('digest_opt_out_at', null)
     .is('blocked_at', null)
     .not('notify_email', 'is', null);
   if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 });
 
-  const toDigestPlan = (p: any): DigestPlan => ({
+  const toDigestPlan = (p: DigestRow): DigestPlan => ({
     slug: p.slug,
     text: p.text,
     when_day: p.when_day,
@@ -97,20 +101,20 @@ export async function GET(req: NextRequest) {
   let sent = 0;
   let failed = 0;
   let skippedNoPlans = 0;
-  for (const r of (recipients ?? []) as any[]) {
+  for (const r of recipients ?? []) {
     const cityPlans = plansByCity.get(r.city_id) ?? [];
 
     // Respect blocks in both directions, and never show someone their own plan.
     // A missed filter here would be a real safety hole (see ARCHITECTURE.md).
     const { data: blocked, error: blockErr } = await supabaseAdmin
-      .rpc('blocked_user_ids' as any, { for_user: r.id } as any);
+      .rpc('blocked_user_ids', { for_user: r.id });
     if (blockErr) {
       // If the block lookup fails, skip this recipient rather than risk
       // showing them a blocked person's plan.
       failed++;
       continue;
     }
-    const blockedIds = ((blocked ?? []) as { other_id: string }[]).map(b => b.other_id);
+    const blockedIds = (blocked ?? []).map(b => b.other_id);
 
     const visible = cityPlans
       .filter(p => p.user_id !== r.id && !blockedIds.includes(p.user_id))
@@ -134,7 +138,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     mode,
     dryRun: !sending,
-    recipientsConsidered: ((recipients ?? []) as any[]).length,
+    recipientsConsidered: (recipients ?? []).length,
     wouldSendOrSent: sent,
     skippedNoPlans,
     failed,

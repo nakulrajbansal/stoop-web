@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRouteAuth, requireUser } from '@/lib/supabase/route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendReplyAlert } from '@/lib/resend';
-import { getBlockedIds } from '@/lib/blocks';
-import { isSuspended } from '@/lib/moderation';
+import { blockLookupUnavailable, BlockLookupError, getBlockedIds } from '@/lib/blocks';
+import { suspensionGate } from '@/lib/moderation';
+import { BLOCKED_LANGUAGE_MESSAGE, containsBlockedLanguage, isBlockedLanguageError } from '@/lib/text-moderation';
+import { notifyUser } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await getRouteAuth(req);
+  const denied = requireUser(auth);
+  if (denied) return denied;
+  const { supabase } = auth;
+  const user = auth.user!;
 
-  if (await isSuspended(user.id)) {
-    return NextResponse.json({ error: 'Account suspended' }, { status: 403 });
-  }
+  const suspended = await suspensionGate(user.id);
+  if (suspended) return suspended;
 
   const { conversationId, text } = await req.json();
   if (!conversationId || !text || typeof text !== 'string') {
@@ -20,6 +23,9 @@ export async function POST(req: NextRequest) {
   }
   if (text.length < 1 || text.length > 2000) {
     return NextResponse.json({ error: 'Message length out of range' }, { status: 400 });
+  }
+  if (containsBlockedLanguage(text)) {
+    return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
   }
 
   // Load the conversation first; we need it for the block check AND the email logic
@@ -43,7 +49,13 @@ export async function POST(req: NextRequest) {
 
   // Refuse if either party has blocked the other
   const otherId = conv.poster_id === user.id ? conv.joiner_id : conv.poster_id;
-  const blockedIds = await getBlockedIds(supabase, user.id);
+  let blockedIds: string[];
+  try {
+    blockedIds = await getBlockedIds(user.id);
+  } catch (caught) {
+    if (caught instanceof BlockLookupError) return blockLookupUnavailable();
+    throw caught;
+  }
   if (blockedIds.includes(otherId)) {
     return NextResponse.json({ error: 'This conversation is no longer available.' }, { status: 403 });
   }
@@ -66,14 +78,19 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (isBlockedLanguageError(error)) {
+      return NextResponse.json({ error: BLOCKED_LANGUAGE_MESSAGE, code: 'blocked_language' }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Notify the OTHER person by email, but only if they seem to have stepped away
   // (haven't sent a message in this conversation in the last 15 minutes).
   try {
     const recipientIsPoster = conv.joiner_id === user.id;
     const recipientId = recipientIsPoster ? conv.poster_id : conv.joiner_id;
-    const sender: any = recipientIsPoster ? conv.joiner : conv.poster;
+    const sender = recipientIsPoster ? conv.joiner : conv.poster;
 
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const { count: recentByRecipient } = await supabase
@@ -83,7 +100,7 @@ export async function POST(req: NextRequest) {
       .eq('from_user_id', recipientId)
       .gte('created_at', fifteenMinAgo);
 
-    const planText = (conv.plan as any)?.text ?? 'your plan';
+    const planText = conv.plan?.text ?? 'your plan';
     if ((recentByRecipient ?? 0) === 0) {
       // notify_email is a private column; only the admin client may read it
       // (migration 0003 revokes it from the API roles).
@@ -92,6 +109,10 @@ export async function POST(req: NextRequest) {
       if (recipient?.notify_email) {
         await sendReplyAlert(recipient.notify_email, sender?.name ?? 'Someone', planText, conversationId, text);
       }
+      // Native push rides the same "they stepped away" gate as the email, so
+      // an active conversation does not buzz the phone on every line. The
+      // reply text itself stays out of the notification.
+      await notifyUser(recipientId, 'reply', { conversationId });
     }
   } catch (e) {
     console.error('reply-email failed (non-fatal):', e);
