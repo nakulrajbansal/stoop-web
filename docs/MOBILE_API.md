@@ -367,10 +367,12 @@ the Expo project, never in this repo.
 
 ## 4. Deploy order (each step is a manual gate)
 
-1. **Merge and push** this branch to `main`. Vercel builds and deploys.
-   Nothing user-visible changes yet: mobile endpoints exist but no app calls them.
-2. **Run migration 0007, then 0008**, in that order, in the Supabase SQL editor.
-   Both are safe to re-run.
+1. **Prepare and approve the backend release**, but do not merge it yet. The
+   shared conversation route calls functions added by 0008, so deploying code
+   first could temporarily break accept/decline on the website.
+2. **Run migration 0007, then 0008**, in that order, in a controlled release
+   window after backup and preflight. Both are safe to re-run. Keep the reviewed
+   backend commit ready to deploy immediately after both migrations succeed.
 
    - `0007_push_tokens.sql` — until it runs, `POST /api/push/register` returns
      500 and push is simply off; every other route is unaffected.
@@ -454,7 +456,10 @@ the Expo project, never in this repo.
    `messages` and a direct update of `profiles.name` are all refused, while
    deleting the account, blocking, reporting, marking a conversation read and
    revoking a push token still work.
-3. **Set `APPLE_TEAM_ID`** in Vercel (Production, Preview) once the Apple
+3. **Merge and deploy the reviewed backend commit immediately after both
+   migrations succeed.** Confirm the deployed Vercel commit matches the reviewed
+   release and run the web regression checklist below.
+4. **Set `APPLE_TEAM_ID`** in Vercel (Production, Preview) once the Apple
    Developer account exists. Redeploy. Then verify:
    ```
    curl -i https://www.stoop.house/.well-known/apple-app-site-association
@@ -464,8 +469,8 @@ the Expo project, never in this repo.
    `stoop.house` 301s to it and Apple does not follow redirects when fetching
    this file, so the apex could never have satisfied an `applinks:stoop.house`
    entry.
-4. **Verify the web is unchanged** (see checklist below).
-5. Only then point a TestFlight build at production.
+5. **Verify the web is unchanged** (see checklist below).
+6. Only then point a TestFlight build at production.
 
 ## 5. Web regression checklist (run after deploying)
 
