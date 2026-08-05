@@ -51,7 +51,7 @@ const PRIORITY_LABELS: Record<OpsPriority, string> = { low: 'Low', medium: 'Medi
 const PRIORITY_STYLE: Record<OpsPriority, string> = {
   low: 'text-muted',
   medium: 'text-ink-2',
-  high: 'text-gold',
+  high: 'text-gold-2',
   urgent: 'text-danger'
 };
 
@@ -290,7 +290,7 @@ function Card({ item, busy, send }: { item: OpsItem; busy: boolean; send: Send }
 
       {item.approval_question && (
         <p className="text-[13px] text-ink leading-[1.55] mb-2">
-          <span className="text-gold font-medium">Decision: </span>{item.approval_question}
+          <span className="text-gold-2 font-medium">Decision: </span>{item.approval_question}
         </p>
       )}
 

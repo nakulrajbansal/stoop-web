@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import { createClient } from '@/lib/supabase/client';
 import { INTENT_TAGS, getDateChips } from '@/lib/utils';
 
@@ -78,7 +79,7 @@ export default function EditPlanPage() {
     return (
       <>
         <Nav />
-        <div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>
+        <PageMain className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</PageMain>
       </>
     );
   }
@@ -86,7 +87,7 @@ export default function EditPlanPage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[640px] mx-auto px-6 py-10 pb-20">
+      <PageMain className="max-w-[640px] mx-auto px-6 py-10 pb-20">
         <Link href={`/plan/${slug}`} className="text-[13px] text-muted hover:text-ink inline-block mb-6">← Back to plan</Link>
         <h2 className="font-serif text-[28px] font-bold tracking-tight mb-1.5">Edit plan</h2>
         <p className="text-[13px] text-muted mb-6">Change anything except location and spots.</p>
@@ -151,7 +152,7 @@ export default function EditPlanPage() {
             {saving ? <span className="spinner" /> : 'Save changes'}
           </button>
         </div>
-      </div>
+      </PageMain>
     </>
   );
 }

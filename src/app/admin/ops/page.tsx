@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getAdminUser } from '@/lib/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import AdminNav from '@/components/AdminNav';
 import { OPS_LIST_LIMIT } from '@/lib/ops';
 import OpsBoard, { type OpsItem } from './OpsBoard';
@@ -35,7 +36,7 @@ export default async function AdminOpsPage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[680px] mx-auto px-5 sm:px-6 py-8 sm:py-10">
+      <PageMain className="max-w-[680px] mx-auto px-5 sm:px-6 py-8 sm:py-10">
         <AdminNav current="/admin/ops" />
         <h1 className="text-[18px] font-semibold text-ink mb-1">Ops</h1>
         <p className="text-[13px] text-muted mb-6">
@@ -57,7 +58,7 @@ export default async function AdminOpsPage() {
         ) : (
           <OpsBoard initialItems={items} />
         )}
-      </div>
+      </PageMain>
     </>
   );
 }

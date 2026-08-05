@@ -2,6 +2,8 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBlockedIds } from '@/lib/blocks';
+import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import PlanDetailClient from './PlanDetailClient';
 import type { Metadata } from 'next';
@@ -119,13 +121,21 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
       }
     : null;
 
+  // Nav, the main landmark and the footer sit OUTSIDE the Suspense boundary so
+  // the server-rendered fallback already has the one <main id="main"> the skip
+  // link points at, rather than gaining it only after hydration.
   return (
-    <Suspense fallback={<div className="max-w-[720px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
+    <>
       {eventJsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
       )}
-      <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
+      <Nav />
+      <PageMain className="max-w-[720px] mx-auto px-6 py-10 pb-20">
+        <Suspense fallback={<div className="py-10 text-center text-muted text-sm">Loading…</div>}>
+          <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
+        </Suspense>
+      </PageMain>
       <Footer />
-    </Suspense>
+    </>
   );
 }

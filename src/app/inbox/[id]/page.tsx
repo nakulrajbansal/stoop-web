@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Avatar from '@/components/Avatar';
 import SafetyCard from '@/components/SafetyCard';
 import { createClient } from '@/lib/supabase/client';
@@ -141,7 +142,7 @@ export default function ChatPage() {
     return (
       <>
         <Nav />
-        <div className="max-w-[640px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>
+        <PageMain className="max-w-[640px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</PageMain>
       </>
     );
   }
@@ -153,7 +154,7 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen">
       <Nav />
-      <div className="flex-1 flex flex-col max-w-[640px] mx-auto w-full">
+      <PageMain className="flex-1 flex flex-col max-w-[640px] mx-auto w-full">
         {/* Header */}
         <div className="border-b border-[var(--border)] px-5 py-3.5 flex items-center gap-3.5 bg-cream sticky top-[58px] z-10">
           <Link href="/inbox" className="text-[13px] text-muted hover:text-ink">←</Link>
@@ -175,19 +176,23 @@ export default function ChatPage() {
           <span className={`text-[11px] px-2.5 py-1 rounded-full font-mono flex-shrink-0 ${
             conv.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.1)] text-sage' :
             conv.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted' :
-            'bg-[rgba(138,104,30,0.12)] text-gold'
+            'bg-[rgba(138,104,30,0.12)] text-gold-2'
           }`}>
             {conv.status === 'confirmed' ? 'Confirmed ✓' : conv.status === 'declined' ? 'Declined' : 'Pending'}
           </span>
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setMenuOpen(v => !v)} className="text-muted hover:text-ink px-2 py-1 text-lg leading-none">⋯</button>
+            <button type="button" onClick={() => setMenuOpen(v => !v)} aria-expanded={menuOpen}
+              aria-label="More options for this conversation"
+              className="text-muted hover:text-ink px-2 py-1 text-lg leading-none">
+              <span aria-hidden="true">⋯</span>
+            </button>
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 bg-card border border-[var(--border2)] rounded-lg shadow-lg py-1 min-w-[160px] z-50">
-                <button onClick={() => { setMenuOpen(false); blockUser(); }} disabled={blocking}
+                <button type="button" onClick={() => { setMenuOpen(false); blockUser(); }} disabled={blocking}
                   className="block w-full text-left px-3 py-2 text-[13px] text-ink hover:bg-cream-2">
                   Block this person
                 </button>
-                <button onClick={() => { setMenuOpen(false); router.push(`/report?conversation=${convId}`); }}
+                <button type="button" onClick={() => { setMenuOpen(false); router.push(`/report?conversation=${convId}`); }}
                   className="block w-full text-left px-3 py-2 text-[13px] text-accent hover:bg-cream-2">
                   Report
                 </button>
@@ -222,9 +227,9 @@ export default function ChatPage() {
           <div className="bg-[rgba(42,66,50,0.08)] border-t border-[rgba(42,66,50,0.15)] px-5 py-3 flex items-center justify-between gap-3">
             <span className="text-[13px] text-sage">✓ Accept and confirm the plan</span>
             <div className="flex gap-2">
-              <button onClick={() => act('decline')} disabled={acting}
+              <button type="button" onClick={() => act('decline')} disabled={acting}
                 className="btn btn-sm btn-ghost">Decline</button>
-              <button onClick={() => act('confirm')} disabled={acting}
+              <button type="button" onClick={() => act('confirm')} disabled={acting}
                 className="btn btn-sm" style={{ background: '#2A4232', color: '#fff' }}>
                 {acting ? <span className="spinner" /> : 'Accept'}
               </button>
@@ -235,21 +240,25 @@ export default function ChatPage() {
         {/* Input */}
         {conv.status !== 'declined' && (
           <div className="border-t border-[var(--border)] px-5 py-3 flex items-end gap-2 bg-cream">
+            <label htmlFor="chat-message" className="sr-only">Message {other.name}</label>
+            {/* 16px below sm so mobile Safari does not zoom the page on focus and
+                leave the thread scrolled sideways; the design's 13.5px from sm up. */}
             <textarea
+              id="chat-message"
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
               rows={1}
               placeholder="Say something…"
-              className="flex-1 bg-card border border-[var(--border2)] rounded-[12px] px-3.5 py-2.5 text-[13.5px] text-ink resize-none outline-none focus:border-accent/40 max-h-[120px]"
+              className="flex-1 bg-card border border-[var(--border2)] rounded-[12px] px-3.5 py-2.5 text-[16px] sm:text-[13.5px] text-ink resize-none outline-none focus:border-accent/40 max-h-[120px]"
             />
-            <button onClick={send} disabled={!text.trim() || sending}
+            <button type="button" onClick={send} disabled={!text.trim() || sending} aria-label="Send message"
               className="w-[38px] h-[38px] rounded-[11px] bg-ink text-cream flex items-center justify-center hover:bg-accent disabled:opacity-40">
-              →
+              <span aria-hidden="true">→</span>
             </button>
           </div>
         )}
-      </div>
+      </PageMain>
     </div>
   );
 }

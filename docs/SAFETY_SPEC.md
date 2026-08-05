@@ -85,7 +85,11 @@ Requirements:
   detail, linked conversation).
 - Admin can Dismiss / Warn / Suspend. Suspend blocks the user from sign-in, posting, messaging,
   and hides their plans.
-- Documented commitment to review within 24 hours (state it in the TOS, Push 4).
+- Say in the TOS what is actually true (Push 4): every report is read, and blocking takes
+  effect instantly so nobody has to wait on a review to stop hearing from someone. Do NOT
+  state a review-time number. Nothing in the code enforces or measures a deadline, and the
+  queue is one person; `/admin/metrics` shows the age of the oldest open report so the real
+  number is visible internally. If a genuine SLA is ever enforced in code, say so then.
 
 Design:
 - `reports` table. `/report?conversation=...` form (categories as tappable options, optional

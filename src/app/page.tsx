@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/server';
@@ -39,7 +40,7 @@ const FAQ = [
   },
   {
     q: 'Is it safe to meet people from Stoop?',
-    a: 'Every member verifies a real phone number, groups are capped at four people, plans happen in public places, and blocking and reporting are built in. Reports are reviewed within 24 hours.'
+    a: 'Every member verifies a real phone number, groups are capped at four people, plans happen in public places, and blocking and reporting are built in. Blocking is instant and mutual, and every report is read.'
   }
 ];
 
@@ -92,9 +93,10 @@ export default async function HomePage() {
       )}
       <Nav />
 
+      <PageMain>
       {/* Editorial masthead */}
-      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-12 pb-4">
-        <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent">
+      <section className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-10 sm:pt-12 pb-4">
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono uppercase tracking-[0.1em] text-accent">
           <span className="w-6 h-px bg-accent"></span>
           <span>Week of {week}</span>
           <span className="opacity-40">·</span>
@@ -109,33 +111,32 @@ export default async function HomePage() {
       </section>
 
       {/* Hero with featured plans index */}
-      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-2 pb-12 sm:pb-16">
-        <div className="grid sm:grid-cols-[1.1fr,1fr] gap-12 sm:gap-16 items-start">
+      <section className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-2 pb-12 sm:pb-16">
+        <div className="grid sm:grid-cols-[1.1fr,1fr] gap-10 sm:gap-16 items-start">
           {/* Left column: headline + CTA */}
           <div>
-            <h1 className="font-serif text-[clamp(56px,7vw,96px)] font-bold leading-[0.92] tracking-[-3px] mb-7">
+            {/* Fluid from 320px up: the old 56px floor overflowed the line on a
+                narrow phone, which is most of the traffic here. */}
+            <h1 className="font-serif text-[clamp(42px,13vw,96px)] font-bold leading-[0.92] tracking-[-1.5px] sm:tracking-[-3px] mb-6 sm:mb-7">
               Plans,<br />not <em className="italic text-gold">profiles.</em>
             </h1>
-            <p className="text-[17px] text-ink-2 leading-[1.6] font-light mb-8 max-w-[440px]">
+            <p className="text-[16px] sm:text-[17px] text-ink-2 leading-[1.6] font-light mb-7 sm:mb-8 max-w-[440px]">
               Post what you&apos;re already doing this week.{' '}
               <strong className="text-ink font-medium">A few neighbors join you.</strong>{' '}
               That&apos;s the whole app.
             </p>
-            <div className="flex items-center gap-3 flex-wrap">
-              {planCount > 0 ? (
-                <>
-                  <Link href="/feed" className="btn btn-primary btn-lg">See all {planCount} plans</Link>
-                  <Link href="/post" className="btn btn-ghost btn-lg">Post your own →</Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/post" className="btn btn-primary btn-lg">Post the first plan →</Link>
-                  <Link href="/feed" className="btn btn-ghost btn-lg">Browse</Link>
-                </>
-              )}
+            {/* One dominant action, full width where the thumb is. Browsing sits
+                directly under it rather than competing at the same weight. */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <Link href="/post" className="btn btn-accent btn-lg justify-center">
+                {planCount > 0 ? 'Post a plan →' : 'Post the first plan →'}
+              </Link>
+              <Link href="/feed" className="btn btn-ghost btn-lg justify-center">
+                {planCount > 0 ? `Browse ${planCount} ${planCount === 1 ? 'plan' : 'plans'}` : 'Browse'}
+              </Link>
             </div>
             <p className="text-[11.5px] text-muted mt-5">
-              Free to browse. You can even write your plan before signing up.
+              Free to browse. You can write your plan before signing up.
             </p>
           </div>
 
@@ -156,7 +157,7 @@ export default async function HomePage() {
                   <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
                     going to the farmers market saturday morning, making coffee after…
                   </div>
-                  <div className="text-[11.5px] text-muted opacity-70">
+                  <div className="text-[11.5px] text-muted">
                     Saturday, 9am
                     <span className="opacity-40 mx-1">·</span>
                     2 spots
@@ -166,7 +167,7 @@ export default async function HomePage() {
                 </div>
                 <p className="text-[13px] text-muted leading-relaxed mb-4 text-center">
                   This week is still wide open.<br />The first plan sets the tone.<br />
-                  <span className="text-gold">First 50 hosts become Founding members.</span>
+                  <span className="text-gold-2">First 50 hosts become Founding members.</span>
                 </p>
                 <div className="text-center">
                   <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
@@ -218,7 +219,7 @@ export default async function HomePage() {
 
       {/* How it works */}
       <section className="bg-cream-2 py-16 sm:py-20 border-y border-[var(--border)]">
-        <div className="max-w-[1080px] mx-auto px-6 sm:px-9">
+        <div className="max-w-[1080px] mx-auto px-5 sm:px-9">
           <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">How it works</div>
           <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
             Three steps to <em className="italic text-gold">an actual plan.</em>
@@ -231,7 +232,11 @@ export default async function HomePage() {
               { n: '03', h: 'You meet', p: 'A few people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
             ].map(step => (
               <div key={step.n} className="bg-cream p-8">
-                <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-[rgba(47,107,63,0.16)] mb-3">{step.n}</div>
+                {/* Accent at 16% composites to 1.24:1 on cream, which is not
+                    readable. At 75% it is 3.29:1, clearing the 3:1 large-text
+                    threshold at 64px bold. Still a tint rather than solid
+                    accent, so the numeral stays quieter than the heading. */}
+                <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-[rgba(47,107,63,0.75)] mb-3">{step.n}</div>
                 <h3 className="font-serif text-[20px] font-bold tracking-tight mb-2">{step.h}</h3>
                 <p className="text-[13.5px] text-ink-2 leading-[1.65] font-light">{step.p}</p>
               </div>
@@ -241,7 +246,7 @@ export default async function HomePage() {
       </section>
 
       {/* Common questions: real content for visitors, FAQPage data for Google */}
-      <section className="max-w-[1080px] mx-auto px-6 sm:px-9 py-16 sm:py-20">
+      <section className="max-w-[1080px] mx-auto px-5 sm:px-9 py-16 sm:py-20">
         <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">Common questions</div>
         <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-10">
           Asked and <em className="italic text-gold">answered.</em>
@@ -290,17 +295,18 @@ export default async function HomePage() {
       />
 
       {/* CTA */}
-      <section className="px-6 sm:px-9 my-16 sm:my-20">
-        <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl px-12 py-16 sm:py-20 flex items-center justify-between gap-8 flex-wrap relative overflow-hidden">
+      <section className="px-5 sm:px-9 my-16 sm:my-20">
+        <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl px-6 sm:px-12 py-12 sm:py-20 flex items-center justify-between gap-8 flex-wrap relative overflow-hidden">
           <div>
-            <h2 className="font-serif text-[clamp(28px,4vw,46px)] font-bold tracking-[-1.2px] leading-[1.05] text-cream mb-2">
+            <h2 className="font-serif text-[clamp(26px,6.5vw,46px)] font-bold tracking-[-1.2px] leading-[1.05] text-cream mb-2">
               The best plans are<br /><em className="italic text-[#D4A93C]">three blocks away.</em>
             </h2>
-            <p className="text-[14px] text-cream/50 font-light leading-relaxed">Post yours this week. See which neighbors turn up.</p>
+            <p className="text-[14px] text-cream/60 font-light leading-relaxed">Post yours this week. See which neighbors turn up.</p>
           </div>
-          <Link href="/post" className="btn btn-lg bg-cream text-ink hover:bg-white">Post your first plan →</Link>
+          <Link href="/post" className="btn btn-lg bg-cream text-ink hover:bg-white justify-center w-full sm:w-auto">Post your first plan →</Link>
         </div>
       </section>
+      </PageMain>
 
       <Footer />
     </>

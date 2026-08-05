@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import PlanCard from '@/components/PlanCard';
 import { supabasePublic } from '@/lib/supabase/public';
@@ -98,7 +99,7 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
   return (
     <>
       <Nav />
-      <div className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-16">
+      <PageMain className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-16">
         <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-4">
           <span className="w-6 h-px bg-accent"></span>
           <span>{found.city.name}</span>
@@ -165,7 +166,7 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
           </div>
           <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
         </div>
-      </div>
+      </PageMain>
       <Footer />
 
       <script

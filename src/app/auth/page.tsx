@@ -8,6 +8,7 @@ import { toE164 } from '@/lib/utils';
 import { toAvatarJpeg } from '@/lib/avatar-image';
 import { neighborhoodsForCity } from '@/lib/neighborhoods';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 
 type Step = 'phone' | 'otp' | 'profile' | 'photo';
 
@@ -22,6 +23,11 @@ function AuthContent() {
     rawNext === 'post' ? '/post'
     : /^\/plan\/[a-z0-9-]+$/i.test(rawNext) ? rawNext
     : '/feed';
+  // Someone arriving mid-plan needs a different first line than someone
+  // arriving cold: they already know what Stoop is, they want to know why they
+  // are being asked for a number and whether their draft survived.
+  const fromDraft = rawNext === 'post';
+  const fromPlan = destination.startsWith('/plan/');
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -179,145 +185,169 @@ function AuthContent() {
 
   return (
     <>
-      <Nav />
-      <div className="max-w-[440px] mx-auto px-6 py-12">
-        <div className="text-center mb-9">
-          <h2 className="font-serif text-[36px] font-bold tracking-tight mb-1.5">
-            Join <em className="italic text-accent">Stoop</em>
-          </h2>
-          <p className="text-sm text-muted">Real plans from people in your neighborhood.</p>
-        </div>
-
-        {error && (
-          <div className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4">
-            {error}
-          </div>
-        )}
-
-        {step === 'phone' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your phone number</label>
-              <input type="tel" inputMode="tel" placeholder="(555) 123-4567" value={phone}
-                onChange={e => setPhone(e.target.value)} className="input" />
-              <p className="text-[11px] text-muted mt-1.5">Real mobile only. Google Voice and Burner numbers won&apos;t work.</p>
-              <p className="text-[11px] text-muted mt-1">
-                Your number just proves you&apos;re a real person. It&apos;s never shown to anyone, and we don&apos;t text you beyond the code.
-              </p>
-            </div>
-            <button onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-              {loading ? <span className="spinner" /> : 'Send code →'}
-            </button>
-          </div>
-        )}
-
-        {step === 'otp' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Code sent to {phoneE164}</label>
-              <input type="text" inputMode="numeric" maxLength={6} placeholder="123456" value={code}
-                onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="input" autoFocus />
-              <button onClick={() => setStep('phone')} className="text-[11px] text-muted underline mt-1.5">
-                Use a different number
-              </button>
-            </div>
-            <button onClick={verifyOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-              {loading ? <span className="spinner" /> : 'Verify →'}
-            </button>
-          </div>
-        )}
-
-        {step === 'profile' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your first name</label>
-              <input type="text" placeholder="e.g. Maya" value={name}
-                onChange={e => setName(e.target.value)} className="input" maxLength={50} />
-            </div>
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your city</label>
-              <select value={city} onChange={e => { setCity(e.target.value); setNeighborhood(''); }} className="input cursor-pointer">
-                <option value="nyc">New York City</option>
-                <option value="austin">Austin</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your neighborhood</label>
-              <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="input cursor-pointer">
-                <option value="">Where are you based?</option>
-                {hoods.map(hood => <option key={hood.slug} value={hood.slug}>{hood.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your email</label>
-              <input type="email" placeholder="e.g. you@example.com" value={email}
-                onChange={e => setEmail(e.target.value)} className="input" maxLength={254} />
-            </div>
-            <div>
-              <label className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">
-                One line about you <span className="lowercase text-[10px] normal-case">(optional)</span>
-              </label>
-              <input type="text" placeholder="e.g. designer, moved from Chicago…" value={about}
-                onChange={e => setAbout(e.target.value)} className="input" maxLength={140} />
-            </div>
-            <button onClick={completeProfile} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-              {loading ? <span className="spinner" /> : 'Create my account →'}
-            </button>
-            <p className="text-[11px] text-muted text-center leading-[1.6]">
-              By creating an account you agree to our{' '}
-              <Link href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</Link>.
-            </p>
-          </div>
-        )}
-
-        {step === 'photo' && (
-          <div className="flex flex-col items-center gap-5 text-center">
-            <p className="text-[14px] text-ink-2 leading-[1.65] max-w-[320px]">
-              One last thing: add a photo. Plans posted with a face get joined a lot more. Just one, and you can change it anytime.
-            </p>
-            <div className="w-[104px] h-[104px] rounded-[28px] bg-cream-2 border border-[var(--border)] flex items-center justify-center overflow-hidden">
-              {photoPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-[32px] opacity-30">☺</span>
-              )}
-            </div>
-            {photoPreview ? (
-              <>
-                <button onClick={() => router.push(destination)} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-                  {destination === '/post' ? 'Looks good, now publish my plan →' : 'Looks good, take me in →'}
-                </button>
-                <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
-                  className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
-                  Use a different photo
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
-                  className="btn btn-accent btn-full" style={{ padding: 13 }}>
-                  {photoBusy ? <span className="spinner" /> : 'Add a photo'}
-                </button>
-                <button onClick={() => router.push(destination)}
-                  className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
-                  Skip for now
-                </button>
-              </>
-            )}
-            <input ref={photoInputRef} type="file" accept="image/*" onChange={onSignupPhotoPicked} className="hidden" />
-          </div>
-        )}
+      <div className="text-center mb-9">
+        <h2 className="font-serif text-[clamp(28px,8vw,36px)] font-bold tracking-tight mb-1.5">
+          {fromDraft ? <>One step <em className="italic text-accent">left</em></> : <>Join <em className="italic text-accent">Stoop</em></>}
+        </h2>
+        <p className="text-sm text-muted">
+          {fromDraft
+            ? 'Your plan is saved. Verify a number and it goes live.'
+            : fromPlan
+              ? 'Verify a number, then send your message.'
+              : 'Real plans from people in your neighborhood.'}
+        </p>
       </div>
+
+      {step === 'phone' && fromDraft && (
+        <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-6">
+          <p className="text-[13px] text-ink-2 leading-relaxed">
+            Everyone on Stoop verifies a number, so the person who turns up is the person who posted. Yours stays private.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
+
+      {step === 'phone' && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="auth-phone" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your phone number</label>
+            <input id="auth-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" value={phone}
+              onChange={e => setPhone(e.target.value)} className="input" />
+            <p className="text-[11px] text-muted mt-1.5">Real mobile only. Google Voice and Burner numbers won&apos;t work.</p>
+            <p className="text-[11px] text-muted mt-1">
+              Your number just proves you&apos;re a real person. It&apos;s never shown to anyone, and we don&apos;t text you beyond the code.
+            </p>
+          </div>
+          <button type="button" onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+            {loading ? <span className="spinner" /> : 'Send code →'}
+          </button>
+        </div>
+      )}
+
+      {step === 'otp' && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="auth-code" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Code sent to {phoneE164}</label>
+            {/* one-time-code lets iOS offer the texted code straight above the
+                keyboard, which is most of this flow on mobile Safari. */}
+            <input id="auth-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className="input" autoFocus />
+            <button type="button" onClick={() => setStep('phone')} className="text-[11px] text-muted underline mt-1.5">
+              Use a different number
+            </button>
+          </div>
+          <button type="button" onClick={verifyOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+            {loading ? <span className="spinner" /> : 'Verify →'}
+          </button>
+        </div>
+      )}
+
+      {step === 'profile' && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="auth-name" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your first name</label>
+            <input id="auth-name" type="text" autoComplete="given-name" placeholder="e.g. Maya" value={name}
+              onChange={e => setName(e.target.value)} className="input" maxLength={50} />
+          </div>
+          <div>
+            <label htmlFor="auth-city" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your city</label>
+            <select id="auth-city" value={city} onChange={e => { setCity(e.target.value); setNeighborhood(''); }} className="input cursor-pointer">
+              <option value="nyc">New York City</option>
+              <option value="austin">Austin</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="auth-hood" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your neighborhood</label>
+            <select id="auth-hood" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="input cursor-pointer">
+              <option value="">Where are you based?</option>
+              {hoods.map(hood => <option key={hood.slug} value={hood.slug}>{hood.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="auth-email" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your email</label>
+            <input id="auth-email" type="email" inputMode="email" autoComplete="email" placeholder="e.g. you@example.com" value={email}
+              onChange={e => setEmail(e.target.value)} className="input" maxLength={254} aria-describedby="auth-email-why" />
+            <p id="auth-email-why" className="text-[11px] text-muted mt-1.5">
+              This is how you hear that someone joined. There is no app to check.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="auth-about" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">
+              One line about you <span className="lowercase text-[10px] normal-case">(optional)</span>
+            </label>
+            <input id="auth-about" type="text" placeholder="e.g. designer, moved from Chicago…" value={about}
+              onChange={e => setAbout(e.target.value)} className="input" maxLength={140} />
+          </div>
+          <button type="button" onClick={completeProfile} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+            {loading ? <span className="spinner" /> : 'Create my account →'}
+          </button>
+          <p className="text-[11px] text-muted text-center leading-[1.6]">
+            By creating an account you agree to our{' '}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-ink">Community Standard &amp; Terms</Link>.
+          </p>
+        </div>
+      )}
+
+      {step === 'photo' && (
+        <div className="flex flex-col items-center gap-5 text-center">
+          <p className="text-[14px] text-ink-2 leading-[1.65] max-w-[320px]">
+            One last thing: add a photo. It is how a neighbor recognizes you when you meet. Just one, and you can change it anytime.
+          </p>
+          <div className="w-[104px] h-[104px] rounded-[28px] bg-cream-2 border border-[var(--border)] flex items-center justify-center overflow-hidden">
+            {photoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[32px] opacity-30">☺</span>
+            )}
+          </div>
+          {photoPreview ? (
+            <>
+              <button type="button" onClick={() => router.push(destination)} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+                {destination === '/post' ? 'Looks good, now publish my plan →' : 'Looks good, take me in →'}
+              </button>
+              <button type="button" onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
+                Use a different photo
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => photoInputRef.current?.click()} disabled={photoBusy}
+                className="btn btn-accent btn-full" style={{ padding: 13 }}>
+                {photoBusy ? <span className="spinner" /> : 'Add a photo'}
+              </button>
+              <button type="button" onClick={() => router.push(destination)}
+                className="text-[12px] text-muted underline underline-offset-2 hover:text-ink">
+                Skip for now
+              </button>
+            </>
+          )}
+          <input ref={photoInputRef} type="file" accept="image/*" onChange={onSignupPhotoPicked} className="hidden" />
+        </div>
+      )}
     </>
   );
 }
 
+// useSearchParams requires a Suspense boundary at build time. Nav and the main
+// landmark sit OUTSIDE it so the server-rendered fallback already has the one
+// <main id="main"> the skip link points at, rather than gaining it only after
+// hydration.
 export default function AuthPage() {
-  // useSearchParams requires a Suspense boundary at build time
   return (
-    <Suspense fallback={<div className="max-w-[440px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
-      <AuthContent />
-    </Suspense>
+    <>
+      <Nav />
+      <PageMain className="max-w-[440px] mx-auto px-6 py-12">
+        <Suspense fallback={<div className="py-20 text-center text-muted text-sm">Loading…</div>}>
+          <AuthContent />
+        </Suspense>
+      </PageMain>
+    </>
   );
 }

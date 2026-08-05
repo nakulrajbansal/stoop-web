@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import AdminNav from '@/components/AdminNav';
 
 export const dynamic = 'force-dynamic';
@@ -89,13 +90,13 @@ export default async function AdminMetricsPage() {
     { label: 'Plans that got a confirmed join', value: confirmRate === null ? 'n/a' : `${confirmRate}%` },
     { label: 'Members', value: String(profiles.length), note: `${signups7} new this week` },
     { label: 'Repeat posters (2+ plans)', value: String(repeatPosters), note: 'One person who posts weekly beats ten lurkers.' },
-    { label: 'Open reports', value: String(openReports.length), note: oldestReportHours === null ? undefined : `Oldest is ${oldestReportHours}h old. Commitment: under 24h.` }
+    { label: 'Open reports', value: String(openReports.length), note: oldestReportHours === null ? undefined : `Oldest is ${oldestReportHours}h old.` }
   ];
 
   return (
     <>
       <Nav />
-      <div className="max-w-[680px] mx-auto px-6 py-10">
+      <PageMain className="max-w-[680px] mx-auto px-6 py-10">
         <AdminNav current="/admin/metrics" />
         <div className="flex items-baseline justify-between mb-1">
           <h1 className="text-[18px] font-semibold text-ink">Metrics</h1>
@@ -139,7 +140,7 @@ export default async function AdminMetricsPage() {
         <p className="text-[11.5px] text-muted mt-3 leading-relaxed">
           Numbers cover the most recent 2,000 profiles and plans; more than enough until the roadmap says otherwise.
         </p>
-      </div>
+      </PageMain>
     </>
   );
 }

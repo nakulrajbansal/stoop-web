@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import type { Metadata } from 'next';
 
@@ -95,6 +96,7 @@ export default async function GuidePage({ params }: { params: Params }) {
   return (
     <>
       <Nav />
+      <PageMain>
       <article className="max-w-[720px] mx-auto px-6 py-12">
         <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-5">
           <span className="w-6 h-px bg-accent"></span>
@@ -126,6 +128,7 @@ export default async function GuidePage({ params }: { params: Params }) {
           <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
         </div>
       </article>
+      </PageMain>
       <Footer />
 
       <script

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import { supabasePublic } from '@/lib/supabase/public';
 import type { Metadata } from 'next';
@@ -60,7 +61,7 @@ export default async function CityPage({ params }: { params: Params }) {
   return (
     <>
       <Nav />
-      <div className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-16">
+      <PageMain className="max-w-[1080px] mx-auto px-6 sm:px-9 pt-10 pb-16">
         <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-4">
           <span className="w-6 h-px bg-accent"></span>
           <span>Stoop in {found.name}</span>
@@ -117,7 +118,7 @@ export default async function CityPage({ params }: { params: Params }) {
           </div>
           <Link href="/post" className="btn btn-primary btn-sm">Post a plan →</Link>
         </div>
-      </div>
+      </PageMain>
       <Footer />
 
       <script
