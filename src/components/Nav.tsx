@@ -47,7 +47,7 @@ export default function Nav() {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center gap-3 px-6 sm:px-9 h-[58px] bg-cream/90 backdrop-blur border-b border-[var(--border)]">
+    <nav aria-label="Main" className="sticky top-0 z-50 flex items-center gap-3 px-5 sm:px-9 h-[58px] bg-cream/90 backdrop-blur border-b border-[var(--border)]">
       <Link href="/" className="font-serif text-[20px] font-bold tracking-tight">
         St<em className="not-italic text-accent italic">oo</em>p
       </Link>
@@ -61,14 +61,17 @@ export default function Nav() {
           <Link href="/inbox" className="text-sm text-ink-2 hover:text-ink relative">
             Inbox
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-3 w-4 h-4 rounded-full bg-accent text-white text-[9px] font-mono flex items-center justify-center">{unreadCount}</span>
+              <>
+                <span aria-hidden="true" className="absolute -top-1 -right-3 w-4 h-4 rounded-full bg-accent text-white text-[9px] font-mono flex items-center justify-center">{unreadCount}</span>
+                <span className="sr-only">, {unreadCount} unread</span>
+              </>
             )}
           </Link>
-          <Link href="/post" className="btn btn-accent btn-sm">
-            <span className="hidden sm:inline">+ Post a plan</span>
-            <span className="sm:hidden">+</span>
+          <Link href="/post" aria-label="Post a plan" className="btn btn-accent btn-sm">
+            <span aria-hidden="true" className="hidden sm:inline">+ Post a plan</span>
+            <span aria-hidden="true" className="sm:hidden">+</span>
           </Link>
-          <Link href="/profile" className="flex">
+          <Link href="/profile" aria-label="Your profile" className="flex">
             <Avatar
               userId={profile.id}
               name={profile.name}

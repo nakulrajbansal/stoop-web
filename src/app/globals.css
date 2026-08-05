@@ -8,10 +8,18 @@
   --card: #FDFAF6;
   --ink: #14110D;
   --ink2: #4A4540;
-  --muted: #6E675E; /* 4.7:1 on cream; do not lighten below WCAG AA */
+  /* 4.99:1 on cream, 4.60:1 on cream-2, 5.69:1 on card. Do not lighten:
+     the old #6E675E cleared AA on cream but only reached 4.33:1 on cream-2,
+     which is the background behind muted text on /post and /my-plans. */
+  --muted: #6A635A;
   --accent: #2F6B3F; /* civic green: buttons, links, structure */
   --acc2: #3B7F4E;
-  --gold: #8A681E; /* mustard: headline emphasis only */
+  /* Display type only. 4.33:1 on cream clears the 3:1 large-text threshold but
+     fails the 4.5:1 one, so anything at body size uses --gold-2 instead. */
+  --gold: #8A681E;
+  /* The same mustard, deep enough for body text and for pending badges:
+     6.05:1 on cream, 5.58:1 on cream-2, 5.23:1 on the 12% mustard badge fill. */
+  --gold-2: #6F5312;
   --danger: #B3402A; /* errors, delete, report; never for CTAs */
   --sage: #2A4232;
   --border: rgba(20, 17, 13, 0.09);
@@ -36,6 +44,47 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Skip past the sticky nav on every page. Off screen until tabbed to. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 999;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 0 0 10px 0;
+  font-size: 13px;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* Honour the OS setting. Movement here is decoration, except the spinner,
+   which still has to read as "working"; it just slows down. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:hover,
+  .plan-card:hover {
+    transform: none !important;
+  }
+  .spinner {
+    animation-duration: 1.4s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* Plan card hover */
@@ -90,7 +139,12 @@ body {
   border-radius: 10px;
   padding: 12px 14px;
   font-family: inherit;
-  font-size: 14px;
+  /* 16px is the threshold below which iOS Safari zooms the page when a field
+     takes focus, and it does not zoom back out. Mobile Safari is the single
+     largest slice of our visitors and /post and /auth are almost all form, so
+     the fields stay at 16px on phone-width screens and drop to the design's
+     14px from the sm breakpoint up, where no browser zooms. */
+  font-size: 16px;
   color: var(--ink);
   outline: none;
   width: 100%;
@@ -101,6 +155,11 @@ body {
   box-shadow: 0 0 0 3px rgba(47, 107, 63, 0.1);
 }
 .input::placeholder { color: var(--muted); }
+@media (min-width: 640px) {
+  .input {
+    font-size: 14px;
+  }
+}
 
 /* Toast */
 .toast {

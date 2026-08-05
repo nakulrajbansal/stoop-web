@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 
 // Deliberately a confirm-button page (not an instant unsubscribe on load):
 // corporate email scanners follow links in emails, and a one-click GET would
@@ -64,9 +65,11 @@ export default function UnsubscribePage() {
   return (
     <>
       <Nav />
-      <Suspense fallback={<div className="max-w-[440px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
-        <UnsubscribeContent />
-      </Suspense>
+      <PageMain>
+        <Suspense fallback={<div className="max-w-[440px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>}>
+          <UnsubscribeContent />
+        </Suspense>
+      </PageMain>
     </>
   );
 }

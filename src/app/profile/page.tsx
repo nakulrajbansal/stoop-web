@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Avatar, { avatarSrc } from '@/components/Avatar';
 import { toAvatarJpeg } from '@/lib/avatar-image';
 import { createClient } from '@/lib/supabase/client';
@@ -175,7 +176,7 @@ export default function ProfilePage() {
     return (
       <>
         <Nav />
-        <div className="max-w-[480px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</div>
+        <PageMain className="max-w-[480px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</PageMain>
       </>
     );
   }
@@ -183,7 +184,7 @@ export default function ProfilePage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[480px] mx-auto px-6 py-10 pb-20">
+      <PageMain className="max-w-[480px] mx-auto px-6 py-10 pb-20">
         <div className="flex items-center gap-4 mb-7">
           {/* key remounts the avatar so a fresh upload shows immediately */}
           <Avatar
@@ -264,7 +265,7 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
-      </div>
+      </PageMain>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">

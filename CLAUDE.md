@@ -91,11 +91,39 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   for italic headline emphasis and pending badges, DANGER #B3402A reserved for
   errors/delete/report (never CTAs), sage for success. Fonts self-hosted via
   next/font in src/app/layout.tsx (Fraunces, DM Sans variable incl. real bold,
-  DM Mono). Muted gray #6E675E (WCAG AA on cream; don't lighten). Per-category
-  tag colors in globals.css (.tag-*, all 7 incl. sports). Site-wide
-  :focus-visible ring. No dark mode. Copy rule: never define Stoop against
-  dating apps (no "no swiping / no algorithm" lines); talk like a block
+  DM Mono). Muted gray is --muted #6A635A (4.99:1 on cream, 4.60:1 on cream-2;
+  don't lighten). MUSTARD #8A681E is DISPLAY TYPE ONLY (3:1 large-text); at body
+  size use --gold-2 #6F5312 (Founding-member lines, pending badges, /admin/ops
+  labels). Per-category tag colors in globals.css (.tag-*, all 7 incl. sports).
+  Site-wide :focus-visible ring. No dark mode. Copy rule: never define Stoop
+  against dating apps (no "no swiping / no algorithm" lines); talk like a block
   noticeboard. Tagline "Plans, not profiles." stays.
+  Do not stack a Tailwind opacity-* on --muted or on the accent for text: both
+  are already at their contrast limit, and that is what caused the two failures
+  fixed on the homepage.
+- ANALYTICS PRIVACY LAYER live in code (src/components/Analytics.tsx,
+  src/lib/analytics-policy.ts, src/lib/referrer-shim.ts). Plan slugs are made
+  from the plan text, so the stock Vercel component was sending user content,
+  conversation ids and auth destinations to a third party. Reporting is now an
+  ALLOWLIST of compile-time route tokens (anything unrecognised is dropped, so
+  a new private route is invisible by default), plan pages report as the literal
+  "/plan/[slug]", and an inline head script clamps document.referrer to a bare
+  origin before any script can read it. It fails closed: no clamp, no analytics.
+  Consequences you will see in the dashboard: per-plan reach is gone, referrers
+  coarsen to origins, and a gate failure records nothing at all. Full contract
+  in docs/GROWTH_GRAPH.md section 7. Do not "fix" a route by adding it to the
+  allowlist without reading that section.
+- DEPENDENCIES: npm audit --omit=dev reports 0 vulnerabilities (was five high:
+  next, axios, form-data, and postcss + sharp nested under next). The postcss
+  and sharp fixes need the "overrides" block in package.json, scoped to next,
+  because next pins them. engines.node is >=20.9.0, which is sharp 0.35's floor,
+  so Vercel must not be pinned to Node 18. Still Next 15, React 18, twilio 5.
+- CHECKS: `npm test` (vitest, 58 tests across analytics-policy, referrer-shim
+  and ops) and `npm run typecheck` are the only checks. The `lint` script was
+  REMOVED: it ran `next lint`, which Next 15.5 deprecates, and with no ESLint
+  installed it dropped into an interactive prompt that hangs. This project has
+  no linter. Typecheck baseline is 103 inherited errors from @supabase/ssr's
+  stale types; that is why ignoreBuildErrors stays on. Do not let it grow.
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and
 in docs/SAFETY_SPEC.md so the next session starts accurate.

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
@@ -32,7 +33,7 @@ export default function InboxPage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[640px] mx-auto px-6 py-10 pb-20">
+      <PageMain className="max-w-[640px] mx-auto px-6 py-10 pb-20">
         <h2 className="font-serif text-[32px] font-bold tracking-tight mb-6">Inbox</h2>
 
         {loading ? (
@@ -97,7 +98,7 @@ export default function InboxPage() {
             })}
           </div>
         )}
-      </div>
+      </PageMain>
     </>
   );
 }

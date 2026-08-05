@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import { createClient } from '@/lib/supabase/client';
 
 export default function MyPlansPage() {
@@ -90,7 +91,7 @@ export default function MyPlansPage() {
   function renderJoinedCard(c: any, isPast: boolean) {
     const statusCls = c.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.09)] text-sage'
       : c.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
-      : 'bg-[rgba(138,104,30,0.12)] text-gold';
+      : 'bg-[rgba(138,104,30,0.12)] text-gold-2';
     const statusTxt = c.status === 'confirmed' ? 'Confirmed' : c.status === 'declined' ? 'Declined' : 'Pending';
 
     return (
@@ -112,7 +113,7 @@ export default function MyPlansPage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[720px] mx-auto px-6 py-10 pb-20">
+      <PageMain className="max-w-[720px] mx-auto px-6 py-10 pb-20">
         <h2 className="font-serif text-[32px] font-bold tracking-tight mb-5">My Plans</h2>
 
         <div className="flex border-b border-[var(--border)] mb-6">
@@ -198,7 +199,7 @@ export default function MyPlansPage() {
             </>
           )
         )}
-      </div>
+      </PageMain>
     </>
   );
 }

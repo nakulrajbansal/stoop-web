@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import PageMain from '@/components/PageMain';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -11,9 +12,9 @@ export default function TermsPage() {
   return (
     <>
       <Nav />
-      <div className="max-w-[680px] mx-auto px-6 py-12">
+      <PageMain className="max-w-[680px] mx-auto px-6 py-12">
         <h1 className="font-serif text-[30px] font-bold tracking-tight mb-2">Terms &amp; Community Standard</h1>
-        <p className="text-[12px] text-muted mb-9">Last updated: May 2026</p>
+        <p className="text-[12px] text-muted mb-9">Last updated: August 2026</p>
 
         {/* Community Standard: the heart of it, kept to one line */}
         <div className="border border-[rgba(42,66,50,0.18)] bg-[rgba(42,66,50,0.05)] rounded-[14px] px-5 py-4 mb-9">
@@ -67,9 +68,10 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-semibold mb-1.5">Blocking and reporting</h2>
             <p className="text-muted">
               You can block anyone at any time; it's silent and it's mutual (you each disappear from
-              the other's experience). You can also report someone. We review every report within
-              24 hours and can warn, suspend, or remove accounts. Reports are private; the person
-              you report is not told who reported them.
+              the other's experience). You can also report someone. We read every report and can
+              warn, suspend, or remove accounts. Blocking takes effect the moment you press it, so
+              you never have to wait on us to stop hearing from someone. Reports are private; the
+              person you report is not told who reported them.
             </p>
           </section>
 
@@ -104,7 +106,7 @@ export default function TermsPage() {
         <div className="mt-10 pt-6 border-t border-[var(--border)]">
           <Link href="/feed" className="text-[13px] text-muted hover:text-ink">← Back to Stoop</Link>
         </div>
-      </div>
+      </PageMain>
     </>
   );
 }
