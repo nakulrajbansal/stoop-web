@@ -19,9 +19,22 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ── 1. THE FULL NAME GOES AWAY ────────────────────────────────────────────
--- display_name was added and granted in the expand migration, so the deployed
--- code is already reading it by the time this runs.
-REVOKE SELECT (name) ON public.profiles FROM anon, authenticated;
+-- Production may still carry a legacy table-level SELECT grant. A column-level
+-- REVOKE cannot override that broader privilege, so remove the table grant and
+-- grant back only the public projection used by the compatible application.
+REVOKE SELECT ON public.profiles FROM anon, authenticated;
+GRANT SELECT (
+  id,
+  display_name,
+  city_id,
+  neighborhood_id,
+  about,
+  avatar_bg,
+  avatar_fg,
+  initials,
+  is_founding_member,
+  created_at
+) ON public.profiles TO anon, authenticated;
 
 -- ── 2. DIRECT WRITES GO AWAY ──────────────────────────────────────────────
 -- The 0001 policies let a signed-in client create a conversation, skipping plan

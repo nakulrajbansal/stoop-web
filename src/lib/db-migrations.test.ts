@@ -252,7 +252,10 @@ describe('expand and contract are separate migrations', () => {
   });
 
   it('closes every legacy path in the postdeploy migration', () => {
-    expect(contract).toMatch(/REVOKE SELECT \(name\) ON public\.profiles FROM anon, authenticated/);
+    // A column-only REVOKE does not beat a legacy table-level SELECT grant.
+    expect(contract).toMatch(/REVOKE SELECT ON public\.profiles FROM anon, authenticated/);
+    expect(contract).toMatch(/GRANT SELECT \([\s\S]*display_name[\s\S]*\) ON public\.profiles TO anon, authenticated/);
+    expect(contract).not.toMatch(/GRANT SELECT \([\s\S]*\bname\b[\s\S]*\) ON public\.profiles/);
     expect(contract).toMatch(/DROP POLICY IF EXISTS "Joiner starts conversation" ON public\.conversations/);
     expect(contract).toMatch(/REVOKE INSERT ON public\.conversations FROM anon, authenticated/);
     expect(contract).toMatch(/DROP POLICY IF EXISTS "Send to own conversations" ON public\.messages/);
