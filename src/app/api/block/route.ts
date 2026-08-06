@@ -12,20 +12,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  // Record the block (admin client; we verified ownership = user.id)
-  const { error: blockErr } = await supabaseAdmin
-    .from('blocks')
-    .upsert({ blocker_id: user.id, blocked_id: blockedId }, { onConflict: 'blocker_id,blocked_id' });
-  if (blockErr) return NextResponse.json({ error: blockErr.message }, { status: 500 });
+  // One transaction: the block, every open conversation between the two, and
+  // the seat that a confirmed participant gives back. Splitting these was how a
+  // blocked participant could vanish from the roster while the plan stayed full.
+  const { data, error } = await (supabaseAdmin as any).rpc('block_and_close', {
+    p_blocker_id: user.id,
+    p_blocked_id: blockedId
+  });
 
-  // Close any open conversations between the two, both directions
-  await supabaseAdmin
-    .from('conversations')
-    .update({ status: 'declined' })
-    .or(`and(poster_id.eq.${user.id},joiner_id.eq.${blockedId}),and(poster_id.eq.${blockedId},joiner_id.eq.${user.id})`)
-    .in('status', ['pending', 'confirmed']);
+  if (error) {
+    console.error('block_and_close failed:', error);
+    return NextResponse.json({ error: 'Could not block right now. Try again.' }, { status: 503 });
+  }
+  if (!data?.ok) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, closed: data.closed ?? 0, seatsReturned: data.seats_returned ?? 0 });
 }
 
 export async function DELETE(req: NextRequest) {

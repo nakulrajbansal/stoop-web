@@ -69,6 +69,86 @@ ID verification, background checks, in-app emergency button, live location shari
 moderation, panic features. Real for mature platforms; premature now. The block + report +
 guidance + manual review layer is the right amount of safety at small scale.
 
+## The minimum plan clarity contract (settled August 2026)
+Feedback that started it: "I have to sign up, but it is not clear what I can expect,"
+and plans vague enough to be unevaluable ("let's meet"). Every NEW plan, and every
+legacy plan that gets edited, must carry six facts: the activity, the date, an exact
+time, a public meeting point, the group size, and a cost expectation
+(`free`, `pay-own-way`, `ticket-required`).
+- There is no publishable "no time" any more. "Sometime Saturday" is exactly the
+  vagueness that makes a stranger's plan unjoinable.
+- The meeting point must be public: a cafe, a venue, a park entrance, a landmark.
+  Home addresses are prohibited by copy and policy, NOT by a geocoder. We do not try
+  to validate a real-world address; a brittle check would give false confidence.
+- Exact location stays PUBLIC for this release. A plan cannot be evaluated without it,
+  and hiding it until confirmation would trade a real safety measure (public places)
+  for a theatrical one.
+- Cost is stated, never processed. Stoop takes no payment and sells no tickets.
+- Rules live in `src/lib/plan-contract.ts` and are enforced on the server. Client
+  validation is convenience; `/api/plans` rejects an incomplete contract with 400.
+- Plans posted before the contract stay readable. The editor asks for the missing
+  pieces when they are next saved, and no cost is invented for a plan that never
+  stated one.
+- This is six fields and a summary, not an event builder. No organizer pages, no
+  ticketing, no RSVP list. That line is the difference between Stoop and Meetup.
+
+## Identity is visible inside a plan, never in a directory (settled August 2026)
+"Not clear whether I can preview my stoopers upfront" is a real objection, and the
+answer is not profile browsing.
+- **Public, before signup**: the host's first name, photo or initials, neighborhood,
+  their one line about themselves, the Founding badge when earned, and how many plans
+  they have hosted once that is 2 or more.
+- **Private to the host**: the requester's first name, photo, neighborhood, one line,
+  prior-plan count and opener, shown above Accept and Decline inside that conversation.
+  Never attached to a public plan response.
+- **Private to the group**: the confirmed roster, visible only to the host and the
+  people they confirmed, through `/api/plans/[id]/participants`. Pending, declined and
+  withdrawn people are never in it, blocks are enforced, and it is fetched after sign
+  in rather than server rendered, so unauthorized HTML cannot contain a name.
+- Still not built and still not wanted: a member directory, profile pages, swiping,
+  any public attendee list.
+
+## The four request states, and withdrawal (settled August 2026)
+`Pending`, `Confirmed`, `Declined`, `Withdrawn`, named identically in the plan page,
+the inbox, the thread and the emails (`src/lib/conversation-lifecycle.ts`).
+- Messaging is never described as acceptance. "Conversation started. No spot is
+  reserved."
+- A requester can withdraw while pending and can leave a confirmed plan before it
+  happens. A host cannot withdraw someone; the host declines.
+- Capacity is Postgres's job, not the application's. The transition happens inside one
+  transaction under a plan row lock, so a confirmed withdrawal restores exactly one
+  spot, a double withdrawal restores none, and two simultaneous confirmations on the
+  last spot cannot both succeed. The old trigger clamped the decrement at zero, which
+  silently overbooked.
+- The lifecycle functions are service-role only. The routes verify the user themselves
+  (auth.uid() is unreliable here) and then call through the admin client. A
+  SECURITY DEFINER function that any client could call with any actor id would be a
+  way to confirm yourself into someone else's plan.
+- **Clients cannot write a status at all.** UPDATE on conversations is revoked from anon
+  and authenticated, and a BEFORE UPDATE trigger refuses any status change that is not
+  made by service_role or from inside the lifecycle functions. Without that, the RLS
+  policy from 0001 let a host set a withdrawn request back to confirmed straight from
+  the browser, reinstating somebody who left with no email and no consent. An external
+  review reproduced exactly that against Postgres under Supabase's stock grants.
+- **A withdrawn person can ask again, once, on purpose.** They write a new opener, the
+  row goes back to pending through a service-only function, and the host is emailed with
+  the fact that this person left earlier. `withdrawn_at` is kept and `reopened_at` and
+  `reopen_count` are recorded, so the history is auditable rather than rewritten. The cap
+  is one: leaving and re-asking must not become a way to pester a host.
+- **A decline is final for that plan.** The host said no; offering the same person a
+  re-ask button would turn a decline into an invitation to keep asking. The plan page
+  says so plainly and points them at other plans. This is the one place the roadmap's
+  "new explicit request" language is deliberately narrowed to withdrawals only.
+- Pressing Message on a plan you already left does nothing on its own. The client has to
+  ask for the re-request explicitly, and the API answers 409 otherwise, so nobody is
+  silently put back in front of a host they walked away from.
+- **A request and its opening message are one transaction.** They were briefly two
+  statements, which meant a failed message insert could leave a pending request with
+  nothing in it: the host sees somebody waiting and no reason why, and a re-request has
+  already spent its one allowed reopen. Both writes now happen inside
+  `start_or_reopen_conversation`, which is also the only path into pending. A separate
+  function that moved the state without the opener would be the same bug again.
+
 ## Design language
 Editorial / print aesthetic, not typical-startup. Rebranded July 2026 to the neighborhood
 noticeboard direction: cream #F0EBE1, ink #14110D, civic green #2F6B3F (accent), mustard

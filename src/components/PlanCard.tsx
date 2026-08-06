@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
 import { intentTagLabel } from '@/lib/utils';
+import { costExpectationLabel } from '@/lib/plan-contract';
+import { firstNameOf } from '@/lib/participants';
 
 type Plan = {
   id: string;
@@ -18,6 +20,7 @@ type Plan = {
   status: string;
   spot: string | null;
   intent_tags?: string[];
+  cost_expectation?: string | null;
   neighborhood?: { name: string } | null;
   city?: { name: string; slug: string } | null;
   poster?: {
@@ -41,6 +44,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export default function PlanCard({ plan }: { plan: Plan }) {
   const isFull = plan.spots_left === 0 || plan.status === 'full';
   const tags = plan.intent_tags ?? [];
+  const costLabel = costExpectationLabel(plan.cost_expectation);
 
   // Build the time/location line: "Today, 9–11am · South Congress"
   let timeLine = plan.when_day;
@@ -69,10 +73,22 @@ export default function PlanCard({ plan }: { plan: Plan }) {
 
       <div className="text-[12px] text-muted mb-4">
         {timeLine}
+        {plan.spot && (
+          <>
+            <span className="opacity-40 mx-1.5">·</span>
+            {plan.spot}
+          </>
+        )}
         {plan.neighborhood?.name && (
           <>
             <span className="opacity-40 mx-1.5">·</span>
             {plan.neighborhood.name}
+          </>
+        )}
+        {costLabel && (
+          <>
+            <span className="opacity-40 mx-1.5">·</span>
+            {costLabel}
           </>
         )}
       </div>
@@ -81,7 +97,7 @@ export default function PlanCard({ plan }: { plan: Plan }) {
         <div className="flex items-center gap-2.5">
           <Avatar
             userId={plan.user_id}
-            name={plan.poster?.name}
+            name={firstNameOf(plan.poster?.name)}
             initials={plan.poster?.initials}
             bg={plan.poster?.avatar_bg}
             fg={plan.poster?.avatar_fg}
@@ -89,7 +105,7 @@ export default function PlanCard({ plan }: { plan: Plan }) {
             radius={8}
           />
           <div>
-            <div className="text-[12.5px] font-semibold text-ink leading-tight">{plan.poster?.name ?? 'A neighbor'}</div>
+            <div className="text-[12.5px] font-semibold text-ink leading-tight">{firstNameOf(plan.poster?.name)}</div>
             <div className="text-[10.5px] text-muted leading-tight">hosting</div>
           </div>
         </div>

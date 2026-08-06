@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client';
 import { toE164 } from '@/lib/utils';
 import { toAvatarJpeg } from '@/lib/avatar-image';
 import { neighborhoodsForCity } from '@/lib/neighborhoods';
+import { SIGNUP_REASON } from '@/lib/product-copy';
+import { NAME_MAX, deriveInitials, normalizeFullName } from '@/lib/profile-identity';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 
@@ -117,7 +119,13 @@ function AuthContent() {
 
   async function completeProfile() {
     setError('');
-    if (!name.trim() || name.trim().length < 1) { setError('Name required'); return; }
+    // The same normalizer the profile editor and /api/profile use. profiles.name
+    // is what Postgres generates display_name from, so a name joined by a pasted
+    // no-break space has to be stored the same way here as anywhere else, or the
+    // initials next to it would describe a different name than the one on show.
+    const fullName = normalizeFullName(name);
+    if (!fullName) { setError('Name required'); return; }
+    if (fullName.length > NAME_MAX) { setError(`Name has to be ${NAME_MAX} characters or fewer`); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setError('A valid email is required for notifications'); return; }
     if (!neighborhood) { setError('Pick your neighborhood'); return; }
     setLoading(true);
@@ -131,19 +139,18 @@ function AuthContent() {
       const { data: nb } = await supabase.from('neighborhoods')
         .select('id').eq('city_id', cityRow.id).eq('slug', neighborhood).single();
 
-      const trimmed = name.trim();
-      const initials = trimmed.split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').join('').substring(0, 2);
-
+      // display_name is not written here, and cannot be: Postgres generates it
+      // from the column below, so signup and the editor cannot drift apart.
       const { error: insErr } = await supabase.from('profiles').insert({
         id: user.id,
-        name: trimmed,
+        name: fullName,
         phone_e164: phoneE164,
         phone_verified_at: new Date().toISOString(),
         city_id: cityRow.id,
         neighborhood_id: nb?.id ?? null,
         about: about.trim() || null,
         notify_email: email.trim().toLowerCase(),
-        initials
+        initials: deriveInitials(fullName)
       });
 
       if (insErr) { setError(insErr.message); setLoading(false); return; }
@@ -151,7 +158,7 @@ function AuthContent() {
       // Fire welcome email (non-blocking)
       fetch('/api/welcome', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), name: trimmed })
+        body: JSON.stringify({ email: email.trim().toLowerCase(), name: fullName })
       }).catch(() => {});
 
       setStep('photo');
@@ -198,11 +205,17 @@ function AuthContent() {
         </p>
       </div>
 
-      {step === 'phone' && fromDraft && (
+      {/* What happens next, and why we are asking, before the first field. */}
+      {step === 'phone' && (
         <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-6">
-          <p className="text-[13px] text-ink-2 leading-relaxed">
-            Everyone on Stoop verifies a number, so the person who turns up is the person who posted. Yours stays private.
+          <p className="text-[13px] text-ink-2 leading-relaxed mb-2">
+            {fromDraft
+              ? 'Next: verify a number, add your name and email, then your saved plan goes live.'
+              : fromPlan
+                ? 'Next: verify a number, add your name and email, then you land back on that plan and can message the host. Messaging does not reserve a spot; the host confirms it.'
+                : 'Next: verify a number, add your name and email. Browsing never needed an account; posting and messaging do.'}
           </p>
+          <p className="text-[12px] text-muted leading-relaxed">{SIGNUP_REASON}</p>
         </div>
       )}
 

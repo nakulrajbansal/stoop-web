@@ -118,12 +118,64 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   and sharp fixes need the "overrides" block in package.json, scoped to next,
   because next pins them. engines.node is >=20.9.0, which is sharp 0.35's floor,
   so Vercel must not be pinned to Node 18. Still Next 15, React 18, twilio 5.
-- CHECKS: `npm test` (vitest, 58 tests across analytics-policy, referrer-shim
-  and ops) and `npm run typecheck` are the only checks. The `lint` script was
+- UNCERTAINTY REDUCTION (Aug 2026) is code complete, PARTLY DARK. The product
+  contract is now stated in the product: browsing is public, signup is only for
+  posting or messaging, a message starts a private conversation and reserves
+  nothing, the host confirms, and confirmed participants privately see the
+  roster. Copy lives once in src/lib/product-copy.ts.
+  - PLAN CLARITY CONTRACT (src/lib/plan-contract.ts): every new plan and every
+    edited legacy plan needs activity, date, EXACT time (the "No time" chip is
+    gone), a public meeting point, group size, and a cost expectation
+    (free | pay-own-way | ticket-required). Validated on the client AND in
+    /api/plans; the composer shows a pre-publish summary of what neighbors see.
+    Legacy plans stay readable; the editor asks for the gaps on next save.
+  - PRIVATE ROSTER: GET /api/plans/[id]/participants, host and confirmed
+    participants only, fetched client side so no unauthorized viewer's HTML ever
+    contains a name. Authorization matrix in src/lib/participants.ts.
+  - WITHDRAWAL: four states (pending, confirmed, declined, withdrawn) named the
+    same everywhere. Capacity moves inside Postgres under a plan row lock, so a
+    confirmed withdrawal restores exactly one spot, a repeat does nothing, and
+    two simultaneous confirmations cannot overbook. Clients cannot write a
+    status at all: UPDATE on conversations is revoked from anon/authenticated and
+    a BEFORE UPDATE trigger refuses any status change not made by service_role or
+    from inside the lifecycle functions.
+  - ASKING AGAIN: someone who withdrew can ask once more, deliberately, with a
+    new opener; the host gets an email that says they left earlier. A DECLINE IS
+    FINAL for that plan. Pressing Message on a plan you left does nothing without
+    the explicit re-request.
+  - ONE TRANSACTION PER REQUEST: start_or_reopen_conversation writes the
+    conversation (or the reopen) AND the opening message together, so a failed
+    opener leaves no pending request with nothing in it and does not spend the
+    one allowed reopen. It is the only way into pending; there is deliberately no
+    separate reopen function. The host email is sent after the commit, once, only
+    when the function says notify_host.
+  - RUN BOTH MIGRATIONS BEFORE DEPLOYING THE CODE:
+    20260805210000_plan_clarity_contract.sql then
+    20260805211500_conversation_withdrawal.sql. NOT order independent. The code
+    selects and writes cost_expectation, so deploying first breaks posting,
+    editing and every neighborhood page; and confirm/decline/withdraw/ask-again
+    have NO fallback, they answer 503 and write nothing until migration two is
+    in. Rehearsed locally against Postgres 16 in Docker (supabase/rehearsal,
+    RUNBOOK "Local migration rehearsal"), including probes that act as anon and
+    authenticated under Supabase's stock grants; NOT run against production.
+  - /admin/metrics gained aggregate loop measures (complete plans, contract rate,
+    conversations per plan, confirmed and withdrawn shares, repeat hosts, blocks,
+    reports). Counts only. The new private routes are NOT on the analytics
+    allowlist and must not be added.
+- CHECKS: `npm test` (vitest) and `npm run typecheck` are the only checks. The
+  suite covers analytics-policy, referrer-shim, ops, plan-contract,
+  conversation-lifecycle, participants, product-copy, public-plan, metrics,
+  blocks, db-migrations, busy-buttons, analytics-private-routes, the plans and
+  conversations and participants routes, and the three components (PlanSummary,
+  RequesterCard, ConfirmedRoster). Component tests run on jsdom with React
+  Testing Library, opted into per file with a `@vitest-environment jsdom`
+  docblock; everything else stays on the node environment. The `lint` script was
   REMOVED: it ran `next lint`, which Next 15.5 deprecates, and with no ESLint
-  installed it dropped into an interactive prompt that hangs. This project has
-  no linter. Typecheck baseline is 103 inherited errors from @supabase/ssr's
-  stale types; that is why ignoreBuildErrors stays on. Do not let it grow.
+  installed it dropped into an interactive prompt that hangs. This project has no
+  linter. Typecheck baseline was 103 inherited errors from @supabase/ssr's stale
+  types and is now 90; that is why ignoreBuildErrors stays on. Do not let it grow.
+  The database is NOT covered by `npm test`: db-migrations.test.ts reads the SQL
+  as text. The executable database proof is the rehearsal in supabase/rehearsal.
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and
 in docs/SAFETY_SPEC.md so the next session starts accurate.

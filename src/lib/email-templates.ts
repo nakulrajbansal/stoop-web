@@ -1,3 +1,5 @@
+import { STATE_COPY } from '@/lib/conversation-lifecycle';
+
 const ACCENT = '#2F6B3F';
 const INK = '#14110D';
 const INK_2 = '#3A332B';
@@ -173,11 +175,40 @@ export function confirmedEmail(args: {
           You're <em style="color:${ACCENT};font-style:italic;">in.</em>
         </h1>
         <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${INK_2};margin:18px 0 0 0;">
-          ${args.posterName} confirmed your spot. Here's where you're showing up:
+          ${STATE_COPY.confirmed.line} Here's where you're showing up:
         </p>
         ${planBlock(args.plan)}
         <p style="font-family:Georgia,serif;font-size:14px;line-height:1.65;color:${INK_2};margin:0;">
           Take it from here. Sort out the small stuff in the conversation. Then show up.
+        </p>
+      `,
+      ctaUrl: args.conversationUrl,
+      ctaText: 'Open the conversation →'
+    })
+  };
+}
+
+export function withdrawnEmail(args: {
+  recipientName: string;
+  joinerName: string;
+  plan: { text: string; when_day: string; when_time_specific?: string | null; when_time?: string | null; neighborhood_name?: string | null };
+  conversationUrl: string;
+}): { subject: string; html: string; from: string } {
+  return {
+    from: `Stoop <hi@stoop.house>`,
+    subject: `${args.joinerName} left your plan`,
+    html: wrapper({
+      preheader: `${args.joinerName} withdrew. Any reserved spot is back.`,
+      content: `
+        <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${INK};margin:0 0 4px 0;font-weight:bold;">
+          ${args.joinerName} <em style="color:${ACCENT};font-style:italic;">left the plan.</em>
+        </h1>
+        <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${INK_2};margin:18px 0 0 0;">
+          ${STATE_COPY.withdrawn.line}
+        </p>
+        ${planBlock(args.plan)}
+        <p style="font-family:Georgia,serif;font-size:14px;line-height:1.65;color:${INK_2};margin:0;">
+          Nothing to do unless you want to. The plan is open again if it was full.
         </p>
       `,
       ctaUrl: args.conversationUrl,
@@ -292,6 +323,17 @@ export const TEMPLATE_PREVIEWS: Record<string, () => { subject: string; html: st
   'confirmed': () => confirmedEmail({
     recipientName: 'Nakul',
     posterName: 'Cleo',
+    plan: {
+      text: "Reading at Spoonbill before they close at 8. Just want to sit, drink coffee, finish my book. Don't have to talk much.",
+      when_day: 'Wednesday',
+      when_time_specific: '7:00 PM',
+      neighborhood_name: 'Williamsburg'
+    },
+    conversationUrl: `${APP_URL}/inbox/preview-789`
+  }),
+  'withdrawn': () => withdrawnEmail({
+    recipientName: 'Nakul',
+    joinerName: 'Theo',
     plan: {
       text: "Reading at Spoonbill before they close at 8. Just want to sit, drink coffee, finish my book. Don't have to talk much.",
       when_day: 'Wednesday',

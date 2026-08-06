@@ -5,6 +5,8 @@ import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import PlanCard from '@/components/PlanCard';
 import { supabasePublic } from '@/lib/supabase/public';
+import { toPublicPlans } from '@/lib/public-plan';
+import { BROWSE_CONTRACT, emptyNeighborhoodCopy, openPlanCount } from '@/lib/product-copy';
 import type { Metadata } from 'next';
 
 // The SEO and QR-card surface: stoop.house/nyc/williamsburg lists that
@@ -62,16 +64,30 @@ async function fetchPlans(neighborhoodId: string) {
     .from('plans')
     .select(`
       id, slug, user_id, text, category, when_day, when_time, when_time_specific,
-      spots_left, spots_total, status, spot, intent_tags, when_date,
+      spots_left, spots_total, status, spot, intent_tags, cost_expectation, when_date,
       neighborhood:neighborhoods(name),
-      poster:profiles!plans_user_id_fkey(name, initials, avatar_bg, avatar_fg)
+      poster:profiles!plans_user_id_fkey(name:display_name, initials, avatar_bg, avatar_fg)
     `)
     .eq('neighborhood_id', neighborhoodId)
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
     .order('when_date', { ascending: true, nullsFirst: false })
-    .limit(30);
-  return (data ?? []) as any[];
+    .limit(PLAN_LIMIT);
+  return toPublicPlans((data ?? []) as any[]);
+}
+
+// The page lists at most this many, so a count taken from the list length would
+// stop being true at exactly the point it starts mattering.
+const PLAN_LIMIT = 30;
+
+async function countOpenPlans(neighborhoodId: string): Promise<number> {
+  const { count } = await supabasePublic
+    .from('plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('neighborhood_id', neighborhoodId)
+    .eq('status', 'open')
+    .gt('expires_at', new Date().toISOString());
+  return count ?? 0;
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
@@ -95,6 +111,7 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
   if (!found) notFound();
 
   const plans = await fetchPlans(found.hood.id);
+  const openCount = await countOpenPlans(found.hood.id);
 
   return (
     <>
@@ -110,17 +127,18 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
         <h1 className="font-serif text-[clamp(34px,5vw,58px)] font-bold tracking-[-1.5px] leading-[1.02] mb-3">
           This week in <em className="italic text-gold">{found.hood.name}.</em>
         </h1>
-        <p className="text-[13.5px] text-muted mb-9 max-w-[520px]">
-          Plans posted by people who live here. No tickets, no events page; a neighbor is
-          doing something and a couple of spots are open.
+        {/* Real availability and the whole contract, before any signup ask. */}
+        <p className="text-[13.5px] text-ink-2 mb-2 max-w-[560px]">
+          <strong className="font-medium">{openPlanCount(openCount)}</strong> in {found.hood.name} right now.
+          {openCount > plans.length && <> Showing the first {plans.length}.</>}
         </p>
+        <p className="text-[13.5px] text-muted mb-9 max-w-[560px] leading-relaxed">{BROWSE_CONTRACT}</p>
 
         {plans.length === 0 ? (
           <div className="py-12 px-6 text-center border border-dashed border-[var(--border2)] rounded-2xl">
             <h2 className="font-serif text-[22px] font-bold mb-2">Nothing here yet this week.</h2>
-            <p className="text-[13.5px] text-muted leading-relaxed mb-6 max-w-[400px] mx-auto">
-              {found.hood.name} is quiet right now. The first plan posted is the one everyone sees,
-              and the first 50 hosts become Founding members.
+            <p className="text-[13.5px] text-muted leading-relaxed mb-6 max-w-[440px] mx-auto">
+              {emptyNeighborhoodCopy(found.hood.name)} The first 50 hosts become Founding members.
             </p>
             <div className="max-w-[420px] mx-auto text-left border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-6 bg-cream-2/40">
               <div className="text-[10px] font-mono uppercase tracking-wide text-muted mb-2">Sample · what a plan looks like</div>
@@ -153,9 +171,10 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
             )}
           </p>
           <p className="text-[13.5px] text-ink-2 leading-[1.75] font-light">
-            Every plan is posted by a phone-verified neighbor, capped at four people total, and happens
-            somewhere public in or near {found.hood.name}. It&apos;s a low-key way to meet people nearby
-            and make friends in {found.city.name} without profiles, swiping, or ticketed events.
+            Every plan is posted by a phone-verified neighbor, names an exact time and a public meeting
+            point in or near {found.hood.name}, and is capped at four people total. You can read all of it
+            without an account. Sign up when you want to post a plan or message a host, and the host
+            decides who joins.
           </p>
         </div>
 

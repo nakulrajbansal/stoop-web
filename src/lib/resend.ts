@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { STATE_COPY } from '@/lib/conversation-lifecycle';
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 const FROM_SYSTEM = 'Stoop <hi@stoop.house>';
@@ -203,13 +204,73 @@ export async function sendConfirmed(to: string, planText: string, posterName: st
         preheader: `${posterName} confirmed your spot on Stoop.`,
         content: `
           <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">You're <em style="color:${C.accent};font-style:italic;">in.</em></h1>
-          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">${escape(posterName)} confirmed your spot. Here's where you're showing up:</p>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">${escape(STATE_COPY.confirmed.line)} Here's where you're showing up:</p>
           ${planBlock(planText)}
-          <p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:0;">A few tips for the meet: pick a public spot, tell a friend where you'll be, trust your gut.</p>
+          <p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:0 0 10px 0;">Once you are confirmed you can see who else is coming, on the plan page.</p>
+          <!-- The last sentence promises withdrawal. It can only be read by
+               somebody whose confirmation came back from confirm_conversation,
+               which does not exist until the withdrawal migration has been run,
+               and that migration is what switches withdrawal on. There is no
+               window where this email is sent but the promise is false. -->
+          <p style="font-family:Georgia,serif;font-size:13px;color:${C.muted};line-height:1.6;margin:0;">A few tips for the meet: pick a public spot, tell a friend where you'll be, trust your gut. If your week changes, you can leave the plan from the conversation and the spot goes back to ${escape(posterName)}.</p>
         `,
         ctaUrl: convId ? `${APP_URL}/inbox/${convId}` : `${APP_URL}/my-plans`,
         ctaText: 'Open the conversation →'
       })
     });
   } catch (e) { console.error('sendConfirmed failed:', e); }
+}
+
+// Somebody who left has asked to come back. Deliberately not the same subject
+// line as a first request: the host should know this person left once, so the
+// decision is made with the whole story.
+export async function sendRequestedAgain(
+  to: string,
+  fromName: string,
+  planText: string,
+  convId: string,
+  messagePreview?: string
+) {
+  const preview = messagePreview && messagePreview.length > 140 ? messagePreview.substring(0, 140) + '…' : messagePreview;
+  try {
+    await resend.emails.send({
+      from: FROM_SYSTEM,
+      to,
+      subject: `${escape(fromName)} is asking to join again`,
+      html: wrap({
+        preheader: `${fromName} left this plan earlier and would like back in.`,
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">${escape(fromName)} is asking to<br>join <em style="color:${C.accent};font-style:italic;">again.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">They left this plan earlier and have asked to come back. ${escape(STATE_COPY.pending.line)} It is your call, same as the first time.</p>
+          ${planBlock(planText)}
+          ${preview ? `<p style="font-family:'Courier New',monospace;font-size:11px;color:${C.muted};letter-spacing:0.08em;text-transform:uppercase;margin:0 0 8px 0;">What they said</p><p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink};margin:0;font-style:italic;">"${escape(preview)}"</p>` : ''}
+        `,
+        ctaUrl: `${APP_URL}/inbox/${convId}`,
+        ctaText: 'Open the conversation →'
+      })
+    });
+  } catch (e) { console.error('sendRequestedAgain failed:', e); }
+}
+
+// The host is the only person who needs to know, and they need to know that
+// the spot is theirs to give again.
+export async function sendWithdrawn(to: string, joinerName: string, planText: string, convId?: string) {
+  try {
+    await resend.emails.send({
+      from: FROM_SYSTEM,
+      to,
+      subject: `${escape(joinerName)} left your plan`,
+      html: wrap({
+        preheader: `${joinerName} withdrew. Any reserved spot is back.`,
+        content: `
+          <h1 style="font-family:Georgia,serif;font-size:32px;line-height:1.15;letter-spacing:-1px;color:${C.ink};margin:0 0 4px 0;font-weight:bold;">${escape(joinerName)} <em style="color:${C.accent};font-style:italic;">left the plan.</em></h1>
+          <p style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${C.ink2};margin:18px 0 0 0;">${escape(STATE_COPY.withdrawn.line)}</p>
+          ${planBlock(planText)}
+          <p style="font-family:Georgia,serif;font-size:14px;line-height:1.7;color:${C.ink2};margin:0;">Nothing to do unless you want to. The plan is open again if it was full, and anyone else who messages can take the spot.</p>
+        `,
+        ctaUrl: convId ? `${APP_URL}/inbox/${convId}` : `${APP_URL}/my-plans`,
+        ctaText: 'Open the conversation →'
+      })
+    });
+  } catch (e) { console.error('sendWithdrawn failed:', e); }
 }

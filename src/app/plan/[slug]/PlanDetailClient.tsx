@@ -4,11 +4,24 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
+import ConfirmedRoster from '@/components/ConfirmedRoster';
 import { CalendarIcon, PinIcon, ShareIcon, CheckCircleIcon, NoteIcon } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { intentTagLabel } from '@/lib/utils';
+import { costExpectationLabel, COST_EXPECTATION_HINTS } from '@/lib/plan-contract';
+import { stateCopy } from '@/lib/conversation-lifecycle';
+import { firstNameOf, priorPlanLabel } from '@/lib/participants';
+import { planMessageCta, MESSAGING_NOT_A_RESERVATION, HOST_REVIEWS_REQUESTS } from '@/lib/product-copy';
 
-export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { initialPlan: any; hostPlanCount?: number }) {
+export default function PlanDetailClient({
+  initialPlan,
+  hostPlanCount = 0,
+  hostNeighborhood = null
+}: {
+  initialPlan: any;
+  hostPlanCount?: number;
+  hostNeighborhood?: string | null;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -17,10 +30,13 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
 
   const [plan] = useState<any>(initialPlan);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [existingConv, setExistingConv] = useState<string | null>(null);
+  const [existingConv, setExistingConv] = useState<{ id: string; status: string } | null>(null);
   const [messaging, setMessaging] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [showMessageBox, setShowMessageBox] = useState(false);
+  // Asking again after leaving is a separate, explicit act, and it needs its
+  // own opener rather than reviving a thread that ended.
+  const [askingAgain, setAskingAgain] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -32,11 +48,12 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
       if (user && plan && plan.user_id !== user.id) {
         const { data: conv } = await supabase
           .from('conversations')
-          .select('id')
+          .select('id, status')
           .eq('plan_id', plan.id)
           .eq('joiner_id', user.id)
           .maybeSingle();
-        if (conv) setExistingConv(conv.id);
+        const convRow = conv as { id: string; status: string } | null;
+        if (convRow) setExistingConv({ id: convRow.id, status: convRow.status });
       }
     }
     load();
@@ -48,7 +65,9 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
     setMessaging(true);
     const res = await fetch('/api/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planId: plan.id, firstMessage: messageText })
+      // requestAgain is the deliberate part. Without it the server refuses to
+      // restart something this person chose to leave.
+      body: JSON.stringify({ planId: plan.id, firstMessage: messageText, requestAgain: askingAgain })
     });
     const data = await res.json();
     setMessaging(false);
@@ -87,6 +106,13 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
   const isFull = plan.spots_left === 0 || plan.status === 'full';
   const u = plan.poster;
   const tags = plan.intent_tags ?? [];
+  const hostFirstName = firstNameOf(u?.name);
+  const hostPlans = priorPlanLabel(hostPlanCount);
+  const costLabel = costExpectationLabel(plan.cost_expectation);
+  const costHint = plan.cost_expectation
+    ? COST_EXPECTATION_HINTS[plan.cost_expectation as keyof typeof COST_EXPECTATION_HINTS]
+    : null;
+  const requestState = existingConv ? stateCopy(existingConv.status) : null;
 
   // Nav, the main landmark and the footer are rendered by the page around this
   // component's Suspense boundary, so the server-rendered fallback already has
@@ -130,36 +156,65 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
           {plan.when_day}
           {plan.when_time_specific ? ` · ${plan.when_time_specific}` : plan.when_time ? ` · ${plan.when_time}` : ''}
         </div>
-        {plan.spot && (
+        {plan.spot ? (
           <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
             <PinIcon className="text-muted flex-shrink-0" />{plan.spot}{plan.neighborhood && `, ${plan.neighborhood.name}`}
+          </div>
+        ) : (
+          // Posted before a meeting point was required. Say so rather than
+          // leaving a gap the reader has to notice on their own.
+          <div className="flex items-center gap-1.5 text-[13px] text-muted bg-cream-2 px-3 py-1.5 rounded-lg border border-dashed border-[var(--border2)]">
+            <PinIcon className="flex-shrink-0" />
+            No meeting point yet{plan.neighborhood && `, somewhere in ${plan.neighborhood.name}`}. Ask before you go.
+          </div>
+        )}
+        {costLabel && (
+          <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
+            <span aria-hidden="true" className="text-muted">$</span>
+            <span className="sr-only">Cost: </span>{costLabel}
           </div>
         )}
       </div>
 
+      {costHint && <p className="text-[12px] text-muted -mt-4 mb-7">{costHint}</p>}
+
       <div className="h-px bg-[var(--border)] my-7"></div>
 
-      <div className="flex items-center gap-3.5 mb-7">
-        <Avatar
-          userId={u.id ?? plan.user_id}
-          name={u.name}
-          initials={u.initials}
-          bg={u.avatar_bg}
-          fg={u.avatar_fg}
-          size={44}
-          radius={13}
-        />
-        <div>
-          <div className="text-[15px] font-medium text-ink flex items-center gap-2">
-            {u.name}
-            {u.is_founding_member && <span className="text-[10px] font-mono uppercase tracking-wider bg-accent text-white px-2 py-0.5 rounded-full">Founding</span>}
-          </div>
-          <div className="text-[13px] text-muted">
-            {u.about || 'Neighbor'}
-            {hostPlanCount >= 2 && <span> · has posted {hostPlanCount} plans</span>}
+      {/* The public host card. First name, photo, neighborhood, their own line,
+          and an honest hosting record. Nothing here is private, and there is no
+          way from it to a profile page: identity lives inside this plan. */}
+      <section aria-labelledby="host-card-heading" className="mb-6">
+        <h2 id="host-card-heading" className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-3">
+          Who is hosting
+        </h2>
+        <div className="flex items-start gap-3.5">
+          <Avatar
+            userId={u.id ?? plan.user_id}
+            name={u.name}
+            initials={u.initials}
+            bg={u.avatar_bg}
+            fg={u.avatar_fg}
+            size={44}
+            radius={13}
+          />
+          <div className="min-w-0">
+            <div className="text-[15px] font-medium text-ink flex items-center gap-2 flex-wrap">
+              {hostFirstName}
+              {u.is_founding_member && <span className="text-[10px] font-mono uppercase tracking-wider bg-accent text-white px-2 py-0.5 rounded-full">Founding</span>}
+            </div>
+            <div className="text-[13px] text-muted">
+              {[hostNeighborhood, hostPlans].filter(Boolean).join(' · ') || 'Neighbor'}
+            </div>
+            {u.about && <p className="text-[13px] text-ink-2 leading-[1.55] mt-1 break-words">{u.about}</p>}
           </div>
         </div>
-      </div>
+        <p className="text-[12px] text-muted mt-3 leading-relaxed">{HOST_REVIEWS_REQUESTS}</p>
+      </section>
+
+      {/* Fails closed: renders nothing unless the endpoint says this viewer is
+          the host or a confirmed participant. Signed-out visitors do not ask at
+          all, since the answer is always 401. */}
+      <ConfirmedRoster planId={plan.id} enabled={Boolean(currentUser)} />
 
       <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-4 flex items-center justify-between mb-6">
         <div>
@@ -176,7 +231,7 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
         <div className="flex flex-col gap-2.5">
           <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted flex items-center gap-2">
             <NoteIcon className="flex-shrink-0" />
-            <span>This is your plan. Wait for someone to message.</span>
+            <span>This is your plan. When someone messages, you see who they are and decide.</span>
           </div>
           <div className="flex gap-2">
             <Link href={`/plan/${plan.slug}/edit`} className="btn btn-ghost flex-1">Edit plan</Link>
@@ -186,39 +241,72 @@ export default function PlanDetailClient({ initialPlan, hostPlanCount = 0 }: { i
             </button>
           </div>
         </div>
+      ) : existingConv && !showMessageBox ? (
+        // Before the full-plan branch on purpose: the person whose confirmation
+        // took the last spot is not a latecomer, and telling them to post their
+        // own plan would be both wrong and cold.
+
+        <>
+          <Link href={`/inbox/${existingConv.id}`} className="btn btn-accent btn-full btn-lg">Open conversation →</Link>
+          {requestState && (
+            <p className="text-[12px] text-muted text-center mt-2" role="status">
+              <span className="font-medium text-ink-2">{requestState.label}.</span> {requestState.line}
+            </p>
+          )}
+          {/* Leaving is not a trap. Asking again is one deliberate tap, with a
+              new opener, and the host decides again from scratch. */}
+          {existingConv.status === 'withdrawn' && (
+            <button type="button"
+              onClick={() => { setAskingAgain(true); setShowMessageBox(true); }}
+              className="btn btn-ghost btn-full mt-2">
+              Ask {hostFirstName} to join again
+            </button>
+          )}
+          {existingConv.status === 'declined' && (
+            <p className="text-[12px] text-muted text-center mt-2">
+              That decision stands for this plan. You can still{' '}
+              <Link href="/feed" className="text-accent font-medium hover:underline">browse other plans</Link>.
+            </p>
+          )}
+        </>
       ) : isFull ? (
         <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-3.5 text-[13px] text-muted">
           This plan is full, but you can <Link href="/post" className="text-accent font-medium hover:underline">post your own</Link>
         </div>
-      ) : existingConv ? (
-        <Link href={`/inbox/${existingConv}`} className="btn btn-accent btn-full btn-lg">Open conversation →</Link>
       ) : !currentUser ? (
         <>
-          <Link href={`/auth?next=/plan/${plan.slug}`} className="btn btn-accent btn-full btn-lg">Sign up to message {u.name} →</Link>
-          <p className="text-[12px] text-muted text-center mt-2">Takes about a minute. You&apos;ll come right back to this plan.</p>
+          <Link href={`/auth?next=/plan/${plan.slug}`} className="btn btn-accent btn-full btn-lg">
+            Create an account to message {hostFirstName} →
+          </Link>
+          <p className="text-[12px] text-muted text-center mt-2">{planMessageCta(hostFirstName)}</p>
         </>
       ) : showMessageBox ? (
         <div className="flex flex-col gap-3">
           <label htmlFor="plan-opener" className="text-[12px] text-ink-2">
-            Say what brings you to this one. A line or two is plenty.
+            {askingAgain
+              ? `You left this plan earlier. Say why you would like back in, and ${hostFirstName} decides again.`
+              : 'Say what brings you to this one. A line or two is plenty.'}
           </label>
           <textarea id="plan-opener" value={messageText} onChange={e => setMessageText(e.target.value)}
             rows={4} maxLength={2000} placeholder={`e.g. I'm around that morning and have been meaning to try it. Mind if I come?`}
             className="input resize-none" autoFocus />
           <div className="flex gap-2">
-            <button type="button" onClick={() => setShowMessageBox(false)} className="btn btn-ghost flex-1">Cancel</button>
-            <button type="button" onClick={sendOpener} disabled={messaging} className="btn btn-accent flex-1">
-              {messaging ? <span className="spinner" /> : 'Send →'}
+            <button type="button" onClick={() => { setShowMessageBox(false); setAskingAgain(false); }}
+              className="btn btn-ghost flex-1">Cancel</button>
+            <button type="button" onClick={sendOpener} disabled={messaging} aria-busy={messaging}
+              className="btn btn-accent flex-1">
+              {messaging && <span className="spinner" aria-hidden="true" />}
+              Send →
             </button>
           </div>
-          <p className="text-[11px] text-muted text-center">No formal request. Just a message.</p>
+          <p className="text-[11px] text-muted text-center">{MESSAGING_NOT_A_RESERVATION}</p>
         </div>
       ) : (
         <>
           <button type="button" onClick={() => setShowMessageBox(true)} className="btn btn-accent btn-full btn-lg">
-            Message {u.name} →
+            Message {hostFirstName} →
           </button>
-          <p className="text-[12px] text-muted text-center mt-2">Not a request, just a message. Short conversation, then you decide.</p>
+          <p className="text-[12px] text-muted text-center mt-2">{MESSAGING_NOT_A_RESERVATION}</p>
         </>
       )}
       {showShareToast && <div className="toast show">Link copied</div>}

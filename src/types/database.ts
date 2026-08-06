@@ -75,6 +75,8 @@ export type Database = {
           when_day: string; when_date: string | null; when_time: string | null; when_time_specific: string | null;
           spots_total: number; spots_left: number;
           intent_tags: string[];
+          // 20260805210000. NULL on plans that predate the clarity contract.
+          cost_expectation: 'free' | 'pay-own-way' | 'ticket-required' | null;
           status: 'open' | 'full' | 'expired' | 'removed';
           expires_at: string; created_at: string;
         };
@@ -84,6 +86,7 @@ export type Database = {
           when_day: string; when_date?: string | null; when_time?: string | null; when_time_specific?: string | null;
           spots_total: number; spots_left: number;
           intent_tags?: string[];
+          cost_expectation?: 'free' | 'pay-own-way' | 'ticket-required' | null;
           status?: 'open' | 'full' | 'expired' | 'removed';
           expires_at: string;
         };
@@ -92,6 +95,7 @@ export type Database = {
           when_day?: string; when_date?: string | null; when_time?: string | null; when_time_specific?: string | null;
           spots_total?: number; spots_left?: number;
           intent_tags?: string[];
+          cost_expectation?: 'free' | 'pay-own-way' | 'ticket-required' | null;
           status?: 'open' | 'full' | 'expired' | 'removed';
           expires_at?: string;
         };
@@ -100,13 +104,15 @@ export type Database = {
       conversations: {
         Row: {
           id: string; plan_id: string; poster_id: string; joiner_id: string;
-          status: 'pending' | 'confirmed' | 'declined'; created_at: string;
+          status: 'pending' | 'confirmed' | 'declined' | 'withdrawn'; created_at: string;
           followup_sent_at: string | null; // 0005
+          withdrawn_at: string | null; // 20260805211500
         };
-        Insert: { id?: string; plan_id: string; poster_id: string; joiner_id: string; status?: 'pending' | 'confirmed' | 'declined' };
+        Insert: { id?: string; plan_id: string; poster_id: string; joiner_id: string; status?: 'pending' | 'confirmed' | 'declined' | 'withdrawn' };
         Update: {
-          status?: 'pending' | 'confirmed' | 'declined';
+          status?: 'pending' | 'confirmed' | 'declined' | 'withdrawn';
           followup_sent_at?: string | null;
+          withdrawn_at?: string | null;
         };
         Relationships: [];
       };

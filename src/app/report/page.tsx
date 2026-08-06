@@ -38,8 +38,8 @@ function ReportForm() {
         .from('conversations')
         .select(`
           poster_id, joiner_id,
-          poster:profiles!conversations_poster_id_fkey(id, name),
-          joiner:profiles!conversations_joiner_id_fkey(id, name)
+          poster:profiles!conversations_poster_id_fkey(id, name:display_name),
+          joiner:profiles!conversations_joiner_id_fkey(id, name:display_name)
         `)
         .eq('id', convId)
         .single();

@@ -23,9 +23,13 @@ export default function Nav() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      // name:display_name, never name. The postdeploy hardening migration
+      // revokes profiles.name from the authenticated role, and a denied column
+      // here does not fail loudly: the row comes back empty, profile stays
+      // null, and the header tells a signed-in person to sign in.
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, initials, avatar_bg, avatar_fg')
+        .select('id, name:display_name, initials, avatar_bg, avatar_fg')
         .eq('id', user.id)
         .single();
       if (mounted && data) setProfile(data);

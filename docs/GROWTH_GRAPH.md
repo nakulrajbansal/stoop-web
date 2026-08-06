@@ -388,6 +388,48 @@ These are not side effects to discover later in the dashboard.
 If the whole arrangement stops being worth it, remove `<Analytics />` from
 `src/app/layout.tsx`. The policy module, the shim and their tests need no changes.
 
+### Routes added by the uncertainty-reduction release
+
+Three new surfaces arrived with the roster and withdrawal work. None of them is on the
+allowlist, and none of them should ever be added to it:
+
+- `GET /api/plans/[id]/participants`, the private confirmed roster. The path contains a
+  plan id, and the body contains first names, neighborhoods and about text of people who
+  agreed to meet. It is an `/api/` path, so it was already denied by default; a
+  regression test in `src/lib/analytics-private-routes.test.ts` fails if the allowlist
+  ever grows to cover it.
+- `GET /api/conversations?conversationId=...`, the host's private requester card. Same
+  reasoning, plus a conversation id in the query string.
+- The composer, the editor and the plan page gained fields (exact time, public meeting
+  point, cost). They report exactly as before: `/post` and the constant `/plan/[slug]`.
+  No field value is ever part of a reported URL.
+
+If a future change makes a private route "look missing" in the dashboard, that is the
+policy working. Read the server-side numbers in `/admin/metrics` instead.
+
+### First-party measures for this release
+
+`/admin/metrics` gained the loop this release exists to move, computed by the pure
+`summarizeLoop` in `src/lib/metrics.ts` (tested in `src/lib/metrics.test.ts`):
+
+- complete plans in the last 7 days, and the share of new plans meeting the clarity
+  contract (activity, date, exact time, public meeting point, group size, cost);
+- conversations per plan, and plans with at least one confirmed participant;
+- the share of all requests that were confirmed, and the share withdrawn;
+- repeat hosts;
+- blocks and total reports, as guardrails rather than goals.
+
+All of it is aggregate counts and percentages. The function takes rows and returns
+numbers: no plan text, host identity, message content, location, plan id or conversation
+id can appear in an output value, and a test asserts that. Nothing here is sent
+anywhere; the page is server rendered behind the `ADMIN_USER_ID` gate, and `/admin` is
+not reportable.
+
+Read the withdrawal rate against the confirmation rate. Confirmations rising while
+withdrawals, blocks and reports stay flat is the result this release is aiming at.
+Confirmations rising *with* withdrawals is people saying yes and then discovering they
+should not have.
+
 ### Not installed, deliberately
 
 PostHog, session replay, autocapture, Speed Insights, and any other third-party
