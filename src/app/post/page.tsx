@@ -5,15 +5,28 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
-import { INTENT_TAGS, getDateChips } from '@/lib/utils';
+import PlanSummary from '@/components/PlanSummary';
+import { INTENT_TAGS, getDateChips, intentTagLabel } from '@/lib/utils';
+import {
+  COST_EXPECTATIONS,
+  COST_EXPECTATION_LABELS,
+  COST_EXPECTATION_HINTS,
+  MEETING_POINT_GUIDANCE,
+  MEETING_POINT_MAX,
+  PLAN_VISIBILITY_NOTE,
+  planContractIssues,
+  formatTimeOfDay,
+  localCalendarDate,
+  resolveReferenceDate,
+  timeBandFor,
+  type CostExpectation
+} from '@/lib/plan-contract';
 
 const CATEGORIES = ['Coffee', 'Outdoors', 'Sports', 'Arts', 'Food', 'Books', 'Music'];
 const CATEGORY_IDS: Record<string, string> = {
   Coffee: 'coffee', Outdoors: 'outdoors', Sports: 'sports', Arts: 'arts',
   Food: 'food', Books: 'books', Music: 'music'
 };
-
-const TIMES = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
 const DRAFT_KEY = 'stoop-plan-draft';
 
@@ -24,11 +37,13 @@ export default function PostPage() {
   const [text, setText] = useState('');
   const [category, setCategory] = useState('Coffee');
   const [dateIso, setDateIso] = useState('');
-  const [time, setTime] = useState('');
-  const [specificTime, setSpecificTime] = useState('');
+  // An exact time, on the clock. There is no publishable "no time" any more:
+  // "sometime Saturday" is the vagueness this release exists to remove.
+  const [timeValue, setTimeValue] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [hoods, setHoods] = useState<{ slug: string; name: string }[]>([]);
   const [spot, setSpot] = useState('');
+  const [cost, setCost] = useState<CostExpectation | ''>('');
   const [spots, setSpots] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -52,10 +67,18 @@ export default function PostPage() {
 
   const textRef = useRef<HTMLTextAreaElement>(null);
   const dayRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
   const hoodRef = useRef<HTMLSelectElement>(null);
+  const spotRef = useRef<HTMLInputElement>(null);
+  const costRef = useRef<HTMLDivElement>(null);
   const spotsRef = useRef<HTMLDivElement>(null);
 
   const dateChips = getDateChips();
+  // The day the chips are counted from, in this browser's timezone. It goes to
+  // the API with the plan so the server judges the window against the same
+  // fourteen days this page just offered, instead of against UTC's.
+  const clientToday = localCalendarDate();
+  const today = resolveReferenceDate(clientToday);
 
   useEffect(() => {
     // Restore a draft (e.g. written logged-out, finished after signup)
@@ -69,10 +92,10 @@ export default function PostPage() {
         if (d.category) setCategory(d.category);
         // Only restore the day if it is still one of the pickable chips
         if (d.dateIso && getDateChips().some(c => c.iso === d.dateIso)) setDateIso(d.dateIso);
-        if (d.time) setTime(d.time);
-        if (d.specificTime) setSpecificTime(d.specificTime);
+        if (d.timeValue) setTimeValue(d.timeValue);
         if (d.neighborhood) { setNeighborhood(d.neighborhood); draftHood = d.neighborhood; }
         if (d.spot) setSpot(d.spot);
+        if (d.cost) setCost(d.cost);
         if (d.spots) setSpots(d.spots);
         if (Array.isArray(d.selectedTags)) setSelectedTags(d.selectedTags);
         cameFromAuth = d.awaitingAuth === true;
@@ -129,27 +152,38 @@ export default function PostPage() {
   // plan is the difference between coming back and not.
   useEffect(() => {
     if (!hydrated) return;
-    const worthKeeping = text || dateIso || neighborhood || spot || specificTime || spots || selectedTags.length > 0;
+    const worthKeeping = text || dateIso || neighborhood || spot || timeValue || cost || spots || selectedTags.length > 0;
     if (!worthKeeping) {
       // They emptied it. Drop the stored copy so a stale draft cannot come back.
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
       return;
     }
     saveDraft(false);
-  }, [hydrated, text, category, dateIso, time, specificTime, neighborhood, spot, spots, selectedTags]);
+  }, [hydrated, text, category, dateIso, timeValue, neighborhood, spot, cost, spots, selectedTags]);
 
-  const ready = text.length >= 25 && dateIso && neighborhood && spots;
+  const displayTime = formatTimeOfDay(timeValue) ?? '';
+  const selectedChip = dateChips.find(d => d.iso === dateIso);
+  const hoodName = (signedIn ? hoods : hoodGroups.flatMap(g => g.hoods))
+    .find(h => h.slug === neighborhood)?.name ?? '';
 
-  const missing: string[] = [];
-  if (text.length < 25) missing.push(text.length === 0 ? 'the plan itself' : `${25 - text.length} more characters`);
-  if (!dateIso) missing.push('which day');
-  if (!neighborhood) missing.push('a neighborhood');
-  if (!spots) missing.push('group size');
+  // One contract, judged the same way here and in the API route.
+  const issues = planContractIssues({
+    text, whenDate: dateIso, whenTimeSpecific: displayTime, spot, spots: spots ?? 0, costExpectation: cost
+  }, { today });
+  const needsHood = !neighborhood;
+  const ready = issues.length === 0 && !needsHood;
+
+  const missing: string[] = issues.map(issue =>
+    issue.field === 'text' && text.length > 0 && text.length < 25
+      ? `${25 - text.length} more characters`
+      : issue.label
+  );
+  if (needsHood) missing.push('a neighborhood');
 
   function saveDraft(awaitingAuth: boolean) {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        text, category, dateIso, time, specificTime, neighborhood, spot, spots, selectedTags, awaitingAuth
+        text, category, dateIso, timeValue, neighborhood, spot, cost, spots, selectedTags, awaitingAuth
       }));
     } catch {}
   }
@@ -163,16 +197,24 @@ export default function PostPage() {
   }
 
   // Take them to whatever is still missing instead of leaving a dead button.
-  function goToFirstMissing() {
+  function focusField(field: string) {
     const target =
-      text.length < 25 ? textRef.current
-      : !dateIso ? dayRef.current?.querySelector('button')
-      : !neighborhood ? hoodRef.current
-      : !spots ? spotsRef.current?.querySelector('button')
+      field === 'text' ? textRef.current
+      : field === 'date' ? dayRef.current?.querySelector('button')
+      : field === 'time' ? timeRef.current
+      : field === 'hood' ? hoodRef.current
+      : field === 'spot' ? spotRef.current
+      : field === 'cost' ? costRef.current?.querySelector('button')
+      : field === 'spots' ? spotsRef.current?.querySelector('button')
       : null;
     if (!target) return;
     target.scrollIntoView({ block: 'center' });
     (target as HTMLElement).focus({ preventScroll: true });
+  }
+
+  function goToFirstMissing() {
+    if (issues.length > 0) { focusField(issues[0].field); return; }
+    if (needsHood) focusField('hood');
   }
 
   async function submit() {
@@ -192,16 +234,18 @@ export default function PostPage() {
 
     setSubmitting(true); setError('');
 
-    const selectedChip = dateChips.find(d => d.iso === dateIso);
-
     const res = await fetch('/api/plans', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text, category: CATEGORY_IDS[category], spot: spot || null,
+        text, category: CATEGORY_IDS[category], spot,
         whenDate: dateIso,
+        clientToday,
         whenDayLabel: selectedChip?.label ?? '',
-        whenTime: time || null,
-        whenTimeSpecific: specificTime || null,
+        // Kept for the surfaces that still read the rough band, derived from
+        // the exact time rather than asked for twice.
+        whenTime: timeBandFor(timeValue),
+        whenTimeSpecific: displayTime,
+        costExpectation: cost,
         spots, neighborhoodSlug: neighborhood,
         intentTags: selectedTags
       })
@@ -212,10 +256,14 @@ export default function PostPage() {
     router.push(`/plan/${data.plan.slug}?posted=1${data.becameFounding ? '&founding=1' : ''}`);
   }
 
-  const missingText = text.length < 25 && showErrors;
-  const missingDay = !dateIso && showErrors;
+  const shows = (field: string) => showErrors && issues.some(i => i.field === field);
+  const missingText = shows('text');
+  const missingDay = shows('date');
+  const missingTime = shows('time');
   const missingHood = !neighborhood && showErrors;
-  const missingSpots = !spots && showErrors;
+  const missingSpot = shows('spot');
+  const missingCost = shows('cost');
+  const missingSpots = shows('spots');
 
   return (
     <>
@@ -291,8 +339,8 @@ export default function PostPage() {
             <h2 id="plan-day-label" className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">
               Which day?{missingDay && <span className="text-danger normal-case tracking-normal"> Still needed</span>}
             </h2>
-            <p className="text-[12px] text-muted mb-3">Up to two weeks out. Pick a rough time below, or set an exact one.</p>
-            <div ref={dayRef} className="flex gap-1.5 flex-wrap mb-3">
+            <p className="text-[12px] text-muted mb-3">Up to two weeks out.</p>
+            <div ref={dayRef} className="flex gap-1.5 flex-wrap mb-4">
               {dateChips.map(d => (
                 <button key={d.iso} type="button" onClick={() => setDateIso(d.iso)} aria-pressed={dateIso === d.iso}
                   className={`px-4 py-2 rounded-full border text-[13px] ${
@@ -300,29 +348,25 @@ export default function PostPage() {
                 }`}>{d.label}</button>
               ))}
             </div>
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              <button type="button" onClick={() => setTime('')} aria-pressed={!time} className={`px-4 py-2 rounded-full border text-[13px] ${
-                !time ? 'bg-cream-2 border-[var(--border2)] text-muted' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'
-              }`}>No time</button>
-              {TIMES.map(t => (
-                <button key={t} type="button" onClick={() => setTime(t)} aria-pressed={time === t}
-                  className={`px-4 py-2 rounded-full border text-[13px] ${
-                  time === t ? 'bg-ink border-ink text-cream font-medium' : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40'
-                }`}>{t}</button>
-              ))}
-            </div>
-            <label htmlFor="plan-time" className="sr-only">Or a specific time</label>
-            <input id="plan-time" type="text" value={specificTime} onChange={e => setSpecificTime(e.target.value)}
-              placeholder="Or a specific time, e.g. 2:30 PM"
-              maxLength={30}
-              className="w-full bg-card border border-[var(--border2)] rounded-xl px-4 py-3 text-[16px] sm:text-[14px] text-ink placeholder:text-muted outline-none focus:border-accent/50" />
+            <label htmlFor="plan-time" className="text-[12px] font-mono uppercase tracking-wider text-muted block mb-1.5">
+              What time?{missingTime && <span className="text-danger normal-case tracking-normal"> Still needed</span>}
+            </label>
+            <p id="plan-time-hint" className="text-[12px] text-muted mb-2">
+              An exact time, so nobody has to ask. Shown as {displayTime || '9:00 AM'}.
+            </p>
+            <input id="plan-time" ref={timeRef} type="time" value={timeValue}
+              onChange={e => setTimeValue(e.target.value)}
+              aria-describedby="plan-time-hint"
+              className={`w-full bg-card border rounded-xl px-4 py-3 text-[16px] sm:text-[14px] text-ink outline-none focus:border-accent/50 ${
+                missingTime ? 'border-danger/60' : 'border-[var(--border2)]'
+              }`} />
           </div>
 
           <div>
             <h2 className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">
-              Where exactly?{missingHood && <span className="text-danger normal-case tracking-normal"> Still needed</span>}
+              Where exactly?{(missingHood || missingSpot) && <span className="text-danger normal-case tracking-normal"> Still needed</span>}
             </h2>
-            <p className="text-[12px] text-muted mb-3">The neighborhood alone isn&apos;t enough.</p>
+            <p className="text-[12px] text-muted mb-3">{MEETING_POINT_GUIDANCE}</p>
             {hoodNeedsRepick && (
               <p className="text-[12px] text-ink-2 bg-cream-2 border-l-[3px] border-gold rounded-r-lg px-3 py-2 mb-2.5" role="status">
                 You picked a neighborhood in another city before signing up. Plans post in your own city, so choose one here.
@@ -342,10 +386,37 @@ export default function PostPage() {
                     </optgroup>
                   ))}
             </select>
-            <label htmlFor="plan-spot" className="sr-only">The exact spot</label>
-            <input id="plan-spot" type="text" value={spot} onChange={e => setSpot(e.target.value)}
+            <label htmlFor="plan-spot" className="sr-only">The public meeting point</label>
+            <input id="plan-spot" ref={spotRef} type="text" value={spot} onChange={e => setSpot(e.target.value)}
+              maxLength={MEETING_POINT_MAX}
               placeholder="e.g. Partners Coffee, Central Park east entrance…"
-              className="w-full bg-card border border-[var(--border2)] rounded-xl px-4 py-3 text-[16px] sm:text-[14px] text-ink placeholder:text-muted outline-none focus:border-accent/50" />
+              className={`w-full bg-card border rounded-xl px-4 py-3 text-[16px] sm:text-[14px] text-ink placeholder:text-muted outline-none focus:border-accent/50 ${
+                missingSpot ? 'border-danger/60' : 'border-[var(--border2)]'
+              }`} />
+          </div>
+
+          <div role="group" aria-labelledby="plan-cost-label">
+            <h2 id="plan-cost-label" className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">
+              Does it cost anything?{missingCost && <span className="text-danger normal-case tracking-normal"> Still needed</span>}
+            </h2>
+            <p className="text-[12px] text-muted mb-3">Say it up front. Stoop never handles money.</p>
+            <div ref={costRef} className="flex flex-col gap-2">
+              {COST_EXPECTATIONS.map(value => (
+                <button key={value} type="button" onClick={() => setCost(value)} aria-pressed={cost === value}
+                  className={`text-left px-4 py-3 rounded-xl border ${
+                    cost === value ? 'border-accent bg-[rgba(47,107,63,0.06)]'
+                      : missingCost ? 'border-danger/60 bg-card'
+                      : 'border-[var(--border2)] bg-card hover:border-accent/40'
+                  }`}>
+                  <span className={`block text-[13.5px] font-medium ${cost === value ? 'text-accent' : 'text-ink'}`}>
+                    {COST_EXPECTATION_LABELS[value]}
+                  </span>
+                  <span className="block text-[12px] text-muted mt-0.5 leading-snug">
+                    {COST_EXPECTATION_HINTS[value]}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div role="group" aria-labelledby="plan-tags-label">
@@ -393,6 +464,22 @@ export default function PostPage() {
             </div>
           </div>
 
+          <PlanSummary
+            input={{
+              text,
+              whenDate: dateIso,
+              whenTimeSpecific: displayTime,
+              spot,
+              spots: spots ?? 0,
+              costExpectation: cost,
+              dayLabel: selectedChip?.label ?? '',
+              neighborhoodName: hoodName,
+              intentTags: selectedTags.map(intentTagLabel)
+            }}
+            missing={needsHood ? [...issues, { field: 'hood', label: 'a neighborhood' }] : issues}
+            onFix={focusField}
+          />
+
           {error && (
             <div className="bg-danger/10 border border-danger/20 text-danger text-[13px] rounded-xl px-4 py-3" role="alert">
               {error}
@@ -400,11 +487,13 @@ export default function PostPage() {
           )}
 
           <div className="sticky bottom-3 bg-cream/95 backdrop-blur-sm rounded-[22px] p-2 -mx-2 shadow-[0_-8px_24px_rgba(20,17,13,0.06)] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            <button onClick={submit} type="button" disabled={submitting} aria-describedby="plan-publish-note"
-              className={`w-full py-4 rounded-2xl font-serif font-bold italic text-[19px] transition-all ${
+            <button onClick={submit} type="button" disabled={submitting} aria-busy={submitting}
+              aria-describedby="plan-publish-note"
+              className={`w-full py-4 rounded-2xl font-serif font-bold italic text-[19px] transition-all inline-flex items-center justify-center gap-2 ${
                 ready ? 'bg-accent text-white hover:bg-acc2 hover:-translate-y-[2px] shadow-lg shadow-accent/20' : 'bg-cream-2 text-ink-2'
               }`}>
-              {submitting ? <span className="spinner" /> : signedIn === false && ready ? 'Publish it →' : 'Put it out there →'}
+              {submitting && <span className="spinner" aria-hidden="true" />}
+              {signedIn === false && ready ? 'Publish it →' : 'Put it out there →'}
             </button>
             <p id="plan-publish-note" role="status" className="text-[11.5px] text-muted text-center mt-2 pb-1">
               {!ready ? (
@@ -412,7 +501,7 @@ export default function PostPage() {
               ) : signedIn === false ? (
                 <>Next: verify a phone number, then this plan goes live. Your draft is saved.</>
               ) : (
-                <>Free to post. Visible to people in your area.</>
+                <>Free to post. {PLAN_VISIBILITY_NOTE}</>
               )}
             </p>
           </div>

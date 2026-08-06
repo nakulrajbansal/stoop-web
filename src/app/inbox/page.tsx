@@ -8,6 +8,7 @@ import PageMain from '@/components/PageMain';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
+import { stateCopy } from '@/lib/conversation-lifecycle';
 
 export default function InboxPage() {
   const router = useRouter();
@@ -49,19 +50,19 @@ export default function InboxPage() {
               const isPoster = c.poster_id === currentUser;
               const other = isPoster ? c.joiner : c.poster;
               const lastMsg = c.messages?.[c.messages.length - 1];
-              const isClosed = c.status === 'confirmed' || c.status === 'declined';
+              const isClosed = c.status !== 'pending';
               const unread = lastMsg && lastMsg.from_user_id !== currentUser && !isClosed;
 
-              const statusLabel =
-                c.status === 'confirmed' ? 'Confirmed' :
-                c.status === 'declined' ? 'Declined' : null;
+              // Same four state names as the thread, the plan page and the emails.
+              const state = stateCopy(c.status);
+              const statusLabel = c.status === 'pending' ? null : state.label;
               const statusClass =
                 c.status === 'confirmed' ? 'text-sage bg-[rgba(42,66,50,0.08)]' :
                 'text-muted bg-[rgba(20,17,13,0.06)]';
 
               return (
                 <Link key={c.id} href={`/inbox/${c.id}`}
-                  className={`bg-card border border-[var(--border)] rounded-2xl px-4 py-3.5 flex items-start gap-3.5 hover:border-accent/25 hover:shadow-sm transition-all ${c.status === 'declined' ? 'opacity-60' : ''}`}>
+                  className={`bg-card border border-[var(--border)] rounded-2xl px-4 py-3.5 flex items-start gap-3.5 hover:border-accent/25 hover:shadow-sm transition-all ${c.status === 'declined' || c.status === 'withdrawn' ? 'opacity-60' : ''}`}>
                   <Avatar
                     userId={other.id}
                     name={other.name}
@@ -91,6 +92,7 @@ export default function InboxPage() {
                     <div className="text-[12.5px] text-muted truncate">
                       {lastMsg ? lastMsg.text.substring(0, 60) : 'Say hello →'}
                     </div>
+                    <div className="text-[11.5px] text-muted mt-0.5">{state.line}</div>
                   </div>
                   {unread && <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0 mt-2" />}
                 </Link>

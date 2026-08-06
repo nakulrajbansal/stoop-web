@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { createClient } from '@/lib/supabase/server';
+import { ogPlanFields } from '@/lib/public-plan';
 
 export const runtime = 'edge';
 export const alt = 'A plan on Stoop';
@@ -12,14 +13,13 @@ export default async function Image({ params }: { params: { slug: string } }) {
     .from('plans')
     .select(`text, when_day, when_time, when_time_specific, spots_left, spots_total,
       neighborhood:neighborhoods(name), city:cities(name),
-      poster:profiles!plans_user_id_fkey(name)`)
+      poster:profiles!plans_user_id_fkey(name:display_name)`)
     .eq('slug', params.slug)
     .single() as any;
 
-  const text = plan?.text ?? 'A plan in your neighborhood';
-  const where = `${plan?.neighborhood?.name ?? ''}, ${plan?.city?.name ?? ''}`;
-  const when = `${plan?.when_day ?? ''}${plan?.when_time_specific ? ' · ' + plan.when_time_specific : plan?.when_time ? ' · ' + plan.when_time : ''}`;
-  const poster = plan?.poster?.name ?? '';
+  // First name only, the same as the plan page, the cards, the feed and the
+  // JSON-LD. A link preview is the most public surface there is.
+  const { text, where, when, poster } = ogPlanFields(plan);
 
   return new ImageResponse(
     (

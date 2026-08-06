@@ -7,8 +7,12 @@ import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Avatar from '@/components/Avatar';
 import SafetyCard from '@/components/SafetyCard';
+import RequesterCard from '@/components/RequesterCard';
+import ConfirmedRoster from '@/components/ConfirmedRoster';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
+import { stateCopy } from '@/lib/conversation-lifecycle';
+import type { RequesterPreview } from '@/lib/participants';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -25,6 +29,8 @@ export default function ChatPage() {
   const msgsEndRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [requester, setRequester] = useState<RequesterPreview | null>(null);
+  const [actionError, setActionError] = useState('');
 
   async function blockUser() {
     if (!conv) return;
@@ -55,8 +61,8 @@ export default function ChatPage() {
         .select(`
           *,
           plan:plans(id, slug, text, when_day, when_time, spot, status),
-          poster:profiles!conversations_poster_id_fkey(id, name, initials, avatar_bg, avatar_fg),
-          joiner:profiles!conversations_joiner_id_fkey(id, name, initials, avatar_bg, avatar_fg)
+          poster:profiles!conversations_poster_id_fkey(id, name:display_name, initials, avatar_bg, avatar_fg),
+          joiner:profiles!conversations_joiner_id_fkey(id, name:display_name, initials, avatar_bg, avatar_fg)
         `)
         .eq('id', convId)
         .single();
@@ -70,6 +76,13 @@ export default function ChatPage() {
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true });
         setMessages(msgs || []);
+
+        // The private requester card. The endpoint only answers with it when
+        // the caller is the host of this conversation.
+        fetch(`/api/conversations?conversationId=${convId}`)
+          .then(r => (r.ok ? r.json() : null))
+          .then(d => { if (d?.requester) setRequester(d.requester as RequesterPreview); })
+          .catch(() => {});
 
         // Mark this conversation as seen
         fetch('/api/unread/seen', {
@@ -125,15 +138,22 @@ export default function ChatPage() {
     setSending(false);
   }
 
-  async function act(action: 'confirm' | 'decline') {
+  async function act(action: 'confirm' | 'decline' | 'withdraw') {
     if (acting) return;
+    if (action === 'withdraw' && !confirm('Leave this plan? Your spot goes back to the host.')) return;
     setActing(true);
+    setActionError('');
     const res = await fetch('/api/conversations', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversationId: convId, action })
     });
+    const data = await res.json().catch(() => null);
     if (res.ok) {
-      setConv((c: any) => ({ ...c, status: action === 'confirm' ? 'confirmed' : 'declined' }));
+      const next = data?.status ?? (action === 'confirm' ? 'confirmed' : action === 'decline' ? 'declined' : 'withdrawn');
+      setConv((c: any) => ({ ...c, status: next }));
+      if (action !== 'withdraw') setRequester(r => (r ? { ...r, status: next } : r));
+    } else {
+      setActionError(data?.error ?? 'Could not do that. Try again.');
     }
     setActing(false);
   }
@@ -150,6 +170,9 @@ export default function ChatPage() {
   const isPoster = conv.poster_id === currentUser;
   const other = isPoster ? conv.joiner : conv.poster;
   const showAcceptBar = isPoster && conv.status === 'pending' && messages.length > 0;
+  const state = stateCopy(conv.status);
+  // The requester, and only the requester, can leave. A host declines instead.
+  const canWithdraw = !isPoster && (conv.status === 'pending' || conv.status === 'confirmed');
 
   return (
     <div className="flex flex-col h-screen">
@@ -175,10 +198,10 @@ export default function ChatPage() {
           </div>
           <span className={`text-[11px] px-2.5 py-1 rounded-full font-mono flex-shrink-0 ${
             conv.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.1)] text-sage' :
-            conv.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted' :
+            conv.status === 'declined' || conv.status === 'withdrawn' ? 'bg-[rgba(20,17,13,0.07)] text-muted' :
             'bg-[rgba(138,104,30,0.12)] text-gold-2'
           }`}>
-            {conv.status === 'confirmed' ? 'Confirmed ✓' : conv.status === 'declined' ? 'Declined' : 'Pending'}
+            <span className="sr-only">Status: </span>{state.label}
           </span>
           <div style={{ position: 'relative' }}>
             <button type="button" onClick={() => setMenuOpen(v => !v)} aria-expanded={menuOpen}
@@ -203,6 +226,23 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-2.5">
+          {/* The same four words everywhere: what this state means for the spot. */}
+          <p className="text-[12.5px] text-muted leading-relaxed" role="status">
+            <span className="font-medium text-ink-2">{state.label}.</span> {state.line}
+            {/* The thread ends here, but the plan is where asking again lives,
+                because it needs a new opener and the host's decision. */}
+            {!isPoster && conv.status === 'withdrawn' && conv.plan?.slug && (
+              <>
+                {' '}
+                <Link href={`/plan/${conv.plan.slug}`} className="text-accent font-medium hover:underline">
+                  Ask to join again on the plan
+                </Link>
+                .
+              </>
+            )}
+          </p>
+          {requester && conv.status === 'pending' && <RequesterCard requester={requester} />}
+          {conv.status === 'confirmed' && conv.plan?.id && <ConfirmedRoster planId={conv.plan.id} />}
           {conv.status === 'confirmed' && (
             <SafetyCard plan={conv.plan} otherName={other.name} />
           )}
@@ -222,23 +262,46 @@ export default function ChatPage() {
           <div ref={msgsEndRef} />
         </div>
 
-        {/* Accept bar (poster only) */}
+        {actionError && (
+          <div className="bg-danger/10 border-t border-danger/25 text-danger text-[13px] px-5 py-3" role="alert">
+            {actionError}
+          </div>
+        )}
+
+        {/* Accept bar (host only). Two separate, explicit decisions. */}
         {showAcceptBar && (
-          <div className="bg-[rgba(42,66,50,0.08)] border-t border-[rgba(42,66,50,0.15)] px-5 py-3 flex items-center justify-between gap-3">
-            <span className="text-[13px] text-sage">✓ Accept and confirm the plan</span>
+          <div className="bg-[rgba(42,66,50,0.08)] border-t border-[rgba(42,66,50,0.15)] px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-[13px] text-sage">Confirm this person, or decline</span>
             <div className="flex gap-2">
-              <button type="button" onClick={() => act('decline')} disabled={acting}
+              <button type="button" onClick={() => act('decline')} disabled={acting} aria-busy={acting}
                 className="btn btn-sm btn-ghost">Decline</button>
-              <button type="button" onClick={() => act('confirm')} disabled={acting}
+              <button type="button" onClick={() => act('confirm')} disabled={acting} aria-busy={acting}
                 className="btn btn-sm" style={{ background: '#2A4232', color: '#fff' }}>
-                {acting ? <span className="spinner" /> : 'Accept'}
+                {acting && <span className="spinner" aria-hidden="true" />}
+                Accept
               </button>
             </div>
           </div>
         )}
 
+        {/* Leaving is the requester's own decision, and it hands the spot back. */}
+        {canWithdraw && (
+          <div className="border-t border-[var(--border)] px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-[12.5px] text-muted">
+              {conv.status === 'confirmed'
+                ? 'Week changed? You can leave before the plan happens.'
+                : 'Changed your mind? You can withdraw this request.'}
+            </span>
+            <button type="button" onClick={() => act('withdraw')} disabled={acting} aria-busy={acting}
+              className="text-[12.5px] px-3 py-1.5 rounded-full border border-danger/30 text-danger hover:bg-danger/5 inline-flex items-center gap-1.5">
+              {acting && <span className="spinner" aria-hidden="true" />}
+              {conv.status === 'confirmed' ? 'Leave the plan' : 'Withdraw'}
+            </button>
+          </div>
+        )}
+
         {/* Input */}
-        {conv.status !== 'declined' && (
+        {conv.status !== 'declined' && conv.status !== 'withdrawn' && (
           <div className="border-t border-[var(--border)] px-5 py-3 flex items-end gap-2 bg-cream">
             <label htmlFor="chat-message" className="sr-only">Message {other.name}</label>
             {/* 16px below sm so mobile Safari does not zoom the page on focus and

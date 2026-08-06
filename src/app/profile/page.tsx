@@ -8,10 +8,24 @@ import Avatar, { avatarSrc } from '@/components/Avatar';
 import { toAvatarJpeg } from '@/lib/avatar-image';
 import { createClient } from '@/lib/supabase/client';
 
+/**
+ * The one screen that may show you your own private full name.
+ *
+ * It used to select profiles.name straight from the browser. The postdeploy
+ * hardening migration revokes that column from the authenticated role, so the
+ * row came back empty, this page read empty as "no profile" and pushed a
+ * signed-in person to /auth on every visit. The private fields now come from
+ * /api/profile, which holds the service role, derives the user from the session
+ * and accepts no id from anybody.
+ *
+ * The redirect rule that follows from that mistake: only a genuinely missing
+ * session sends you to /auth. Every other failure is shown, not redirected.
+ */
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
   const [profile, setProfile] = useState<any>(null);
+  const [loadError, setLoadError] = useState('');
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
@@ -36,20 +50,22 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth'); return; }
 
-      // Explicit columns only (never *): migration 0003 restricts which
-      // profile columns the API may read, and * would trip over it.
-      const { data } = await supabase
-        .from('profiles')
-        .select(`
-          id, name, about, city_id, neighborhood_id, initials,
-          avatar_bg, avatar_fg, is_founding_member,
-          city:cities(slug, name),
-          neighborhood:neighborhoods(slug, name)
-        `)
-        .eq('id', user.id)
-        .single();
+      // The private fields come from the server, which reads them with the
+      // service role. Nothing on this page asks PostgREST for profiles.name.
+      const res = await fetch('/api/profile', { cache: 'no-store' });
+      const body = await res.json().catch(() => ({}));
 
-      if (!data) { router.push('/auth'); return; }
+      // 401 means the session is gone, 404 means signup never finished: both
+      // are answered at /auth. Anything else is a failure to report, because a
+      // denied column looked exactly like a missing session and that is how a
+      // signed-in person got told to sign in.
+      if (res.status === 401 || res.status === 404) { router.push('/auth'); return; }
+      if (!res.ok || !body?.profile) {
+        setLoadError(body?.error || 'Could not load your profile right now. Try again in a moment.');
+        return;
+      }
+
+      const data = body.profile;
       setProfile(data);
 
       // Find out whether this user already has a photo (drives the
@@ -57,16 +73,10 @@ export default function ProfilePage() {
       const probe = new Image();
       probe.onload = () => setHasPhoto(true);
       probe.src = avatarSrc(user.id, Date.now());
-      setName(data.name);
+      setName(data.name || '');
       setCity(data.city?.slug || 'nyc');
       setNeighborhood(data.neighborhood?.slug || '');
       setAbout(data.about || '');
-
-      const { data: nb } = await supabase
-        .from('neighborhoods')
-        .select('slug, name')
-        .eq('city_id', data.city_id);
-      setHoods(nb || []);
     }
     load();
   }, []);
@@ -90,25 +100,32 @@ export default function ProfilePage() {
     }
     setSaving(true);
 
-    const { data: cityRow } = await supabase.from('cities').select('id').eq('slug', city).single();
-    const { data: nb } = await supabase.from('neighborhoods').select('id')
-      .eq('city_id', cityRow!.id).eq('slug', neighborhood).single();
-
-    const trimmed = name.trim();
-    const initials = trimmed.split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').join('').substring(0, 2);
-
-    const { error } = await supabase.from('profiles').update({
-      name: trimmed,
-      city_id: cityRow!.id,
-      neighborhood_id: nb?.id ?? null,
-      about: about.trim() || null,
-      initials
-    }).eq('id', profile.id);
-
+    // Slugs, not ids, and the name exactly as it was typed. The server resolves
+    // the neighborhood inside the chosen city, normalizes the name and derives
+    // the initials, because the public projection is generated from the name it
+    // stores: a name normalized here and there could differ, and only one of
+    // the two would be what neighbors see.
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, city, neighborhood, about })
+    });
+    const body = await res.json().catch(() => ({}));
     setSaving(false);
-    setToast(error ? 'Could not save' : 'Profile saved');
+
+    if (res.status === 401) { router.push('/auth'); return; }
+    if (!res.ok || !body?.profile) {
+      setToast(body?.error || 'Could not save your profile right now. Try again in a moment.');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+
+    // What the database actually stored, not what was typed at it.
+    const saved = body.profile;
+    setName(saved.name);
+    setProfile({ ...profile, name: saved.name, initials: saved.initials });
+    setToast('Profile saved');
     setTimeout(() => setToast(''), 2500);
-    if (!error) setProfile({ ...profile, name: trimmed, initials });
   }
 
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -176,7 +193,11 @@ export default function ProfilePage() {
     return (
       <>
         <Nav />
-        <PageMain className="max-w-[480px] mx-auto px-6 py-20 text-center text-muted text-sm">Loading…</PageMain>
+        <PageMain className="max-w-[480px] mx-auto px-6 py-20 text-center text-sm">
+          {loadError
+            ? <p className="text-danger leading-relaxed">{loadError}</p>
+            : <span className="text-muted">Loading…</span>}
+        </PageMain>
       </>
     );
   }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { calculateExpiry, slugify, INTENT_TAGS } from '@/lib/utils';
+import { parsePlanContractBody, parseReferenceDate, resolveDayLabel } from '@/lib/plan-contract';
+import { toPublicPlans } from '@/lib/public-plan';
 import { getBlockedIds } from '@/lib/blocks';
 import { isSuspended } from '@/lib/moderation';
 import { pingIndexNow } from '@/lib/indexnow';
@@ -30,10 +32,10 @@ export async function GET(req: NextRequest) {
     .from('plans')
     .select(`
       *,
-      poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member),
+      poster:profiles!plans_user_id_fkey(id, name:display_name, initials, avatar_bg, avatar_fg, about, is_founding_member),
       neighborhood:neighborhoods(id, slug, name),
       city:cities(slug, name)
-    `)
+    `, { count: 'exact' })
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
@@ -56,9 +58,15 @@ export async function GET(req: NextRequest) {
     if (nb) query = query.eq('neighborhood_id', nb.id);
   }
 
-  const { data: plans, error } = await query;
+  const { data: plans, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ plans: plans ?? [] });
+  // Public feed data: hosts are first names here, the same as on the card.
+  // `total` is the count for the same filters before the row cap, so the feed
+  // can state a true number instead of the length of one page.
+  return NextResponse.json({
+    plans: toPublicPlans((plans ?? []) as any[]),
+    total: count ?? (plans ?? []).length
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -70,23 +78,34 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { text, category, spot, whenDate, whenDayLabel, whenTime, whenTimeSpecific, spots, neighborhoodSlug, intentTags } = body;
+  const { category, whenDayLabel, whenTime, neighborhoodSlug, intentTags, clientToday } = body;
 
-  if (!text || typeof text !== 'string' || text.length < 25 || text.length > 220) {
-    return NextResponse.json({ error: 'Plan text must be 25-220 characters' }, { status: 400 });
+  // The composer offers fourteen day chips counted from the visitor's own day,
+  // so the window has to be judged from that day too. At 8pm in New York or
+  // Austin the UTC day is already tomorrow, and counting from UTC refused the
+  // "Today" chip the composer had just offered. A client may leave the field
+  // out and get UTC, but a day it cannot honestly be on is refused here rather
+  // than dropped, so nothing is stored against a fortnight nobody was shown.
+  const reference = parseReferenceDate(clientToday);
+  if (!reference.ok) {
+    return NextResponse.json({ error: reference.error }, { status: 400 });
   }
+  const today = reference.today;
+
+  // The clarity contract, enforced on the server. The composer checks the same
+  // rules, but a client that skips them gets a 400 rather than a vague plan.
+  const contract = parsePlanContractBody(body, { today });
+  if (!contract.ok) {
+    return NextResponse.json({ error: contract.error, missing: contract.missing }, { status: 400 });
+  }
+  const { text, whenDate, whenTimeSpecific, spot, spots, costExpectation } = contract.value;
+
   if (!['coffee','outdoors','arts','food','books','music','sports'].includes(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
   }
-  if (![1, 2, 3].includes(spots)) {
-    return NextResponse.json({ error: 'Spots must be 1, 2, or 3' }, { status: 400 });
-  }
-  if (!whenDate || !/^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
-    return NextResponse.json({ error: 'Date is required' }, { status: 400 });
-  }
-  if (!whenDayLabel || typeof whenDayLabel !== 'string') {
-    return NextResponse.json({ error: 'Date label required' }, { status: 400 });
-  }
+  // The client computes the label in its own timezone, which is why it is sent
+  // rather than derived. It still has to agree with the date it came with.
+  const dayLabel = resolveDayLabel(whenDate, whenDayLabel, today);
 
   const cleanTags: string[] = Array.isArray(intentTags)
     ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
@@ -135,11 +154,12 @@ export async function POST(req: NextRequest) {
       neighborhood_id: neighborhoodId,
       text,
       category,
-      spot: spot ?? null,
-      when_day: whenDayLabel,
+      spot,
+      when_day: dayLabel,
       when_date: whenDate,
       when_time: whenTime ?? null,
-      when_time_specific: whenTimeSpecific ?? null,
+      when_time_specific: whenTimeSpecific,
+      cost_expectation: costExpectation,
       spots_total: spots,
       spots_left: spots,
       intent_tags: cleanTags,
@@ -197,35 +217,57 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { planId, text, whenDate, whenDayLabel, whenTime, whenTimeSpecific, intentTags } = await req.json();
+  const body = await req.json();
+  const { planId, whenDayLabel, whenTime, intentTags, clientToday } = body;
   if (!planId) return NextResponse.json({ error: 'planId required' }, { status: 400 });
 
   // Verify ownership BEFORE updating, using admin client
-  const { data: plan } = await supabaseAdmin
+  const { data: planRow } = await supabaseAdmin
     .from('plans')
-    .select('user_id')
+    .select('user_id, spots_total, cost_expectation')
     .eq('id', planId)
     .single();
+  const plan = planRow as { user_id: string; spots_total: number; cost_expectation: string | null } | null;
 
   if (!plan || plan.user_id !== user.id) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
+  // Same reference day as POST, judged the same way: the editor offers the same
+  // chips, so an edit is measured against the same fourteen days a new plan is,
+  // and a day the client cannot honestly be on is refused rather than dropped.
+  // Asked after ownership, so a stranger's request is still answered with 403
+  // and nothing else, whatever they put in the body.
+  const reference = parseReferenceDate(clientToday);
+  if (!reference.ok) {
+    return NextResponse.json({ error: reference.error }, { status: 400 });
+  }
+  const today = reference.today;
+
+  // Editing a plan is republishing it, so the edit has to meet the same
+  // contract a new plan does. Group size is not editable (capacity is already
+  // committed to whoever was confirmed), so the stored value is what is judged.
+  const contract = parsePlanContractBody({ ...body, spots: plan.spots_total }, { today });
+  if (!contract.ok) {
+    return NextResponse.json({ error: contract.error, missing: contract.missing }, { status: 400 });
+  }
+  const { text, whenDate, whenTimeSpecific, spot, costExpectation } = contract.value;
+
   const cleanTags: string[] | undefined = Array.isArray(intentTags)
     ? intentTags.filter((t: unknown) => typeof t === 'string' && VALID_TAG_IDS.has(t as any)).slice(0, 2)
     : undefined;
 
-  const updates: any = {};
-  if (typeof text === 'string' && text.length >= 25 && text.length <= 220) updates.text = text;
-  if (typeof whenDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(whenDate)) {
-    updates.when_date = whenDate;
-    if (typeof whenDayLabel === 'string' && whenDayLabel) {
-      updates.when_day = whenDayLabel;
-    }
-    updates.expires_at = calculateExpiry(whenDate);
-  }
+  const updates: any = {
+    text,
+    when_date: whenDate,
+    when_time_specific: whenTimeSpecific,
+    spot,
+    cost_expectation: costExpectation,
+    expires_at: calculateExpiry(whenDate)
+  };
+  // An edit that moves the date must not keep the old day copy.
+  updates.when_day = resolveDayLabel(whenDate, whenDayLabel, today);
   if (typeof whenTime === 'string') updates.when_time = whenTime || null;
-  if (typeof whenTimeSpecific === 'string') updates.when_time_specific = whenTimeSpecific || null;
   if (cleanTags !== undefined) updates.intent_tags = cleanTags;
 
   const { error } = await supabaseAdmin

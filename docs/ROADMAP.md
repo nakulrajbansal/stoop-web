@@ -114,6 +114,45 @@ engagement mechanics.
 - [x] **Report review SLA**: /admin/metrics shows open report count and the oldest
       open report's age against the 24-hour commitment.
 
+## Phase 5: Uncertainty reduction (code complete, August 2026)
+
+The objection was not "I do not like it", it was "I cannot tell what happens next".
+Six answers, in the product rather than the FAQ. Details and rationale in
+DECISIONS.md; the measurement contract is in GROWTH_GRAPH.md sections 7 and 10.
+
+- [x] **Contract copy before signup**: homepage "Before you sign up" section, the
+      four-step sequence, three new FAQ entries, feed and neighborhood pages, and an
+      `/auth` screen that says what happens next and why the phone and email are
+      asked for. One source of truth in `src/lib/product-copy.ts`.
+- [x] **Minimum plan clarity contract**: exact time (no publishable "no time"),
+      required public meeting point with a home-address warning, required cost
+      expectation, group size 1 to 3, shared client and server validation, and a
+      pre-publish summary of exactly what a neighbor will see.
+- [x] **Public host preview** on the plan page, and a **private requester card** for
+      the host above Accept and Decline.
+- [x] **Private confirmed roster** at `/api/plans/[id]/participants`, host and
+      confirmed participants only, fetched after sign in and never server rendered.
+- [x] **Withdrawal and capacity correctness**: four states everywhere, atomic
+      transitions in Postgres, exactly one spot restored, no overbooking.
+- [x] **Honest empty states and real counts** on the homepage, feed and neighborhood
+      pages. Samples stay labelled Sample and are never counted.
+- [x] **Aggregate first-party measures** on `/admin/metrics`: complete plans, contract
+      rate, conversations per plan, confirmed and withdrawn shares, plans with a
+      confirmed participant, repeat hosts, blocks and reports.
+- [x] **Asking again**: somebody who withdrew can ask once more, deliberately, with a
+      new opener and an email to the host. A decline is final for that plan.
+- [x] **Only Stoop moves a request**: UPDATE on conversations revoked from the API
+      roles, plus a guard trigger, so a status cannot be written from a browser.
+- [ ] **Founder gates, not code**: run migrations `20260805210000` then
+      `20260805211500` in Supabase **before** pushing the code, then confirm the plan
+      page, a request, an accept, the roster, a withdrawal and an ask-again on the live
+      site. Confirm, decline, withdraw and ask-again all answer 503 and write nothing
+      until the second migration is in, by design.
+- [ ] **Comprehension test**: five first-impression sessions, at least three on mobile
+      and at least two women, before optimizing conversion. Four of five should be able
+      to explain the state model and who sees whom, unprompted.
+- [ ] **Supply gate**: see SEEDING.md. Unmet until real plans exist.
+
 ## Explicitly not doing (unchanged from DECISIONS.md)
 
 Native iOS app, ID verification, background checks, AI moderation, larger groups,
@@ -159,3 +198,28 @@ more cities. All revisit-with-traction items. Density in one neighborhood first.
   posted N plans" from 2 plans up). Remaining roadmap items all need real-world
   traction first: landing-page proof photos, link-preview spot checks, and the
   founder checklist in Phase 0.
+- 2026-08-05 (uncertainty reduction): built Phase 5 above. New pure modules with
+  tests: `plan-contract`, `conversation-lifecycle`, `participants`, `product-copy`,
+  `metrics`. New migrations `20260805210000_plan_clarity_contract.sql` and
+  `20260805211500_conversation_withdrawal.sql`, neither run in production yet.
+  Rehearsed locally against Postgres 16 in Docker: full migration chain applied to a
+  fresh database, 12 lifecycle and security probes passed, both new migrations
+  re-applied twice with no error or data change, and a two-session race on the last
+  spot produced exactly one confirmation. Test suite 58 to 164. Typecheck went from
+  103 inherited errors to 90, with no new diagnostic identity. Founder to-dos are the
+  three unchecked boxes above.
+- 2026-08-06 (independent review, then refinement): an external review passed the
+  release with required fixes and found one thing the original rehearsal could not:
+  under Supabase's stock table grants, a host could set a withdrawn request back to
+  confirmed with a plain UPDATE, because the guarantee lived in the function rather
+  than at the table. Reproduced locally, then closed at the database boundary (UPDATE
+  revoked from the API roles, plus a guard trigger) and covered by new probes that act
+  as anon and authenticated with a JWT claim. Also fixed: the migration order is
+  migrations-first and no longer claims to be order independent; the non-atomic confirm
+  fallback is gone and the route fails closed with a 503; withdrawn requesters can ask
+  again once, on purpose, and declines are final; public surfaces render and serialize
+  first names only, including the JSON-LD organizer; the roster denies rather than
+  proceeding when the block lookup fails; a POST onto a resolved conversation returns
+  its real status; action buttons keep their names while busy; counts say when they are
+  filtered or capped. Component tests now exist for PlanSummary, RequesterCard and
+  ConfirmedRoster on jsdom. Test suite 164 to 226.

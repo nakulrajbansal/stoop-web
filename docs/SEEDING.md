@@ -1,7 +1,13 @@
 # Seeding the feed (the launch week playbook)
 
+> Status, August 2026: this is a playbook, not a report. Nothing in this file has
+> been carried out yet. The supply gate below is unmet until the founder says
+> otherwise, and no code in this repo creates plans.
+
 The rules (from DECISIONS.md, non-negotiable):
-- ONE neighborhood. The one you live in. Density beats spread.
+- ONE neighborhood. The one you live in. Density beats spread. The default launch
+  wedge is Williamsburg; Greenpoint stays browseable but does not get equal
+  acquisition effort until Williamsburg clears the gate.
 - REAL plans only, posted by you and friends, that you would actually host if
   someone joined. No fake profiles, no staged full plans, ever.
 - 1 spot each. Small plans genuinely fill, which puts real "Full" badges in the
@@ -9,6 +15,31 @@ The rules (from DECISIONS.md, non-negotiable):
 - Spread across the week: two plans today/tomorrow, the rest across 5 or 6 days,
   so the feed's date column looks alive top to bottom.
 - Everyone who posts becomes a Founding member automatically (first 50).
+- Every plan now has to meet the clarity contract anyway: activity, date, exact
+  time, public meeting point, group size, and cost. The composer will not publish
+  without them, so a seeded plan is a complete plan by construction.
+
+## The supply gate (August 2026)
+
+Acquisition is gated on real inventory, because explaining the product better
+cannot substitute for having plans in it.
+
+- **Green**: 5 or more real open plans, from at least 3 distinct hosts, spread
+  across at least 3 different days in the next week. Broad outreach is allowed.
+- **Yellow**: 2 to 4 real open plans. Recruit hosts only. Do not recruit general
+  joiners into a board they cannot use.
+- **Red**: 0 or 1 real open plan. Pause broad outreach entirely and seed through
+  founder and trusted-host plans.
+
+Check the status on `/admin/metrics` (plans posted in the last 7 days, complete
+plans, repeat hosts) and on the neighborhood page itself before each outreach
+batch, and write the colour down in the growth operations record. Never create
+inventory to reach a threshold: in a hyperlocal product, staged activity is
+discoverable by neighbors and fatal.
+
+Ask hosts to share their plan link with people who already know them before it
+goes anywhere colder. A first joiner who is a friend of the host is a real
+meeting; a first joiner from a cold channel, on an empty board, usually is not.
 
 ## Ten ready-to-paste plans
 

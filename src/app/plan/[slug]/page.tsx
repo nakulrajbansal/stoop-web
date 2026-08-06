@@ -2,6 +2,8 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBlockedIds } from '@/lib/blocks';
+import { toPublicPlan } from '@/lib/public-plan';
+import { firstNameOf } from '@/lib/participants';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
@@ -16,7 +18,7 @@ async function fetchPlan(slug: string) {
     .from('plans')
     .select(`
       *,
-      poster:profiles!plans_user_id_fkey(id, name, initials, avatar_bg, avatar_fg, about, is_founding_member),
+      poster:profiles!plans_user_id_fkey(id, name:display_name, initials, avatar_bg, avatar_fg, about, is_founding_member),
       neighborhood:neighborhoods(name),
       city:cities(name)
     `)
@@ -80,10 +82,31 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
     .eq('user_id', plan.user_id)
     .neq('status', 'removed');
 
+  // The host's own neighborhood, which is public and part of the host card.
+  // Read separately because the embedded profile join does not carry it.
+  let hostNeighborhood: string | null = null;
+  const { data: hostProfile } = await supabase
+    .from('profiles')
+    .select('neighborhood_id')
+    .eq('id', plan.user_id)
+    .maybeSingle();
+  const hostHoodId = (hostProfile as { neighborhood_id: string | null } | null)?.neighborhood_id;
+  if (hostHoodId) {
+    const { data: hood } = await supabase
+      .from('neighborhoods')
+      .select('name')
+      .eq('id', hostHoodId)
+      .maybeSingle();
+    hostNeighborhood = (hood as { name: string } | null)?.name ?? null;
+  }
+
   // Machine-readable event data for Google. Only when the plan has a real
   // date; a dateless plan is not a valid Event for rich results.
   const isFullEvent = plan.status === 'full' || plan.spots_left === 0;
   const paidTag = Array.isArray(plan.intent_tags) && plan.intent_tags.includes('paid');
+  // The stated cost expectation wins over the older vibe tag. A plan that never
+  // said keeps the old behaviour rather than being described as free.
+  const isFree = plan.cost_expectation ? plan.cost_expectation === 'free' : !paidTag;
   const eventJsonLd = plan.when_date
     ? {
         '@context': 'https://schema.org',
@@ -94,16 +117,17 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
         endDate: plan.when_date,
         eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
         eventStatus: 'https://schema.org/EventScheduled',
-        isAccessibleForFree: !paidTag,
+        isAccessibleForFree: isFree,
         maximumAttendeeCapacity: 4,
         remainingAttendeeCapacity: Math.max(0, plan.spots_left ?? 0),
         keywords: `${plan.category}, ${plan.neighborhood?.name || ''}, ${plan.city?.name || ''}, meet neighbors, make friends`,
-        organizer: { '@type': 'Person', name: plan.poster?.name ?? 'A neighbor' },
-        performer: { '@type': 'Person', name: plan.poster?.name ?? 'A neighbor' },
+        organizer: { '@type': 'Person', name: firstNameOf(plan.poster?.name) },
+        performer: { '@type': 'Person', name: firstNameOf(plan.poster?.name) },
         offers: {
           '@type': 'Offer',
-          price: '0',
-          priceCurrency: 'USD',
+          // Only claim a price when the host said the plan is free. Stoop does
+          // not sell anything, and a pay-own-way plan has no price to state.
+          ...(isFree ? { price: '0', priceCurrency: 'USD' } : {}),
           availability: isFullEvent ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
           url: `https://www.stoop.house/plan/${plan.slug}`
         },
@@ -132,7 +156,11 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
       <Nav />
       <PageMain className="max-w-[720px] mx-auto px-6 py-10 pb-20">
         <Suspense fallback={<div className="py-10 text-center text-muted text-sm">Loading…</div>}>
-          <PlanDetailClient initialPlan={plan} hostPlanCount={hostPlanCount ?? 0} />
+          <PlanDetailClient
+            initialPlan={toPublicPlan(plan)}
+            hostPlanCount={hostPlanCount ?? 0}
+            hostNeighborhood={hostNeighborhood}
+          />
         </Suspense>
       </PageMain>
       <Footer />

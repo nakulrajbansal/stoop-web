@@ -4,6 +4,15 @@ import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/server';
+import { firstNameOf } from '@/lib/participants';
+import {
+  BROWSE_CONTRACT,
+  CONTRACT_STEPS,
+  CONTRACT_QUESTIONS,
+  CONTRACT_FAQ,
+  emptyNeighborhoodCopy,
+  openPlanCount
+} from '@/lib/product-copy';
 import type { Metadata } from 'next';
 
 export const revalidate = 60;
@@ -11,7 +20,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: 'Stoop · Meet neighbors over real plans in NYC and Austin',
   description:
-    "Post what you're already doing this week (coffee, a run, pickleball) and a few neighbors join you. A free, small-group way to make friends nearby in New York and Austin.",
+    "Post what you're already doing this week (coffee, a run, pickleball) and a few neighbors join you. Browse plans and hosts without an account; sign up only when you want to post or message.",
   alternates: { canonical: 'https://www.stoop.house/' }
 };
 
@@ -22,10 +31,7 @@ const FAQ = [
     q: 'What is Stoop?',
     a: 'Stoop is a neighborhood noticeboard for plans. You post something you are already doing this week, in your own words, and up to three neighbors can join you. No profiles to browse, no feed to scroll.'
   },
-  {
-    q: 'How do I make friends on Stoop?',
-    a: 'Post a real plan (coffee before work, a park run, a gallery visit) or message someone else\'s. You meet in person, in a small group, over the thing itself. Most friendships here start as one ordinary Tuesday plan.'
-  },
+  ...CONTRACT_FAQ,
   {
     q: 'What kinds of plans do people post?',
     a: 'Coffee, runs and pickup sports, food, arts, books, live music, time outdoors. If you were going to do it anyway, it belongs on Stoop.'
@@ -59,7 +65,7 @@ export default async function HomePage() {
     .from('plans')
     .select(`
       *,
-      poster:profiles!plans_user_id_fkey(name, initials, avatar_bg, avatar_fg),
+      poster:profiles!plans_user_id_fkey(name:display_name, initials, avatar_bg, avatar_fg),
       neighborhood:neighborhoods(name),
       city:cities(slug, name)
     `, { count: 'exact' })
@@ -68,7 +74,17 @@ export default async function HomePage() {
     .order('when_date', { ascending: true, nullsFirst: false })
     .limit(4);
 
+  // Two different true numbers. The featured list includes plans that filled up,
+  // because a full plan is still worth reading; the count a visitor is given is
+  // plans they could actually join.
+  const { count: openCount } = await supabase
+    .from('plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'open')
+    .gt('expires_at', new Date().toISOString());
+
   const planCount = count ?? 0;
+  const openPlans = openCount ?? 0;
   const totalSpots = plans?.reduce((acc, p) => acc + (p.spots_left ?? 0), 0) ?? 0;
   const week = weekOfLabel();
 
@@ -120,10 +136,14 @@ export default async function HomePage() {
             <h1 className="font-serif text-[clamp(42px,13vw,96px)] font-bold leading-[0.92] tracking-[-1.5px] sm:tracking-[-3px] mb-6 sm:mb-7">
               Plans,<br />not <em className="italic text-gold">profiles.</em>
             </h1>
-            <p className="text-[16px] sm:text-[17px] text-ink-2 leading-[1.6] font-light mb-7 sm:mb-8 max-w-[440px]">
+            <p className="text-[16px] sm:text-[17px] text-ink-2 leading-[1.6] font-light mb-4 max-w-[440px]">
               Post what you&apos;re already doing this week.{' '}
               <strong className="text-ink font-medium">A few neighbors join you.</strong>{' '}
               That&apos;s the whole app.
+            </p>
+            {/* The whole sequence, before anyone is asked for a phone number. */}
+            <p className="text-[13.5px] text-ink-2 leading-[1.65] mb-7 sm:mb-8 max-w-[440px]">
+              {BROWSE_CONTRACT}
             </p>
             {/* One dominant action, full width where the thumb is. Browsing sits
                 directly under it rather than competing at the same weight. */}
@@ -136,7 +156,8 @@ export default async function HomePage() {
               </Link>
             </div>
             <p className="text-[11.5px] text-muted mt-5">
-              Free to browse. You can write your plan before signing up.
+              {openPlanCount(openPlans)} across NYC and Austin right now. Free to browse, and you can write
+              your plan before signing up.
             </p>
           </div>
 
@@ -153,7 +174,11 @@ export default async function HomePage() {
               <div className="py-2">
                 {/* Empty week: show what a plan looks like instead of a void */}
                 <div className="border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-4">
-                  <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">What a plan looks like</div>
+                  {/* Labelled Sample for the same reason the feed's are: it is
+                      an illustration, and it is not in any count on this page. */}
+                  <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">
+                    Sample · what a plan looks like
+                  </div>
                   <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
                     going to the farmers market saturday morning, making coffee after…
                   </div>
@@ -165,8 +190,8 @@ export default async function HomePage() {
                     your neighborhood
                   </div>
                 </div>
-                <p className="text-[13px] text-muted leading-relaxed mb-4 text-center">
-                  This week is still wide open.<br />The first plan sets the tone.<br />
+                <p className="text-[13px] text-muted leading-relaxed mb-4">
+                  {emptyNeighborhoodCopy()}{' '}
                   <span className="text-gold-2">First 50 hosts become Founding members.</span>
                 </p>
                 <div className="text-center">
@@ -180,7 +205,7 @@ export default async function HomePage() {
                     className="group flex items-start gap-3 py-3.5 border-b border-[var(--border)] last:border-0 hover:bg-cream-2/60 -mx-3 px-3 rounded-md transition-colors">
                     <Avatar
                       userId={plan.user_id}
-                      name={plan.poster?.name}
+                      name={firstNameOf(plan.poster?.name)}
                       initials={plan.poster?.initials}
                       bg={plan.poster?.avatar_bg}
                       fg={plan.poster?.avatar_fg}
@@ -193,7 +218,7 @@ export default async function HomePage() {
                         {plan.text.length > 70 ? plan.text.substring(0, 70) + '…' : plan.text}
                       </div>
                       <div className="text-[11.5px] text-muted">
-                        {plan.poster?.name}
+                        {firstNameOf(plan.poster?.name)}
                         <span className="opacity-40 mx-1">·</span>
                         {plan.when_day}
                         {plan.when_time_specific && `, ${plan.when_time_specific}`}
@@ -222,27 +247,41 @@ export default async function HomePage() {
         <div className="max-w-[1080px] mx-auto px-5 sm:px-9">
           <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">How it works</div>
           <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
-            Three steps to <em className="italic text-gold">an actual plan.</em>
+            Four steps, and <em className="italic text-gold">no guessing.</em>
           </h2>
 
-          <div className="grid sm:grid-cols-3 gap-[2px] mt-10 rounded-2xl overflow-hidden bg-[var(--border)]">
-            {[
-              { n: '01', h: 'Write your plan', p: 'In your own words. Specific place, specific time. No event form, no category dropdown.' },
-              { n: '02', h: 'A neighbor reaches out', p: 'A real message from someone nearby who read what you wrote and wants to come along.' },
-              { n: '03', h: 'You meet', p: 'A few people, one thing, no pressure. You were already going. Now you\'re not going alone.' }
-            ].map(step => (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-[2px] mt-10 rounded-2xl overflow-hidden bg-[var(--border)]">
+            {CONTRACT_STEPS.map(step => (
               <div key={step.n} className="bg-cream p-8">
                 {/* Accent at 16% composites to 1.24:1 on cream, which is not
                     readable. At 75% it is 3.29:1, clearing the 3:1 large-text
                     threshold at 64px bold. Still a tint rather than solid
                     accent, so the numeral stays quieter than the heading. */}
                 <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-[rgba(47,107,63,0.75)] mb-3">{step.n}</div>
-                <h3 className="font-serif text-[20px] font-bold tracking-tight mb-2">{step.h}</h3>
-                <p className="text-[13.5px] text-ink-2 leading-[1.65] font-light">{step.p}</p>
+                <h3 className="font-serif text-[20px] font-bold tracking-tight mb-2">{step.title}</h3>
+                <p className="text-[13.5px] text-ink-2 leading-[1.65] font-light">{step.body}</p>
               </div>
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Before you sign up: the whole contract, in the product rather than in
+          the terms. Six questions a first time visitor actually has. */}
+      <section aria-labelledby="before-signup-heading" className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-16 sm:pt-20">
+        <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">Before you sign up</div>
+        <h2 id="before-signup-heading" className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-4">
+          What you are <em className="italic text-gold">actually agreeing to.</em>
+        </h2>
+        <p className="text-[14px] text-ink-2 leading-[1.7] max-w-[620px] mb-10">{BROWSE_CONTRACT}</p>
+        <dl className="grid sm:grid-cols-2 gap-x-12 gap-y-7">
+          {CONTRACT_QUESTIONS.map(item => (
+            <div key={item.q}>
+              <dt className="font-serif text-[18px] font-bold tracking-tight mb-1.5">{item.q}</dt>
+              <dd className="text-[13.5px] text-ink-2 leading-[1.7] font-light">{item.a}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       {/* Common questions: real content for visitors, FAQPage data for Google */}

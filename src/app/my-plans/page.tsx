@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import { createClient } from '@/lib/supabase/client';
+import { stateCopy } from '@/lib/conversation-lifecycle';
 
 export default function MyPlansPage() {
   const router = useRouter();
@@ -40,12 +41,14 @@ export default function MyPlansPage() {
   const postedActive = posted.filter(p => p.status === 'open' || p.status === 'full');
   const postedPast = posted.filter(p => p.status === 'expired' || p.status === 'removed');
 
-  // Split joined conversations: past = plan ended OR conversation declined
+  // Split joined conversations: past = plan ended, or the request is closed
+  // (the host declined, or the requester withdrew).
+  const closed = (c: any) => c.status === 'declined' || c.status === 'withdrawn';
   const joinedActive = joined.filter((c: any) =>
-    (c.plan?.status === 'open' || c.plan?.status === 'full') && c.status !== 'declined'
+    (c.plan?.status === 'open' || c.plan?.status === 'full') && !closed(c)
   );
   const joinedPast = joined.filter((c: any) =>
-    c.plan?.status === 'expired' || c.plan?.status === 'removed' || c.status === 'declined'
+    c.plan?.status === 'expired' || c.plan?.status === 'removed' || closed(c)
   );
 
   function sectionHeader(label: string, count: number) {
@@ -90,9 +93,9 @@ export default function MyPlansPage() {
 
   function renderJoinedCard(c: any, isPast: boolean) {
     const statusCls = c.status === 'confirmed' ? 'bg-[rgba(42,66,50,0.09)] text-sage'
-      : c.status === 'declined' ? 'bg-[rgba(20,17,13,0.07)] text-muted'
+      : closed(c) ? 'bg-[rgba(20,17,13,0.07)] text-muted'
       : 'bg-[rgba(138,104,30,0.12)] text-gold-2';
-    const statusTxt = c.status === 'confirmed' ? 'Confirmed' : c.status === 'declined' ? 'Declined' : 'Pending';
+    const statusTxt = stateCopy(c.status).label;
 
     return (
       <Link key={c.id} href={`/inbox/${c.id}`}

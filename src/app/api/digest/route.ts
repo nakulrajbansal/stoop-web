@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { buildWeeklyDigestHtml, sendWeeklyDigest, type DigestPlan } from '@/lib/resend';
+import { firstNameOf } from '@/lib/participants';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
     .select(`
       slug, text, when_day, when_time, when_time_specific, user_id, city_id,
       neighborhood:neighborhoods(name),
-      poster:profiles!plans_user_id_fkey(name)
+      poster:profiles!plans_user_id_fkey(name:display_name)
     `)
     .eq('status', 'open')
     .gt('expires_at', new Date().toISOString())
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
   // and living in a city that has at least one open plan.
   const { data: recipients, error: recErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, name, notify_email, city_id' as any)
+    .select('id, notify_email, city_id' as any)
     .is('digest_opt_out_at' as any, null)
     .is('blocked_at', null)
     .not('notify_email', 'is', null);
@@ -79,7 +80,8 @@ export async function GET(req: NextRequest) {
     when_time: p.when_time,
     when_time_specific: p.when_time_specific,
     neighborhood: p.neighborhood?.name ?? null,
-    hostName: p.poster?.name ? String(p.poster.name).split(' ')[0] : null
+    // Same helper as every other surface, rather than splitting by hand here.
+    hostName: p.poster?.name ? firstNameOf(p.poster.name) : null
   });
 
   if (preview) {
