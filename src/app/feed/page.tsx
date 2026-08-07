@@ -13,7 +13,7 @@ export default function FeedPage() {
   return (
     <>
       <Nav />
-      <PageMain className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-10 pb-16">
+      <PageMain className="max-w-[1080px] mx-auto gut pt-6 sm:pt-10 pb-10 sm:pb-16">
         <Suspense fallback={<div className="py-20 text-center text-muted">Loading…</div>}>
           <FeedContent />
         </Suspense>

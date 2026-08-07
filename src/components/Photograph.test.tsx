@@ -1,17 +1,24 @@
 /**
  * @vitest-environment jsdom
  *
- * The caption is the invariant, not the caption field.
+ * A photograph is decorative, and the separation from plan data is structural.
  *
- * "Photograph, not a plan" is the one line keeping editorial atmosphere
- * visibly separate from live plan data. src/lib/photos.test.ts already checks
- * that every record carries that string, but a record carrying a caption and a
- * page printing one are different claims: the closing call to action used to
- * pass a showCaption={false} and render no caption at all while every doc in
- * the repo said all three were captioned.
+ * The previous build kept editorial atmosphere apart from live plans by
+ * printing "Photograph, not a plan" under every picture. It worked as a rule
+ * and failed as a page: a disclaimer in the middle of the layout, three times,
+ * and each photograph framed as an exhibit that needed explaining. The rule is
+ * now carried by placement instead, and there are three separate things to hold
+ * down for that to be worth anything:
  *
- * So these tests render the component and read the document, and the source
- * checks below make sure the homepage cannot opt out again.
+ *   1. nothing is captioned any more, and no call site can smuggle a label
+ *      back in through an alt string;
+ *   2. a photograph announces nothing by default, so a screen reader on these
+ *      pages meets the plans and not the scenery;
+ *   3. the wording a photograph COULD be given lives in lib/photos, where
+ *      photos.test.ts scans it, and nowhere else.
+ *
+ * The placement half of the contract (never on a plan, feed, inbox or roster
+ * surface) is enforced in src/lib/photos.test.ts.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -25,73 +32,83 @@ afterEach(cleanup);
 const PAGE = readFileSync(join(process.cwd(), 'src', 'app', 'page.tsx'), 'utf8');
 const COMPONENT = readFileSync(join(process.cwd(), 'src', 'components', 'Photograph.tsx'), 'utf8');
 
-describe('a rendered photograph always says it is a photograph', () => {
+describe('a rendered photograph is decorative', () => {
   for (const photo of ALL_PHOTOS) {
-    it(`prints the caption under ${photo.src}`, () => {
+    it(`renders ${photo.src} with an empty alt and no caption`, () => {
       const { container } = render(<Photograph photo={photo} sizes="100vw" aspect="3 / 2" />);
-      const caption = container.querySelector('figcaption');
+      const image = container.querySelector('img')!;
 
-      expect(caption, 'no figcaption rendered').not.toBeNull();
-      expect(caption!.textContent).toBe(photo.caption);
-      expect(caption!.textContent).toMatch(/not a plan/i);
-      // Visible, not hidden from sight or from assistive tech.
-      expect(caption!.getAttribute('aria-hidden')).toBeNull();
-      expect(caption!.className).not.toMatch(/\bhidden\b|\bsr-only\b/);
-      expect(screen.getByText(photo.caption)).toBeDefined();
+      expect(image, 'no image rendered').not.toBeNull();
+      // alt="" is the whole signal: present, and empty. A missing alt attribute
+      // would leave a screen reader to announce the file name instead.
+      expect(image.getAttribute('alt')).toBe('');
+      expect(container.querySelector('figcaption')).toBeNull();
+      expect(container.querySelector('figure')).toBeNull();
+      // Nothing about the picture reaches the accessibility tree at all.
+      expect(screen.queryAllByRole('img')).toHaveLength(0);
+      expect(container.textContent).toBe('');
     });
   }
 
-  it('still prints it when the caption is restyled for a dark panel', () => {
-    // The closing call to action needs light type on ink. Restyling is the
-    // only concession available, and it is not the same as removing it.
+  it('speaks the record\'s own alt, and only when asked to', () => {
     const { container } = render(
-      <Photograph photo={PHOTOS.coffeeCounter} sizes="240px" captionClassName="text-cream/70" />
+      <Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" informative />
     );
-    const caption = container.querySelector('figcaption')!;
-
-    expect(caption.textContent).toBe('Photograph, not a plan');
-    expect(caption.className).toContain('text-cream/70');
-    expect(caption.className).not.toContain('text-muted');
+    expect(container.querySelector('img')!.getAttribute('alt')).toBe(PHOTOS.parkPath.alt);
+    expect(screen.getByRole('img', { name: PHOTOS.parkPath.alt })).toBeDefined();
   });
 
-  it('describes the picture, and never a person on Stoop', () => {
-    render(<Photograph photo={PHOTOS.sidewalkTable} sizes="100vw" aspect="3 / 2" />);
-    const image = screen.getByRole('img', { name: PHOTOS.sidewalkTable.alt });
-    expect(image.getAttribute('alt')).toBe(PHOTOS.sidewalkTable.alt);
+  it('reserves its box before the bytes land, so nothing shifts', () => {
+    const { container } = render(<Photograph photo={PHOTOS.sidewalkTable} sizes="100vw" aspect="3 / 2" />);
+    const box = container.querySelector('.photo') as HTMLElement;
+    expect(box).not.toBeNull();
+    expect(box.style.aspectRatio).toBe('3 / 2');
+    expect(container.querySelector('img')!.getAttribute('src')).toContain('sidewalk-table');
   });
 
-  it('wraps the picture and its caption in one figure', () => {
-    const { container } = render(<Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" />);
-    const figure = container.querySelector('figure')!;
-    expect(figure).not.toBeNull();
-    expect(figure.querySelector('figcaption')).not.toBeNull();
-    expect(figure.querySelector('img')).not.toBeNull();
+  it('lets the one picture above the fold load eagerly and lazies the rest', () => {
+    const { container: lazy } = render(<Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" />);
+    expect(lazy.querySelector('img')!.getAttribute('loading')).toBe('lazy');
+
+    cleanup();
+    const { container: eager } = render(
+      <Photograph photo={PHOTOS.sidewalkTable} sizes="100vw" aspect="3 / 2" priority />
+    );
+    expect(eager.querySelector('img')!.getAttribute('loading')).not.toBe('lazy');
   });
 });
 
-describe('the caption cannot be switched off', () => {
-  it('has no prop for it, so no call site can pass one', () => {
-    expect(COMPONENT).not.toMatch(/showCaption/);
-    expect(COMPONENT).not.toMatch(/hideCaption|noCaption/);
-    // The figcaption is unconditional: no && and no ternary in front of it.
-    expect(COMPONENT).toMatch(/<figcaption/);
-    expect(COMPONENT).not.toMatch(/\{\s*\w+\s*&&\s*\(?\s*<figcaption/);
+describe('the caption is gone, and cannot come back by the side door', () => {
+  it('has no caption anything left in the component', () => {
+    expect(COMPONENT).not.toMatch(/figcaption/);
+    expect(COMPONENT).not.toMatch(/captionClassName/i);
+    expect(COMPONENT).not.toMatch(/not a plan/i);
   });
 
-  it('is not opted out of anywhere on the homepage', () => {
+  it('takes no free-text alt, so every word a photograph can say lives in lib/photos', () => {
+    // `informative` is a boolean that opts into the record's own alt. An `alt`
+    // string prop would let a call site write anything, which is exactly the
+    // surface photos.test.ts scans for language implying a member.
+    expect(COMPONENT).toMatch(/informative\?: boolean/);
+    expect(COMPONENT).not.toMatch(/\balt\?: string/);
+    expect(COMPONENT).toMatch(/alt=\{informative \? photo\.alt : ''\}/);
+  });
+
+  it('is not captioned anywhere on the homepage either', () => {
     const uses = [...PAGE.matchAll(/<Photograph[\s\S]*?\/>/g)].map(m => m[0]);
-    // Three photographs: the hero, "What people post", and the closing panel.
-    expect(uses).toHaveLength(3);
+    expect(uses.length).toBeGreaterThan(0);
     for (const use of uses) {
-      expect(use).not.toMatch(/showCaption/);
+      expect(use).not.toMatch(/caption/i);
       expect(use).toMatch(/sizes=/);
     }
-    expect(PAGE).not.toMatch(/showCaption/);
+    expect(PAGE).not.toMatch(/not a plan/i);
   });
 
   it('is what the docs say it is', () => {
     const assets = readFileSync(join(process.cwd(), 'docs', 'VISUAL_ASSETS.md'), 'utf8');
-    expect(assets).toMatch(/Photograph, not a plan/);
-    expect(COMPONENT).toMatch(/Photograph, not a plan/);
+    // The docs must not still promise a caption that no longer renders. A stale
+    // claim in the one file a person checks provenance in is worse than none.
+    expect(assets).not.toMatch(/Photograph, not a plan/);
+    expect(assets).toMatch(/decorative/i);
   });
 });

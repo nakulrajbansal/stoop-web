@@ -105,16 +105,24 @@ photography lives under are in `docs/VISUAL_ASSETS.md`.
   the plan page already used. Both readings clamp the total to `GROUP_SPOTS_MAX` (3), so
   a corrupt row cannot print "9 of 9 spots open" beside three drawn segments.
 - **`src/components/Photograph.tsx`**: the only way a photograph reaches a page. Takes a
-  record from `src/lib/photos.ts` (local file, intrinsic size, alt, caption, blur, credit)
-  and renders `next/image` in **`fill`** mode with real `sizes` and an aspect-ratio box.
-  It is the box, not the intrinsic size, that reserves the layout: `fill` takes no width
-  or height, and the recorded dimensions document the file and pick an honest ratio.
-  The caption "Photograph, not a plan" is **mandatory and has no prop to disable it**;
-  a dark panel restyles it with `captionClassName`. Photography is homepage-only;
-  `src/lib/photos.test.ts` scans the tree (including `src/app/[city]/[hood]/`) and fails
-  if a photo appears on a plan, feed, inbox or profile surface, or if alt text starts
-  implying a member, and `Photograph.test.tsx` renders the component to prove the caption
-  is in the document rather than only in the data.
+  record from `src/lib/photos.ts` (local file, intrinsic size, alt, blur, credit) and
+  renders `next/image` in **`fill`** mode with real `sizes` and a box whose shape is an
+  aspect ratio or a stated height. It is the box, not the intrinsic size, that reserves
+  the layout: `fill` takes no width or height, and the recorded dimensions document the
+  file and pick an honest crop. **Decorative by default**: it renders `alt=""` and no
+  caption, and there is no free-text `alt` prop, so the only wording a photograph could
+  ever be given is the `alt` on its record, spoken only where a call site passes
+  `informative` (nothing does today). Photography is homepage-only and is laid in as a
+  masked band or as a layer inside the closing panel, never as a framed exhibit beside
+  plans; `src/lib/photos.test.ts` scans the tree (including `src/app/[city]/[hood]/`) and
+  fails if a photo appears on a plan, feed, inbox or profile surface, if alt text starts
+  implying a member, if a caption reappears in the data, or if a file is left in
+  `public/photos` that no record references. `Photograph.test.tsx` renders the component
+  to prove the empty alt and the absent caption rather than trusting the source.
+  The earlier build printed "Photograph, not a plan" under every picture. It was removed
+  because it put a disclaimer in the middle of the page and made each photograph read as
+  an exhibit needing explanation; the separation it was asserting is now carried by the
+  placement scan, which is the claim that was doing the real work all along.
 - **`src/components/JsonLd.tsx` + `src/lib/json-ld.ts`**: the one authority for structured
   data, and the only way a block reaches a page. `serializeJsonLd` rewrites `<` and `>` as
   the JSON escapes `\u003c` and `\u003e` (plus U+2028 and U+2029) **after**
@@ -142,12 +150,40 @@ photography lives under are in `docs/VISUAL_ASSETS.md`.
   outline is browser-dependent; the accessible name and the keyboard behaviour are not.
   The alternatives (wrapping `details` in the heading, or a visually hidden duplicate)
   are worse, and the reasoning is written out in the component.
+- **The mobile scale** lives in `globals.css` and nowhere else: `.sec` / `.sec-tight`
+  (section padding), `.gut` (the page gutter), `.h-sec` (section headings) and `.rows`
+  (facts as hairline rules rather than as bordered cards, flattened from `sm` by
+  `.rows-flat-sm` where the list becomes a grid). Each grows at the 640px breakpoint, so
+  the scale is mobile-first rather than a desktop one scaled down. This exists because the
+  first visual release gave a phone a stack of desktop sections: five serif headlines all
+  at `clamp(28px, 4vw, 44px)`, 56px of air above and below every block, ten bordered
+  cards, and a 6,871px homepage at 320px. `visual-system.test.ts` reads the numbers out of
+  the stylesheet and fails if a size stops growing at `sm`, and `home-page.test.ts` fails
+  if a section heading sets its own `clamp()` instead of wearing `.h-sec`.
+- **Photograph placement** is CSS too: `.photo` (a positioned, clipped box with no border
+  and no radius, plus a shared desaturation and warm veil so two CC0 photographs read as
+  one system), `.photo-fade-b` / `.photo-fade-y` / `.photo-fade-panel` (masks, so a band
+  melts into whatever is behind it without knowing what that is), and `.photo-layer`
+  (the closing panel's geometry, kept in CSS because this file is emitted after Tailwind's
+  utilities and `.photo`'s own `position` would beat an `absolute` typed at the call site).
 - **Motion** lives in `globals.css`: `stoop-rise` and `stoop-rise-art`, entrance only,
   `both` fill, opacity and transform only (nothing that reflows), plus `.lift` for
   hover/focus. The `prefers-reduced-motion` block names `.rise`, `.rise-art`,
   `.lift:hover`, `.lift:focus-within` and `.meter-seg` explicitly and sets them to their
   finished state; only `.spinner` is allowed to loop. The two `.lift` selectors must stay
   identical to the live rule (they drifted once, and pointing at a tile still moved it).
+- **The composer's pinned action bar** needs three rules, not one, and they are all in
+  `globals.css`. `.has-sticky-action` gives every focusable descendant
+  `scroll-margin-bottom: 150px`, which handles a control the browser scrolls to.
+  `html:has(.has-sticky-action)` adds `scroll-padding-bottom: 150px`, because scroll
+  margin only applies once a scroll actually happens and Blink's sequential-focus scroll
+  barely moves for an element that is already partly on screen. And
+  `@media (max-height: 640px)` returns the bar to the flow entirely: at 320 x 568 it owns
+  135px of a 568px viewport and sits over the plan textarea before any scroll has been
+  asked for, which neither of the other two rules can reach. Above the threshold it stays
+  pinned exactly as before. All three are presentation only: same button, same disabled
+  logic, same status line, same accessible description. Measured with a real keyboard
+  sweep at 320 x 568, 375 x 667, 390 x 844 and 1440 x 900: 51 focus stops, none covered.
   `src/lib/visual-system.test.ts` parses the stylesheet and enforces all of that: that no
   keyframe animates a layout property, that every state the lift moves on is cancelled,
   and that no entrance delay class is defined without an element wearing it.

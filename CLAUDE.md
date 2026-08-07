@@ -162,9 +162,18 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     conversations per plan, confirmed and withdrawn shares, repeat hosts, blocks,
     reports). Counts only. The new private routes are NOT on the analytics
     allowlist and must not be added.
-- VISUAL STORYTELLING (Aug 2026) is code complete and needs no migration, no env
-  var and no ops step: it is presentation only. Full detail in
-  docs/ARCHITECTURE.md "Visual system" and docs/VISUAL_ASSETS.md.
+- VISUAL SYSTEM (Aug 2026) needs no migration, no env var and no ops step: it is
+  presentation only. Full detail in docs/ARCHITECTURE.md "Visual system" and
+  docs/VISUAL_ASSETS.md.
+  STATUS: the first release of this shipped and was ROLLED BACK. The visible
+  "Photograph, not a plan" caption under every picture read as a disclaimer
+  dropped into the layout, and the phone got a stack of desktop sections:
+  6,871px of homepage at 320px, five serif headlines all at the same size, ten
+  bordered cards, three standalone photo blocks. Production is on the previous
+  deployment. What is described below is the SECOND pass, built on
+  feature/visual-staging-v2 and NOT deployed: preview only until reviewed. It is
+  presentation and copy-placement only; no API, database, migration, analytics
+  or lifecycle behaviour was touched.
   - DRAWINGS, not an icon package: src/components/CategoryArt.tsx (one authored
     SVG per category, all seven) and src/components/StoopArt.tsx (pinned card,
     conversation, host deciding, table for four, empty board, unplugged line).
@@ -175,16 +184,24 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     featured rows and the composer's pre-publish summary) the art gets an
     accessible name from categoryLabelOf, which answers null for a stored
     category we no longer draw rather than calling it Coffee out loud.
-  - PHOTOGRAPHY: exactly three CC0 photographs in public/photos (148,230 bytes
-    total), homepage only, always through src/components/Photograph.tsx, always
-    captioned "Photograph, not a plan". There is NO prop to switch the caption
-    off. No photograph shows an identifiable face and nobody in one may be
-    presented as a member; the hero does contain distant pedestrians, cropped
-    below the shoulder. No alt text may mention a host, member or attendee.
-    Provenance (source page, creator, licence, download date, encode recipe) is
-    in docs/VISUAL_ASSETS.md. A photograph must never appear on a plan, feed,
-    inbox or profile surface; the test scans for it, including the /[city]/[hood]
-    neighborhood routes.
+  - PHOTOGRAPHY: exactly two CC0 photographs in public/photos (134,376 bytes
+    total, down from three and 148,230), homepage only, always through
+    src/components/Photograph.tsx. They are DECORATIVE: empty alt, NO caption,
+    and no free-text alt prop, so the only wording a photograph can ever be
+    given is the alt on its record in src/lib/photos.ts (spoken only if a call
+    site passes `informative`, and nothing does). Placement is what keeps them
+    apart from plan data: a masked band under the nameplate, and a layer inside
+    the closing panel. No photograph shows an identifiable face and nobody in
+    one may be presented as a member; the masthead does contain distant
+    pedestrians, cropped below the shoulder. No alt text may mention a host,
+    member or attendee. Provenance (source page, creator, licence, download
+    date, encode recipe) is in docs/VISUAL_ASSETS.md, including for the one that
+    was dropped. A photograph must never appear on a plan, feed, inbox or
+    profile surface; the test scans for it, including the /[city]/[hood]
+    neighborhood routes, and also fails on an unreferenced file left in
+    public/photos. Both originals are 960px wide, so a full-bleed band on a
+    1440px desktop is painted ~1.5x up; that ceiling is written down in
+    VISUAL_ASSETS.md and the fix is a larger CC0 original, never an upscale.
   - STRUCTURED DATA: every JSON-LD block in the app goes through
     src/components/JsonLd.tsx, which escapes < and > (and U+2028/U+2029) after
     JSON.stringify (src/lib/json-ld.ts). Plan text is user-authored, and a plan
@@ -204,17 +221,31 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     loops but the spinner. prefers-reduced-motion names them explicitly and
     leaves them in their finished state, and its .lift selectors must stay
     identical to the live rule (:hover and :focus-within). No animation library,
-    no new dependency. The composer's form carries .has-sticky-action, which
-    gives its controls scroll-margin-bottom so tabbing to one cannot land it
-    under the pinned publish bar.
-  - THE SURFACES: homepage (image-led hero with the live board under it, drawn
-    four-step sequence, category tiles into the feed, contract cards, FAQ as
-    native details), feed (category art per row, capacity segments, distinct
-    loading/empty/outage graphics), plan detail (category header band, capacity
-    meter, logistics still directly under the title), composer (visual category
-    picker, illustrated pre-publish summary). Product facts, copy and API
-    behaviour are unchanged; CONTRACT_STEPS gained a `short` line for the drawn
-    sequence and the full `body` is still the contract. The feed's outage state
+    no new dependency. The composer's pinned publish bar needs THREE rules and
+    they are all in globals.css: .has-sticky-action (scroll-margin on every
+    focusable control), html:has(.has-sticky-action) (scroll-padding, because
+    scroll margin never fires for a control already partly on screen), and
+    @media (max-height: 640px) which un-pins the bar entirely, because at
+    320x568 it owns 135px of the viewport and parks over the plan textarea
+    before any scroll is asked for. Presentation only: same button, same
+    disabled logic, same status line. Verified by keyboard sweep at four
+    viewports, 51 stops, none covered.
+  - MOBILE SCALE: .sec/.sec-tight, .gut, .h-sec and .rows/.rows-flat-sm in
+    globals.css are the ONE place section padding, page gutter, heading size
+    and hairline lists are set, and each grows at the 640px breakpoint. A
+    section must not type its own clamp(); home-page.test.ts fails if a
+    section heading does, and visual-system.test.ts reads the numbers out of
+    the stylesheet and fails if one stops growing at sm.
+  - THE SURFACES: homepage (masthead photo band, promise and primary action
+    above the fold at 320px, the live board second, the four steps as a
+    scannable list, category tiles into the feed, the six contract answers as
+    hairline rows, FAQ as native details, closing panel with the second
+    photograph layered into it), feed (category art per row, capacity segments,
+    distinct loading/empty/outage graphics), plan detail (category header band,
+    capacity meter, logistics still directly under the title), composer (visual
+    category picker, illustrated pre-publish summary). Product facts, copy and
+    API behaviour are unchanged; CONTRACT_STEPS gained a `short` line for the
+    drawn sequence and the full `body` is still the contract. The feed's outage state
     is ONE role="alert" holding the headline, the drawing, the explanation, the
     retry and the way out, in the headline slot with nothing in the list below;
     split in two, a screen reader heard the body without the headline.

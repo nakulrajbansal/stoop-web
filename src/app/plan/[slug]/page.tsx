@@ -155,7 +155,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
     <>
       {eventJsonLd && <JsonLd data={eventJsonLd} />}
       <Nav />
-      <PageMain className="max-w-[720px] mx-auto px-6 py-10 pb-20">
+      <PageMain className="max-w-[720px] mx-auto px-5 sm:px-6 py-7 sm:py-10 pb-16 sm:pb-20">
         <Suspense fallback={<div className="py-10 text-center text-muted text-sm">Loading…</div>}>
           <PlanDetailClient
             initialPlan={toPublicPlan(plan)}

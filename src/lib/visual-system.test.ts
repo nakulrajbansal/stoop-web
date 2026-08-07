@@ -208,6 +208,138 @@ describe('a pinned action bar cannot hide the control you tabbed to', () => {
     // Every surface that pins an action bar has to opt in; none is missing.
     expect(pinners.length).toBe(wearers.length);
   });
+
+  it('also shortens the scrollport, because scroll margin alone never fires', () => {
+    // Scroll margin only applies once a scroll happens, and Blink's
+    // sequential-focus scroll barely moves for an element already partly on
+    // screen. Measured at 320 x 568: Tab into /post scrolled 18px and left the
+    // plan textarea at 378..508 under a bar across 433..568. Scroll padding on
+    // the scroll container is what makes "already visible" stop being true for
+    // anything sitting under the bar.
+    const rule = CSS.match(/html:has\(\.has-sticky-action\)\s*\{([^}]*)\}/);
+    expect(rule, 'no scroll-padding rule for the pinning page').not.toBeNull();
+    const declared = rule![1].match(/scroll-padding-bottom:\s*(\d+)px/);
+    expect(declared).not.toBeNull();
+    expect(Number(declared![1])).toBeGreaterThanOrEqual(BAR_HEIGHT_PX + BAR_OFFSET_PX);
+  });
+
+  it('un-pins the bar on a viewport too short to afford it', () => {
+    // The case neither rule can reach: at 320 x 568 the bar owns 135px of a
+    // 568px screen and is parked over the first field before any scroll has
+    // been asked for. Below the threshold it goes back into the flow.
+    const escape = CSS.match(/@media \(max-height:\s*(\d+)px\)\s*\{\s*\.sticky-action\s*\{([^}]*)\}/);
+    expect(escape, 'no short-viewport escape for the pinned bar').not.toBeNull();
+    expect(escape![2]).toMatch(/position:\s*static/);
+    // High enough that a 568px phone is covered, and that the bar plus the
+    // field it was covering both fit below it.
+    expect(Number(escape![1])).toBeGreaterThan(568);
+
+    // And the composer's bar actually wears the class the rule names.
+    const composer = readFileSync(join(ROOT, 'src', 'app', 'post', 'page.tsx'), 'utf8');
+    const bar = composer.match(/className="([^"]*sticky bottom-3[^"]*)"/);
+    expect(bar, 'the pinned bar is no longer findable').not.toBeNull();
+    expect(bar![1]).toMatch(/\bsticky-action\b/);
+  });
+});
+
+describe('the mobile rhythm lives in one place', () => {
+  // The rebuild's premise: a phone got a stack of desktop sections, five serif
+  // headlines at the same size and 56px of air between every block, and ran to
+  // 6,871px of homepage. The scale that replaced it is defined here once, so a
+  // section cannot quietly opt out of it by typing its own clamp().
+  const SIZES: [string, RegExp][] = [
+    ['.sec', /\.sec\s*\{([^}]*)\}/],
+    ['.sec-tight', /\.sec-tight\s*\{([^}]*)\}/],
+    ['.gut', /\.gut\s*\{([^}]*)\}/],
+    ['.h-sec', /\.h-sec\s*\{([^}]*)\}/]
+  ];
+
+  for (const [name, pattern] of SIZES) {
+    it(`defines ${name}, and grows it at the sm breakpoint`, () => {
+      const base = CSS.match(pattern);
+      expect(base, `${name} is missing`).not.toBeNull();
+
+      // The second occurrence is inside the min-width: 640px block, which is
+      // what makes this a mobile-first scale rather than a desktop one scaled
+      // down. Read the numbers rather than trusting the order.
+      const all = [...CSS.matchAll(new RegExp(pattern.source, 'g'))];
+      expect(all.length, `${name} has no wide-screen size`).toBe(2);
+
+      const numbersIn = (body: string) =>
+        [...body.matchAll(/(\d+(?:\.\d+)?)px/g)].map(m => Number(m[1]));
+      const small = numbersIn(all[0][1]);
+      const large = numbersIn(all[1][1]);
+      expect(small.length).toBeGreaterThan(0);
+      expect(large.length).toBe(small.length);
+      for (let i = 0; i < small.length; i++) {
+        expect(large[i], `${name} is not larger on a wide screen`).toBeGreaterThan(small[i]);
+      }
+    });
+  }
+
+  it('keeps the phone gutter and section padding inside sane bounds', () => {
+    const gut = Number(CSS.match(/\.gut\s*\{[^}]*padding-left:\s*(\d+)px/)![1]);
+    // 320px minus two gutters has to leave a column a sentence can live in.
+    expect(gut).toBeGreaterThanOrEqual(14);
+    expect(320 - gut * 2).toBeGreaterThanOrEqual(280);
+
+    const sec = Number(CSS.match(/\.sec\s*\{[^}]*padding-top:\s*(\d+)px/)![1]);
+    expect(sec).toBeLessThanOrEqual(36);
+
+    const hSec = Number(CSS.match(/\.h-sec\s*\{[^}]*font-size:\s*(\d+)px/)![1]);
+    // Big enough to be a heading, small enough that five of them down a phone
+    // are not five posters.
+    expect(hSec).toBeGreaterThanOrEqual(18);
+    expect(hSec).toBeLessThanOrEqual(23);
+  });
+
+  it('draws hairline rows, and stops drawing them where the list becomes a grid', () => {
+    expect(CSS).toMatch(/\.rows\s*>\s*\*\s*\+\s*\*\s*\{[^}]*border-top:\s*1px/);
+    const flat = CSS.match(/@media \(min-width: 640px\)\s*\{\s*\.rows-flat-sm\s*>\s*\*\s*\+\s*\*\s*\{([^}]*)\}/);
+    expect(flat, 'nothing turns the rules off once the list is a grid').not.toBeNull();
+    expect(flat![1]).toMatch(/border-top:\s*0/);
+  });
+});
+
+describe('photographs are laid in, not framed', () => {
+  it('has no frame chrome left on the photo box', () => {
+    const photo = CSS.match(/^\.photo\s*\{([^}]*)\}/m);
+    expect(photo, '.photo is missing').not.toBeNull();
+    // A border and a radius are what made each picture read as an exhibit that
+    // needed a caption under it.
+    expect(photo![1]).not.toMatch(/border:/);
+    expect(photo![1]).not.toMatch(/border-radius:/);
+    expect(photo![1]).toMatch(/position:\s*relative/);
+    expect(photo![1]).toMatch(/overflow:\s*hidden/);
+
+    // And the old class is gone rather than orphaned in the stylesheet.
+    expect(CSS).not.toMatch(/\.photo-frame\b/);
+    for (const source of MARKUP) expect(source).not.toMatch(/photo-frame/);
+  });
+
+  it('fades every photograph into the page with a mask, prefixed for older WebKit', () => {
+    const fades = [...CSS.matchAll(/\.(photo-fade-[a-z]+)\s*\{([^}]*)\}/g)];
+    expect(fades.length).toBeGreaterThanOrEqual(3);
+    for (const [, name, body] of fades) {
+      expect(body, `${name} does not mask`).toMatch(/mask-image:\s*linear-gradient/);
+      expect(body, `${name} has no -webkit- fallback`).toMatch(/-webkit-mask-image:/);
+    }
+  });
+
+  it('ties the two photographs to the same paper', () => {
+    // Two CC0 photographs by two people do not belong to each other until
+    // something makes them. Without this they read as stock dropped on cream.
+    expect(CSS).toMatch(/\.photo img\s*\{[^}]*filter:\s*saturate\(/);
+    expect(CSS).toMatch(/\.photo::after\s*\{[^}]*background:\s*linear-gradient/);
+  });
+
+  it('positions the panel layer in CSS, where the utilities cannot lose to it', () => {
+    // This file is emitted after Tailwind's utilities, so `.photo`'s own
+    // position beats an `absolute` typed at the call site.
+    const layer = CSS.match(/\.photo-layer\s*\{([^}]*)\}/);
+    expect(layer, '.photo-layer is missing').not.toBeNull();
+    expect(layer![1]).toMatch(/position:\s*absolute/);
+  });
 });
 
 describe('the disclosure styling keeps the native control usable', () => {

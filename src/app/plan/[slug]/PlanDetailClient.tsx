@@ -135,9 +135,12 @@ export default function PlanDetailClient({
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-8">
-        <Link href="/feed" className="text-[13px] text-muted hover:text-ink">← Back to plans</Link>
-        <button type="button" onClick={share} className="text-[12px] text-muted hover:text-ink flex items-center gap-1.5">
+      {/* Negative margins keep the row where it was while the two controls grow
+          into a 30px tap target. At 18px and 20px tall they were the smallest
+          things on a phone screen. */}
+      <div className="flex items-center justify-between mb-6 sm:mb-8 -mx-1">
+        <Link href="/feed" className="text-[13px] text-muted hover:text-ink px-1 py-1.5">← Back to plans</Link>
+        <button type="button" onClick={share} className="text-[12px] text-muted hover:text-ink flex items-center gap-1.5 px-1 py-1.5">
           <ShareIcon /> Share
         </button>
       </div>

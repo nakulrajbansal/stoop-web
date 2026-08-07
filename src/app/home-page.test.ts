@@ -12,7 +12,15 @@
  *   * the FAQ that a person sees and the FAQ that Google is told about coming
  *     from the same array, so collapsing the answers cannot make the structured
  *     data describe a page that does not exist;
- *   * photographs only through the framed, captioned component.
+ *   * photographs only through the one component, decorative, with a reserved
+ *     box;
+ *   * and the mobile-first shape of the page, which is what this rebuild is
+ *     for. Only the parts a source read can honestly speak for are here: which
+ *     order the sections are written in, that the primary action is above the
+ *     board rather than below five explanatory sections, and that the phone
+ *     type scale and section rhythm come from the one place they are defined.
+ *     Rendered height, overflow and the focus sweep are browser facts and are
+ *     measured in a browser, not asserted here.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -84,31 +92,92 @@ describe('the FAQ a person reads and the FAQ Google is told about', () => {
 });
 
 describe('photography', () => {
-  it('goes through the framed component and nothing else', () => {
+  it('goes through the one component and nothing else', () => {
     expect(SOURCE).toMatch(/<Photograph/);
     expect(SOURCE).not.toMatch(/<img\b/);
     expect(SOURCE).not.toMatch(/from 'next\/image'/);
   });
 
-  it('gives every photograph a sizes hint and a fixed shape, so none of them shifts the page', () => {
+  it('gives every photograph a sizes hint and a reserved box, so none of them shifts the page', () => {
     const photographs = [...SOURCE.matchAll(/<Photograph[\s\S]*?\/>/g)].map(m => m[0]);
-    expect(photographs.length).toBeGreaterThan(2);
+    expect(photographs.length).toBeGreaterThan(1);
     for (const photograph of photographs) {
       expect(photograph).toMatch(/sizes=/);
-      expect(photograph).toMatch(/aspect=|aspect-\[/);
+      // A ratio or a stated height. Both settle the layout before the bytes
+      // land; the bands use a height because their shape is the crop.
+      expect(photograph).toMatch(/aspect=|aspect-\[|h-\[\d+px\]|photo-layer/);
     }
   });
 
   it('loads the one above the fold eagerly and leaves the rest lazy', () => {
     expect([...SOURCE.matchAll(/\bpriority\b/g)]).toHaveLength(1);
+    // The masthead band is the eager one: it is the only picture a visitor
+    // sees before scrolling.
+    const masthead = SOURCE.slice(SOURCE.indexOf('<Photograph'));
+    expect(masthead.slice(0, masthead.indexOf('/>'))).toMatch(/priority/);
   });
 
-  it('captions all three, with no opt-out anywhere on the page', () => {
-    // Photograph renders the caption unconditionally now, so this is here to
-    // catch a call site trying to reintroduce the exception rather than to
-    // check the component. The rendered proof is in Photograph.test.tsx.
-    expect(SOURCE).not.toMatch(/showCaption/);
-    expect([...SOURCE.matchAll(/<Photograph\b/g)]).toHaveLength(3);
+  it('is laid in as atmosphere, never as a captioned exhibit', () => {
+    expect(SOURCE).not.toMatch(/caption/i);
+    expect(SOURCE).not.toMatch(/not a plan/i);
+    // Decorative by default: no call site opts into speaking.
+    expect(SOURCE).not.toMatch(/informative/);
+    // Every placement is a fade or a panel layer rather than a bordered frame.
+    for (const use of [...SOURCE.matchAll(/<Photograph[\s\S]*?\/>/g)].map(m => m[0])) {
+      expect(use).toMatch(/photo-fade-|photo-layer/);
+    }
+  });
+});
+
+describe('the shape of the page on a phone', () => {
+  /** Where each landmark first appears in the source, i.e. in document order. */
+  function at(pattern: RegExp): number {
+    const found = SOURCE.search(pattern);
+    expect(found, `not on the page: ${pattern}`).toBeGreaterThan(-1);
+    return found;
+  }
+
+  it('puts the promise and the primary action ahead of the board and everything after it', () => {
+    // The rejected build opened with a headline, a photograph in a frame, and
+    // then four explanatory sections before a visitor reached a plan.
+    expect(at(/Plans,<br \/>not /)).toBeLessThan(at(/btn btn-accent btn-lg/));
+    expect(at(/btn btn-accent btn-lg/)).toBeLessThan(at(/On the board/));
+    expect(at(/On the board/)).toBeLessThan(at(/how-it-works-heading/));
+  });
+
+  it('runs the board before the explaining, and the explaining before the FAQ', () => {
+    const order = [
+      /On the board/,
+      /how-it-works-heading/,
+      /categories-heading/,
+      /before-signup-heading/,
+      /faq-heading/,
+      /three blocks away/
+    ].map(at);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('takes its section rhythm and heading size from the stylesheet, not from each section', () => {
+    // Five sections each carrying their own clamp() is how the phone ended up
+    // with five different 28px headlines and 56px of air between every block.
+    expect(SOURCE).not.toMatch(/text-\[clamp\(2[0-9]px/);
+    const headings = [...SOURCE.matchAll(/<h2[^>]*className="([^"]*)"/g)].map(m => m[1]);
+    expect(headings.length).toBeGreaterThan(3);
+    const sectionHeadings = headings.filter(cls => /font-serif/.test(cls) && !/text-cream/.test(cls));
+    for (const cls of sectionHeadings) {
+      expect(cls, `a section heading sets its own size: ${cls}`).toMatch(/\bh-sec\b/);
+    }
+    expect(SOURCE).toMatch(/className="[^"]*\bsec\b/);
+    expect(SOURCE).toMatch(/className="[^"]*\bgut\b/);
+  });
+
+  it('states the six contract answers as rows rather than as six bordered cards', () => {
+    const block = SOURCE.slice(SOURCE.indexOf('before-signup-heading'));
+    const list = block.slice(0, block.indexOf('</ul>'));
+    expect(list).toMatch(/\brows\b/);
+    // A card here is a border plus a radius plus padding, six times, in a
+    // 284px column. The answers are the content; the chrome was not.
+    expect(list).not.toMatch(/border-\[var\(--border\)\] rounded-2xl/);
   });
 });
 
@@ -132,7 +201,7 @@ describe('what a featured row says about the kind of plan', () => {
 
   it('leaves the plan text, the host and the logistics as text, not as pictures', () => {
     const row = featuredRow();
-    expect(row).toMatch(/\{plan\.text/);
+    expect(row).toMatch(/plan\.text/);
     expect(row).toMatch(/firstNameOf\(plan\.poster\?\.name\)/);
     expect(row).toMatch(/\{plan\.when_day\}/);
     expect(row).toMatch(/\{plan\.neighborhood\?\.name\}/);

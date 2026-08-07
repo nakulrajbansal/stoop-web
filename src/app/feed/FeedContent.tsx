@@ -155,17 +155,19 @@ export default function FeedContent() {
 
   return (
     <>
-      {/* Masthead */}
-      <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-4">
-        <span className="w-6 h-px bg-accent"></span>
-        <span>Week of {week}</span>
-        <span className="opacity-40">·</span>
-        <span>{cityLabel}</span>
+      {/* Masthead. Each part is nowrap and the row wraps between them: at 320px
+          the plain flex row broke "Week of August 3" after "August" and split
+          "NYC + Austin" down the middle. */}
+      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 text-[10.5px] sm:text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-3">
+        <span aria-hidden="true" className="w-5 h-px bg-accent"></span>
+        <span className="whitespace-nowrap">Week of {week}</span>
+        <span aria-hidden="true" className="opacity-40">·</span>
+        <span className="whitespace-nowrap">{cityLabel}</span>
       </div>
 
       {/* Headline */}
       {loading ? (
-        <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+        <h1 className="font-serif text-[28px] sm:text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-1px] sm:tracking-[-2px] leading-[1.02] mb-2.5 sm:mb-3">
           This week<em className="italic text-gold">…</em>
         </h1>
       ) : failed ? (
@@ -180,7 +182,7 @@ export default function FeedContent() {
         // never look like is zero supply. It wraps at 320px because the block
         // is a single column with no fixed widths.
         <div role="alert" className="mb-9">
-          <h1 className="font-serif text-[clamp(30px,5vw,52px)] font-bold tracking-[-1.5px] leading-[1.05] mb-4">
+          <h1 className="font-serif text-[26px] sm:text-[clamp(30px,5vw,52px)] font-bold tracking-[-0.8px] sm:tracking-[-1.5px] leading-[1.05] mb-3 sm:mb-4">
             {FEED_ERROR_HEADLINE}
           </h1>
           <div className="bg-cream-2 border-l-[3px] border-danger rounded-r-lg px-5 py-4 max-w-[560px]">
@@ -199,7 +201,7 @@ export default function FeedContent() {
         <>
           {planCount > 0 ? (
             <>
-              <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+              <h1 className="font-serif text-[28px] sm:text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-1px] sm:tracking-[-2px] leading-[1.02] mb-2.5 sm:mb-3">
                 This week, <em className="italic text-gold">{total} {total === 1 ? 'plan' : 'plans'}.</em>
               </h1>
               <p className="text-[13px] text-muted mb-8">
@@ -213,7 +215,7 @@ export default function FeedContent() {
             </>
           ) : (
             <>
-              <h1 className="font-serif text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-2px] leading-[1.0] mb-3">
+              <h1 className="font-serif text-[28px] sm:text-[clamp(36px,5.5vw,64px)] font-bold tracking-[-1px] sm:tracking-[-2px] leading-[1.02] mb-2.5 sm:mb-3">
                 This week is <em className="italic text-gold">wide open.</em>
               </h1>
               <p className="text-[13px] text-muted mb-8 max-w-[520px] leading-relaxed">
@@ -225,12 +227,13 @@ export default function FeedContent() {
         </>
       )}
 
-      {/* Editor's note */}
-      <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-5 py-4 mb-9 max-w-[640px] flex items-start gap-3.5">
-        <PinnedCardArt width={26} className="text-accent flex-shrink-0 mt-0.5" />
+      {/* Editor's note. Still the whole contract, in a block that does not own
+          a fifth of the phone screen before the first plan. */}
+      <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-3.5 sm:px-5 py-3 sm:py-4 mb-6 sm:mb-9 max-w-[640px] flex items-start gap-3">
+        <PinnedCardArt width={22} className="text-accent flex-shrink-0 mt-0.5" />
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">How this works</div>
-          <p className="text-[13.5px] text-ink-2 leading-[1.65]">{BROWSE_CONTRACT}</p>
+          <div className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-accent mb-1">How this works</div>
+          <p className="text-[12.5px] sm:text-[13.5px] text-ink-2 leading-[1.55]">{BROWSE_CONTRACT}</p>
         </div>
       </div>
 
@@ -253,15 +256,17 @@ export default function FeedContent() {
       </div>
 
       {/* Quiet category filter. The drawing repeats what the word already says,
-          so it stays decorative and the button keeps its plain accessible name. */}
-      <div role="group" aria-label="Filter by category" className="flex items-center gap-1 flex-wrap py-3 mb-2">
+          so it stays decorative and the button keeps its plain accessible name.
+          Every chip is a 32px row: at py-1 these were 24px tall, which is a
+          small thing to hit on a phone and there are eight of them. */}
+      <div role="group" aria-label="Filter by category" className="flex items-center gap-1 flex-wrap py-2.5 mb-2">
         <button type="button" onClick={() => setCategory(null)} aria-pressed={!cat}
-          className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2.5 py-1.5 rounded ${
+          className={`text-[11px] font-mono uppercase tracking-[0.1em] px-3 h-8 rounded inline-flex items-center ${
           !cat ? 'text-ink bg-cream-2' : 'text-muted hover:text-ink-2'
         }`}>All</button>
         {CATEGORIES.map(c => (
           <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={cat === c}
-            className={`text-[11px] font-mono uppercase tracking-[0.1em] pl-1.5 pr-2.5 py-1 rounded inline-flex items-center gap-1.5 ${
+            className={`text-[11px] font-mono uppercase tracking-[0.1em] pl-1.5 pr-2.5 h-8 rounded inline-flex items-center gap-1.5 ${
             cat === c ? 'text-accent bg-[rgba(47,107,63,0.08)]' : 'text-muted hover:text-ink-2'
           }`}>
             <CategoryArt category={c} size={20} tile={false} />
@@ -283,10 +288,14 @@ export default function FeedContent() {
               </div>
               <div className="w-px self-stretch bg-[var(--border)] flex-shrink-0"></div>
               <div className="h-9 w-9 rounded-xl bg-cream-2 flex-shrink-0 mt-0.5"></div>
+              {/* Percentages, not fixed widths. At 320px this column is 143px
+                  wide and the last bar was w-44 (176px), so the skeleton was
+                  the one thing on the site that scrolled sideways, and only
+                  while the real rows were still loading. */}
               <div className="flex-1 min-w-0 pt-1">
-                <div className="h-2.5 w-20 rounded bg-cream-2 mb-3"></div>
-                <div className="h-4 w-3/4 max-w-[420px] rounded bg-cream-2 mb-3"></div>
-                <div className="h-3 w-44 rounded bg-cream-2"></div>
+                <div className="h-2.5 w-1/2 max-w-[80px] rounded bg-cream-2 mb-3"></div>
+                <div className="h-4 w-full max-w-[420px] rounded bg-cream-2 mb-3"></div>
+                <div className="h-3 w-3/4 max-w-[176px] rounded bg-cream-2"></div>
               </div>
             </div>
           ))}
@@ -363,38 +372,45 @@ export default function FeedContent() {
                     <h2 className="font-serif text-[17px] sm:text-[18px] font-bold text-ink leading-snug mb-1.5 tracking-[-0.2px]">
                       {plan.text.length > 100 ? plan.text.substring(0, 100) + '…' : plan.text}
                     </h2>
-                    <div className="text-[12px] text-muted flex items-center flex-wrap gap-y-1">
-                      <Avatar
-                        userId={plan.user_id}
-                        name={firstNameOf(plan.poster?.name)}
-                        initials={plan.poster?.initials}
-                        bg={plan.poster?.avatar_bg}
-                        fg={plan.poster?.avatar_fg}
-                        size={20}
-                        radius={6}
-                        className="mr-1.5"
-                      />
-                      <span className="text-ink-2 font-medium">{firstNameOf(plan.poster?.name)}</span>
-                      <span className="opacity-40 mx-1.5">·</span>
-                      hosting
+                    {/* Each fact is one nowrap group. Left to wrap freely, a
+                        320px row put the pin at the end of one line and the
+                        neighborhood at the start of the next. */}
+                    <div className="text-[11.5px] sm:text-[12px] text-muted flex items-center flex-wrap gap-x-1.5 gap-y-1">
+                      <span className="inline-flex items-center whitespace-nowrap">
+                        <Avatar
+                          userId={plan.user_id}
+                          name={firstNameOf(plan.poster?.name)}
+                          initials={plan.poster?.initials}
+                          bg={plan.poster?.avatar_bg}
+                          fg={plan.poster?.avatar_fg}
+                          size={18}
+                          radius={6}
+                          className="mr-1.5"
+                        />
+                        <span className="text-ink-2 font-medium">{firstNameOf(plan.poster?.name)}</span>
+                        <span aria-hidden="true" className="opacity-40 mx-1.5">·</span>
+                        hosting
+                      </span>
                       {plan.neighborhood?.name && (
-                        <>
-                          <span className="opacity-40 mx-1.5">·</span>
-                          <PinIcon size={12} className="mr-1" />
+                        <span className="inline-flex items-center whitespace-nowrap">
+                          <span aria-hidden="true" className="opacity-40 mr-1.5">·</span>
+                          <PinIcon size={12} className="mr-1 flex-shrink-0" />
                           {plan.neighborhood.name}
-                        </>
+                        </span>
                       )}
                       {costExpectationLabel(plan.cost_expectation) && (
-                        <>
-                          <span className="opacity-40 mx-1.5">·</span>
-                          <CoinIcon size={12} className="mr-1" />
+                        <span className="inline-flex items-center whitespace-nowrap">
+                          <span aria-hidden="true" className="opacity-40 mr-1.5">·</span>
+                          <CoinIcon size={12} className="mr-1 flex-shrink-0" />
                           {costExpectationLabel(plan.cost_expectation)}
-                        </>
+                        </span>
                       )}
                       {/* Desktop shows this in the right-hand column; on a
                           phone that column is hidden, so say it here. */}
-                      <span className="opacity-40 mx-1.5 sm:hidden">·</span>
-                      <span className="text-sage sm:hidden">{plan.spots_left} open</span>
+                      <span className="inline-flex items-center whitespace-nowrap text-sage sm:hidden">
+                        <span aria-hidden="true" className="opacity-40 mr-1.5 text-muted">·</span>
+                        {plan.spots_left} open
+                      </span>
                     </div>
                   </div>
 

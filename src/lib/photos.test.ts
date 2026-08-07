@@ -10,10 +10,17 @@
  *      and every one is written down in docs/VISUAL_ASSETS.md;
  *   2. privacy, because alt text is where an innocent picture starts claiming
  *      something about members: no photo may describe a host, a member or an
- *      attendee, and every photo carries the caption that separates it from
- *      live plan data;
+ *      attendee;
  *   3. placement and weight, because a photograph belongs on the marketing
  *      surface and nowhere near a plan, a roster or an inbox.
+ *
+ * The second and third of those used to lean on a visible caption reading
+ * "Photograph, not a plan" under every picture. That line is gone: it was a
+ * disclaimer sitting in the middle of the page, and a rule that has to be
+ * printed to be true is a weak rule. What replaces it is the placement scan at
+ * the bottom of this file, which is the claim that actually matters, plus
+ * decorative rendering (Photograph.test.tsx), so a photograph says nothing at
+ * all rather than saying what it is not.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, statSync, readdirSync } from 'node:fs';
@@ -28,11 +35,17 @@ const PHOTO_DIR = join(ROOT, 'public', 'photos');
 const TOTAL_BUDGET = 800 * 1024;
 /** What we actually intend to ship, so a careless re-encode is caught early. */
 const TOTAL_TARGET = 400 * 1024;
+/**
+ * What the previous release shipped. This pass was allowed to match it or beat
+ * it and never to exceed it, so the number is written down rather than
+ * remembered.
+ */
+const PREVIOUS_RELEASE_BYTES = 148230;
 
 /**
  * Every module the app actually ships, test files excluded. The rules below
  * are about surfaces a visitor can reach; a test that renders a photograph in
- * order to check its caption is not one, and counting it would force this file
+ * order to check how it renders is not one, and counting it would force this file
  * to keep an allowlist of its own suite.
  */
 function walk(dir: string, out: string[] = []): string[] {
@@ -62,8 +75,11 @@ function importsFrom(source: string, specifier: string): boolean {
 const VISUAL_ASSETS = readFileSync(join(ROOT, 'docs', 'VISUAL_ASSETS.md'), 'utf8');
 
 describe('every photograph is real, local and accounted for', () => {
-  it('ships three, and they all live under public/photos', () => {
-    expect(ALL_PHOTOS.length).toBe(3);
+  it('ships two, and they both live under public/photos', () => {
+    // Three shipped in the visual release. The third (a latte on a counter,
+    // 560px square) had no placement left where it was both sharp and doing
+    // work once the captioned figure blocks went, so it went with them.
+    expect(ALL_PHOTOS.length).toBe(2);
     for (const photo of ALL_PHOTOS) {
       expect(photo.src.startsWith('/photos/')).toBe(true);
       expect(photo.src.endsWith('.webp')).toBe(true);
@@ -80,6 +96,15 @@ describe('every photograph is real, local and accounted for', () => {
     );
     expect(total).toBeLessThan(TOTAL_TARGET);
     expect(total).toBeLessThan(TOTAL_BUDGET);
+    expect(total).toBeLessThanOrEqual(PREVIOUS_RELEASE_BYTES);
+  });
+
+  it('leaves nothing on disk that no longer ships', () => {
+    // A deleted record and a live file is how an unreferenced asset survives a
+    // cleanup, gets found later, and gets put back on a page.
+    const onDisk = readdirSync(PHOTO_DIR).filter(name => /\.(webp|jpg|jpeg|png|avif)$/i.test(name)).sort();
+    const referenced = ALL_PHOTOS.map(photo => photo.src.replace('/photos/', '')).sort();
+    expect(onDisk).toEqual(referenced);
   });
 
   it('carries the intrinsic size, so no image can shift a page while it loads', () => {
@@ -140,15 +165,19 @@ describe('a photograph never says anything about a member', () => {
     }
   });
 
-  it('is captioned as a photograph rather than as a plan', () => {
+  it('carries no caption field for a surface to print', () => {
+    // The caption is not merely unrendered, it is not in the data. Left in the
+    // record it would be one call site away from coming back.
     for (const photo of ALL_PHOTOS) {
-      expect(photo.caption).toMatch(/not a plan/i);
+      expect(photo).not.toHaveProperty('caption');
     }
+    const lib = readFileSync(join(SRC, 'lib', 'photos.ts'), 'utf8');
+    expect(lib).not.toMatch(/caption/i);
+    expect(lib).not.toMatch(/not a plan/i);
   });
 
   it('names a scene, not a person', () => {
     expect(PHOTOS.sidewalkTable.alt).toMatch(/chairs|table/i);
-    expect(PHOTOS.coffeeCounter.alt).toMatch(/cup|counter/i);
     expect(PHOTOS.parkPath.alt).toMatch(/path|trees/i);
   });
 });
@@ -164,7 +193,7 @@ describe('where a photograph is allowed to appear', () => {
     ]);
   });
 
-  it('renders them through one component, so the frame and caption cannot be skipped', () => {
+  it('renders them through one component, so the placement rules cannot be skipped', () => {
     expect(usesNextImage.map(f => f.path)).toEqual(['src/components/Photograph.tsx']);
   });
 

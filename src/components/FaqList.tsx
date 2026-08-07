@@ -55,7 +55,9 @@ export default function FaqList({ items, className }: { items: FaqItem[]; classN
             >
               <path d="m4 2 4 4-4 4" />
             </svg>
-            <h3 className="font-serif text-[17px] sm:text-[18px] font-bold tracking-tight leading-snug">
+            {/* 14.5px at 320px, where 17px wrapped most of these to two lines
+                and turned eight closed questions into a 580px block. */}
+            <h3 className="font-serif text-[14.5px] sm:text-[18px] font-bold tracking-tight leading-snug">
               {item.q}
             </h3>
           </summary>

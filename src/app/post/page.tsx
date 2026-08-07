@@ -269,13 +269,13 @@ export default function PostPage() {
   return (
     <>
       <Nav />
-      <PageMain className="max-w-[700px] mx-auto px-5 sm:px-6 py-10 pb-20">
+      <PageMain className="max-w-[700px] mx-auto px-5 sm:px-6 py-7 sm:py-10 pb-20">
         <div className="text-[11px] font-mono uppercase tracking-wider text-accent mb-2">Post a plan</div>
-        <h1 className="font-serif text-[clamp(28px,4.5vw,44px)] font-bold tracking-[-1px] leading-[1.05] mb-1">
+        <h1 className="font-serif text-[26px] sm:text-[clamp(28px,4.5vw,44px)] font-bold tracking-[-0.8px] sm:tracking-[-1px] leading-[1.05] mb-1">
           What&apos;s the <em className="italic text-gold">plan?</em>
         </h1>
-        <p className="text-[14px] text-muted mb-2">Write it like you&apos;d text a friend. Specific time, specific place.</p>
-        <p className="text-[12.5px] text-gold-2 mb-10">The first 50 hosts become Founding members. The badge stays on everything you post.</p>
+        <p className="text-[13.5px] sm:text-[14px] text-muted mb-1.5">Write it like you&apos;d text a friend. Specific time, specific place.</p>
+        <p className="text-[12.5px] text-gold-2 mb-7 sm:mb-10">The first 50 hosts become Founding members. The badge stays on everything you post.</p>
 
         {resumedAfterAuth && (
           <div className="bg-[rgba(42,66,50,0.08)] border-l-[3px] border-sage rounded-r-lg px-4 py-3 mb-8 -mt-6" role="status">
@@ -299,7 +299,7 @@ export default function PostPage() {
             gives everything focusable in here enough scroll margin to clear the
             bar. Measured at 320px: keyboard focus on the last category button
             used to land it flush with the viewport bottom, under the bar. */}
-        <div className="space-y-8 has-sticky-action">
+        <div className="space-y-7 sm:space-y-8 has-sticky-action">
           <div>
             <label htmlFor="plan-text" className="text-[12px] font-mono uppercase tracking-wider text-muted block mb-2">
               Your plan
@@ -459,12 +459,12 @@ export default function PostPage() {
             <div ref={spotsRef} className="flex gap-2">
               {[1, 2, 3].map(n => (
                 <button key={n} type="button" onClick={() => setSpots(n)} aria-pressed={spots === n}
-                  className={`flex-1 py-5 rounded-2xl border text-center transition-all ${
+                  className={`flex-1 py-4 sm:py-5 rounded-2xl border text-center transition-all ${
                   spots === n ? 'border-accent bg-[rgba(47,107,63,0.06)]'
                     : missingSpots ? 'border-danger/60 bg-card'
                     : 'border-[var(--border2)] bg-card hover:border-accent/40'
                 }`}>
-                  <div className={`font-serif text-[40px] font-bold leading-none tracking-tight ${spots === n ? 'text-accent' : 'text-ink-2'}`}>
+                  <div className={`font-serif text-[32px] sm:text-[40px] font-bold leading-none tracking-tight ${spots === n ? 'text-accent' : 'text-ink-2'}`}>
                     {n}
                   </div>
                   <div className={`text-[12px] mt-1 ${spots === n ? 'text-ink' : 'text-muted'}`}>
@@ -498,16 +498,19 @@ export default function PostPage() {
             </div>
           )}
 
-          <div className="sticky bottom-3 bg-cream/95 backdrop-blur-sm rounded-[22px] p-2 -mx-2 shadow-[0_-8px_24px_rgba(20,17,13,0.06)] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {/* sticky-action: on a viewport under 640px tall this bar returns to
+              the flow rather than parking 135px of itself over the plan field.
+              See the rule in globals.css for the measurement behind it. */}
+          <div className="sticky-action sticky bottom-3 bg-cream/95 backdrop-blur-sm rounded-[22px] p-1.5 sm:p-2 -mx-2 shadow-[0_-8px_24px_rgba(20,17,13,0.06)] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <button onClick={submit} type="button" disabled={submitting} aria-busy={submitting}
               aria-describedby="plan-publish-note"
-              className={`w-full py-4 rounded-2xl font-serif font-bold italic text-[19px] transition-all inline-flex items-center justify-center gap-2 ${
+              className={`w-full py-3.5 sm:py-4 rounded-2xl font-serif font-bold italic text-[18px] sm:text-[19px] transition-all inline-flex items-center justify-center gap-2 ${
                 ready ? 'bg-accent text-white hover:bg-acc2 hover:-translate-y-[2px] shadow-lg shadow-accent/20' : 'bg-cream-2 text-ink-2'
               }`}>
               {submitting && <span className="spinner" aria-hidden="true" />}
               {signedIn === false && ready ? 'Publish it →' : 'Put it out there →'}
             </button>
-            <p id="plan-publish-note" role="status" className="text-[11.5px] text-muted text-center mt-2 pb-1">
+            <p id="plan-publish-note" role="status" className="text-[11.5px] text-muted text-center mt-1.5 pb-0.5">
               {!ready ? (
                 <>Still needed: {missing.join(', ')}.</>
               ) : signedIn === false ? (

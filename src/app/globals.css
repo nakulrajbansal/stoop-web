@@ -69,11 +69,51 @@ body {
    /post at 320px: the bar is 123px tall and sits 12px off the bottom, so 150px
    clears it with room. Without this, tabbing to the last category button put it
    underneath the publish button.
-   Applied per form rather than as scroll-padding on the root, because only this
-   page has a pinned action and every other page's anchor scrolling should be
-   left alone. */
+
+   Scroll margin alone is not enough, and this is the case it cannot reach: a
+   control that is ALREADY on screen triggers no scroll at all, so nothing is
+   aligned and the margin never applies. At 320 x 568 that was the very first
+   field. Tab into /post and the plan textarea sat at 396..526 with the bar
+   pinned across 433..568, so two thirds of the box you had just focused was
+   behind the publish button, at the exact moment you were asked to type in it.
+   Scroll padding on the scroll container is the half that fixes that: it
+   shortens the scrollport the browser measures against, so "already visible"
+   stops being true for anything under the bar.
+
+   Scoped with :has so only a page that actually pins an action gets it, and
+   every other page's anchor scrolling is left alone. A browser without :has
+   (Safari below 15.4) still gets the scroll-margin behaviour above, which is
+   what shipped before, so this is never a downgrade. */
 .has-sticky-action :is(a, button, input, textarea, select, summary, [tabindex]) {
   scroll-margin-bottom: 150px;
+}
+html:has(.has-sticky-action) {
+  scroll-padding-bottom: 150px;
+}
+
+/* And the case neither of them can reach.
+   Blink's sequential-focus scroll is more conservative than scrollIntoView: for
+   an element already partly on screen it barely scrolls at all, so neither the
+   padding nor the margin above gets a chance to align anything. Measured at
+   320 x 568: Tab into /post moved the page 18px and left the plan textarea at
+   378..508 with the bar across 433..568. The same element, given
+   scrollIntoView({block:'nearest'}), lands at 138..268, which is what the two
+   rules are worth once a scroll actually happens.
+
+   So on a viewport too short to afford it, the bar stops being pinned. 135px of
+   permanent furniture is a quarter of a 568px screen and it is parked over the
+   field you are being asked to type in; the same button at the end of the form
+   costs one scroll and covers nothing. Above the threshold, where the bar fits
+   without sitting on the first field, it stays pinned exactly as before. This
+   is presentation only: same button, same disabled logic, same status line,
+   same accessible description. */
+@media (max-height: 640px) {
+  .sticky-action {
+    position: static;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+  }
 }
 
 /* Honour the OS setting. Movement here is decoration, except the spinner,
@@ -249,29 +289,139 @@ body {
   border-radius: 8px;
 }
 
-/* Photographs: editorial atmosphere, never plan data. The frame is what keeps
-   that legible, so it lives with the image rather than at each call site. */
-.photo-frame {
+/* ── Photography ───────────────────────────────────────────────────────────
+   Editorial atmosphere, never plan data. v1 set each photograph in a bordered,
+   rounded frame with a caption under it, which made three separate exhibits
+   that each had to be explained. These are laid into the page instead: a band
+   that fades into the paper at its edges, or a layer behind a panel. A picture
+   with no seam and no frame does not read as inventory, so nothing has to say
+   it is not.
+
+   Tone. Two CC0 photographs shot by two people do not belong to each other
+   until something makes them. A little desaturation plus a warm veil in the
+   page's own cream is that something, and it is deliberately light: enough that
+   the orange chairs and the green trees sit on the same paper, not so much that
+   either becomes a duotone graphic. */
+.photo {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid var(--border2);
   background: var(--bg2);
 }
-.photo-frame img {
+.photo img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.84) contrast(1.02);
 }
-/* Slightly uneven corners, the way a print pinned to a board never sits square.
-   Percentages, so it holds its character at any size. */
-.photo-frame-organic {
-  border-radius: 26px 18px 26px 18px;
+.photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(240, 235, 225, 0.16), rgba(122, 78, 40, 0.1));
+  pointer-events: none;
+}
+
+/* The fades. A mask is alpha, so a band melts into whatever is behind it: the
+   same class works on cream, on cream-2 and on the ink panel without knowing
+   which one it landed on. Prefixed as well as plain for older WebKit. */
+.photo-fade-b {
+  -webkit-mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
+}
+.photo-fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
+}
+/* The closing panel's layer: a picture inside the panel, bleeding to its edges
+   rather than sitting on it as a tile. The geometry is here and not in Tailwind
+   because `.photo` sets position and this file is emitted after the utilities,
+   so an `absolute` typed at the call site would lose to it. */
+.photo-layer {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 132px;
 }
 @media (min-width: 640px) {
-  .photo-frame-organic {
-    border-radius: 34px 22px 34px 22px;
+  .photo-layer {
+    inset: 0 0 0 auto;
+    width: 42%;
+    height: auto;
+  }
+}
+
+/* On a phone the panel is one column, so that layer is a strip under the words
+   and fades upward into the ink; from sm it moves beside them and fades
+   sideways instead. */
+.photo-fade-panel {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 52%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 52%);
+}
+@media (min-width: 640px) {
+  .photo-fade-panel {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 46%);
+    mask-image: linear-gradient(to right, transparent 0%, #000 46%);
+  }
+}
+
+/* ── Section rhythm ────────────────────────────────────────────────────────
+   One scale for the whole site, set here rather than typed per section, so a
+   phone gets a page with a beat instead of a stack of desktop blocks. v1 put
+   56px above and below every section at 320px and ran to 6,871px of homepage;
+   these are the numbers that page is now built on. */
+.sec {
+  padding-top: 26px;
+  padding-bottom: 26px;
+}
+.sec-tight {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+.gut {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+@media (min-width: 640px) {
+  .sec {
+    padding-top: 66px;
+    padding-bottom: 66px;
+  }
+  .sec-tight {
+    padding-top: 42px;
+    padding-bottom: 42px;
+  }
+  .gut {
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+}
+
+/* Section headings. Still Fraunces, still bold, but sized for a 284px column:
+   v1 set five of these at clamp(28px, 4vw, 44px), and five 28px serif
+   headlines stacked down a phone read as five posters rather than as one page.
+   The desktop size is unchanged in feel. */
+.h-sec {
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.4px;
+}
+@media (min-width: 640px) {
+  .h-sec {
+    font-size: 30px;
+    letter-spacing: -1px;
+  }
+}
+
+/* Facts as hairline rows rather than as bordered cards. Six rounded cards in a
+   284px column is a component gallery; six rules is a list you can scan. */
+.rows > * + * {
+  border-top: 1px solid var(--border);
+}
+/* Where that same list becomes a grid on a wider screen, the rules would draw
+   across the columns instead of down them. */
+@media (min-width: 640px) {
+  .rows-flat-sm > * + * {
+    border-top: 0;
   }
 }
 
