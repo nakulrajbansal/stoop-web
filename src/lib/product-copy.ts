@@ -13,25 +13,38 @@
 export const BROWSE_CONTRACT =
   'Browse plans and hosts without an account. Sign up only when you want to post or message. Messaging starts a private conversation; the host chooses who joins.';
 
-export const CONTRACT_STEPS: { n: string; title: string; body: string }[] = [
+/**
+ * The four steps.
+ *
+ * `body` is the full statement of the step and is what the contract is judged
+ * against. `short` is the same step said in one line, for a surface that draws
+ * the sequence rather than explains it; every fact `short` leaves out is stated
+ * elsewhere on that page, in BROWSE_CONTRACT or in CONTRACT_QUESTIONS. Never
+ * use `short` as the only place a step appears.
+ */
+export const CONTRACT_STEPS: { n: string; title: string; short: string; body: string }[] = [
   {
     n: '01',
     title: 'Browse',
+    short: 'Read plans and hosts without an account.',
     body: 'Read plans and host cards without an account. Nothing is hidden behind signup.'
   },
   {
     n: '02',
     title: 'Message',
+    short: 'Sign up only to message. That opens a private conversation.',
     body: 'Found one that fits? Make an account and message the host. That starts a private conversation.'
   },
   {
     n: '03',
     title: 'The host chooses',
+    short: 'They read your request, then accept or decline.',
     body: 'The host decides, not an algorithm. They see your first name, photo, neighborhood, one line about you, and your message, then accept or decline.'
   },
   {
     n: '04',
     title: 'You meet',
+    short: 'Confirmed people see each other. Four at most, counting the host.',
     body: 'Once you are confirmed, you can see who else is coming. Up to four people, counting the host.'
   }
 ];
@@ -136,7 +149,7 @@ export const PRODUCT_COPY_STRINGS: readonly string[] = Object.freeze([
   FEED_ERROR_HEADLINE,
   FEED_ERROR_BODY,
   FEED_ERROR_RETRY,
-  ...CONTRACT_STEPS.flatMap(step => [step.title, step.body]),
+  ...CONTRACT_STEPS.flatMap(step => [step.title, step.short, step.body]),
   ...CONTRACT_QUESTIONS.flatMap(item => [item.q, item.a]),
   ...CONTRACT_FAQ.flatMap(item => [item.q, item.a]),
   planMessageCta('Maya'),

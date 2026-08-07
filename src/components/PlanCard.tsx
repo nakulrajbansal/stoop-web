@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
+import CategoryArt, { CATEGORY_LABELS } from '@/components/CategoryArt';
+import { CapacitySegments } from '@/components/CapacityMeter';
+import { CalendarIcon, PinIcon, CoinIcon } from '@/components/icons';
 import { intentTagLabel } from '@/lib/utils';
 import { costExpectationLabel } from '@/lib/plan-contract';
 import { firstNameOf } from '@/lib/participants';
@@ -31,16 +34,6 @@ type Plan = {
   } | null;
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-  coffee: 'Coffee',
-  outdoors: 'Outdoors',
-  sports: 'Sports',
-  arts: 'Arts',
-  food: 'Food',
-  books: 'Books',
-  music: 'Music'
-};
-
 export default function PlanCard({ plan }: { plan: Plan }) {
   const isFull = plan.spots_left === 0 || plan.status === 'full';
   const tags = plan.intent_tags ?? [];
@@ -56,9 +49,11 @@ export default function PlanCard({ plan }: { plan: Plan }) {
 
   return (
     <Link href={`/plan/${plan.slug}`} className="plan-card block no-underline">
-      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+      {/* The drawing repeats the category pill next to it, so it is decorative. */}
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <CategoryArt category={plan.category} size={34} />
         <span className={`tag tag-${plan.category}`}>
-          {CATEGORY_LABEL[plan.category] ?? plan.category}
+          {CATEGORY_LABELS[plan.category as keyof typeof CATEGORY_LABELS] ?? plan.category}
         </span>
         {tags.slice(0, 2).map(t => (
           <span key={t} className="text-[11px] font-medium text-ink-2 bg-cream-2 px-2.5 py-[3px] rounded-full">
@@ -71,25 +66,26 @@ export default function PlanCard({ plan }: { plan: Plan }) {
         {plan.text.length > 90 ? plan.text.substring(0, 90) + '…' : plan.text}
       </p>
 
-      <div className="text-[12px] text-muted mb-4">
-        {timeLine}
-        {plan.spot && (
-          <>
-            <span className="opacity-40 mx-1.5">·</span>
-            {plan.spot}
-          </>
-        )}
-        {plan.neighborhood?.name && (
-          <>
-            <span className="opacity-40 mx-1.5">·</span>
-            {plan.neighborhood.name}
-          </>
+      {/* One line per fact, each with its own mark, so day, place and cost can
+          be found without reading the whole line. */}
+      <div className="text-[12px] text-muted mb-4 flex flex-col gap-1.5">
+        <span className="flex items-center gap-1.5">
+          <CalendarIcon size={12} className="flex-shrink-0" />
+          {timeLine}
+        </span>
+        {(plan.spot || plan.neighborhood?.name) && (
+          <span className="flex items-start gap-1.5">
+            <PinIcon size={12} className="flex-shrink-0 mt-[3px]" />
+            <span className="min-w-0">
+              {[plan.spot, plan.neighborhood?.name].filter(Boolean).join(', ')}
+            </span>
+          </span>
         )}
         {costLabel && (
-          <>
-            <span className="opacity-40 mx-1.5">·</span>
+          <span className="flex items-center gap-1.5">
+            <CoinIcon size={12} className="flex-shrink-0" />
             {costLabel}
-          </>
+          </span>
         )}
       </div>
 
@@ -116,7 +112,9 @@ export default function PlanCard({ plan }: { plan: Plan }) {
               : 'text-sage bg-[rgba(42,66,50,0.08)]'
           }`}
         >
-          {!isFull && <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block"></span>}
+          {!isFull && (
+            <CapacitySegments spotsLeft={plan.spots_left} spotsTotal={plan.spots_total} compact />
+          )}
           {isFull ? 'Full' : `${plan.spots_left} ${plan.spots_left === 1 ? 'spot' : 'spots'} open`}
         </span>
       </div>

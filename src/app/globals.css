@@ -62,6 +62,20 @@ body {
   left: 0;
 }
 
+/* A form whose action bar is pinned to the bottom of the viewport.
+   Tabbing to a control makes the browser scroll it "just into view", which
+   lands it flush with the viewport bottom, which is where the pinned bar is.
+   Scroll margin makes the browser stop short of the bar instead. Measured on
+   /post at 320px: the bar is 123px tall and sits 12px off the bottom, so 150px
+   clears it with room. Without this, tabbing to the last category button put it
+   underneath the publish button.
+   Applied per form rather than as scroll-padding on the root, because only this
+   page has a pinned action and every other page's anchor scrolling should be
+   left alone. */
+.has-sticky-action :is(a, button, input, textarea, select, summary, [tabindex]) {
+  scroll-margin-bottom: 150px;
+}
+
 /* Honour the OS setting. Movement here is decoration, except the spinner,
    which still has to read as "working"; it just slows down. */
 @media (prefers-reduced-motion: reduce) {
@@ -84,6 +98,180 @@ body {
   .spinner {
     animation-duration: 1.4s !important;
     animation-iteration-count: infinite !important;
+  }
+  /* The entrance animations are not merely slowed here, they are removed: a
+     0.01ms fade still fires a repaint per element, and the final state is the
+     only state anyone asked for. Stated rather than inherited, so the rule
+     survives someone changing the blanket override above. */
+  .rise,
+  .rise-art {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* These two selectors must stay identical to the .lift rule further down.
+     They named :focus-visible once while the live rule fired on :focus-within,
+     so pointing at a tile still nudged it 2px under this setting. */
+  .lift:hover,
+  .lift:focus-within {
+    transform: none !important;
+  }
+  .meter-seg {
+    transition: none !important;
+  }
+}
+
+/* ── Entrance motion ───────────────────────────────────────────────────────
+   One keyframe, used on first paint only. Opacity and transform, so nothing
+   reserves or releases space and no image or card can shift the page under a
+   thumb. Nothing here loops: the animation runs once and stops. */
+@keyframes stoop-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes stoop-rise-art {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: stoop-rise 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.rise-art {
+  animation: stoop-rise-art 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+/* Staggering is a delay only. Each element still ends at its natural state, so
+   a visitor who lands mid-animation never sees a gap where content will be.
+   One step exists because one element uses it; add the next only with the
+   element that needs it. */
+.rise-1 { animation-delay: 60ms; }
+
+/* State change only: a card lifts when it is the one you are pointing at or
+   have tabbed to. No idle movement. */
+.lift {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.lift:hover,
+.lift:focus-within {
+  transform: translateY(-2px);
+}
+
+/* ── Category art ──────────────────────────────────────────────────────────
+   One ink and one wash per category, matched to the .tag-{category} pill below
+   so a drawing and its label never disagree. The drawing is currentColor, so a
+   caller can override the ink by setting a text colour. */
+.cat-art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--cat-ink, var(--ink2));
+  line-height: 0;
+}
+/* The drawing is sized in px by the component; the tile only paints behind it. */
+.cat-art-tile {
+  background: var(--cat-wash, rgba(20, 17, 13, 0.05));
+  border-radius: 30% 30% 32% 30% / 30% 32% 30% 30%;
+}
+.cat-coffee { --cat-ink: #7A4E28; --cat-wash: rgba(160, 105, 60, 0.14); }
+.cat-outdoors { --cat-ink: #2A4232; --cat-wash: rgba(42, 66, 50, 0.12); }
+.cat-sports { --cat-ink: #74581B; --cat-wash: rgba(146, 111, 27, 0.16); }
+.cat-arts { --cat-ink: #8E3552; --cat-wash: rgba(160, 59, 92, 0.12); }
+.cat-food { --cat-ink: #4A3870; --cat-wash: rgba(80, 60, 120, 0.12); }
+.cat-books { --cat-ink: #1E3C5A; --cat-wash: rgba(30, 60, 90, 0.12); }
+.cat-music { --cat-ink: #1F5453; --cat-wash: rgba(37, 100, 99, 0.14); }
+
+/* ── Capacity meter ────────────────────────────────────────────────────────
+   Segments, one per spot the host offered. The number is always written out
+   next to it; this is a second reading of the same fact, never the only one. */
+.meter {
+  display: inline-flex;
+  gap: 4px;
+}
+.meter-seg {
+  width: 26px;
+  height: 8px;
+  border-radius: 100px;
+  background: rgba(20, 17, 13, 0.1);
+  transition: background-color 0.25s ease;
+}
+.meter-sm {
+  gap: 3px;
+}
+.meter-sm .meter-seg {
+  width: 13px;
+  height: 5px;
+}
+.meter-seg-open {
+  background: var(--accent);
+}
+.meter-seg-taken {
+  background: rgba(20, 17, 13, 0.16);
+}
+
+/* ── Native disclosure ─────────────────────────────────────────────────────
+   details/summary, styled without losing the built-in keyboard behaviour. The
+   marker is replaced by our own mark, which rotates on open. */
+.disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 2px;
+}
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.disclosure > summary .disclosure-mark {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+.disclosure[open] > summary .disclosure-mark {
+  transform: rotate(90deg);
+}
+.disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Photographs: editorial atmosphere, never plan data. The frame is what keeps
+   that legible, so it lives with the image rather than at each call site. */
+.photo-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+}
+.photo-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Slightly uneven corners, the way a print pinned to a board never sits square.
+   Percentages, so it holds its character at any size. */
+.photo-frame-organic {
+  border-radius: 26px 18px 26px 18px;
+}
+@media (min-width: 640px) {
+  .photo-frame-organic {
+    border-radius: 34px 22px 34px 22px;
   }
 }
 

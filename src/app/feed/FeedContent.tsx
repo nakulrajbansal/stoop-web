@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
+import CategoryArt, { CATEGORIES } from '@/components/CategoryArt';
+import { CapacitySegments } from '@/components/CapacityMeter';
+import { EmptyBoardArt, OutageArt, PinnedCardArt } from '@/components/StoopArt';
+import { PinIcon, CoinIcon } from '@/components/icons';
 import { useCityPreference, setCityPreference } from '@/lib/city-preference';
 import { intentTagLabel } from '@/lib/utils';
 import {
@@ -16,8 +20,6 @@ import {
 } from '@/lib/product-copy';
 import { costExpectationLabel } from '@/lib/plan-contract';
 import { firstNameOf } from '@/lib/participants';
-
-const CATEGORIES = ['coffee', 'outdoors', 'sports', 'arts', 'food', 'books', 'music'];
 
 // Shown ONLY in the empty state, clearly labeled as samples. They demonstrate
 // the format without pretending to be real activity.
@@ -167,9 +169,32 @@ export default function FeedContent() {
           This week<em className="italic text-gold">…</em>
         </h1>
       ) : failed ? (
-        <h1 className="font-serif text-[clamp(30px,5vw,52px)] font-bold tracking-[-1.5px] leading-[1.05] mb-3">
-          {FEED_ERROR_HEADLINE}
-        </h1>
+        // One announcement, not two. The headline names the problem and the
+        // paragraph explains it, so they live inside a single role="alert":
+        // split across the page, a screen reader reached the body ("that is a
+        // problem with Stoop") without ever hearing what had gone wrong. The
+        // retry and the way out are in here for the same reason.
+        //
+        // No count, no samples, no server detail. The drawing is a snapped
+        // line, deliberately not an empty board: the one thing this state must
+        // never look like is zero supply. It wraps at 320px because the block
+        // is a single column with no fixed widths.
+        <div role="alert" className="mb-9">
+          <h1 className="font-serif text-[clamp(30px,5vw,52px)] font-bold tracking-[-1.5px] leading-[1.05] mb-4">
+            {FEED_ERROR_HEADLINE}
+          </h1>
+          <div className="bg-cream-2 border-l-[3px] border-danger rounded-r-lg px-5 py-4 max-w-[560px]">
+            <OutageArt width={108} className="text-danger mb-3" />
+            <p className="text-[13.5px] text-ink-2 leading-[1.65] mb-4">{FEED_ERROR_BODY}</p>
+            <button type="button" onClick={() => setAttempt(n => n + 1)} className="btn btn-accent btn-sm">
+              {FEED_ERROR_RETRY}
+            </button>
+          </div>
+          <p className="text-[12.5px] text-muted mt-4 max-w-[560px] leading-relaxed">
+            You can still <Link href="/post" className="text-accent font-medium hover:underline">post a plan</Link>{' '}
+            while this is happening.
+          </p>
+        </div>
       ) : (
         <>
           {planCount > 0 ? (
@@ -201,9 +226,12 @@ export default function FeedContent() {
       )}
 
       {/* Editor's note */}
-      <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-5 py-4 mb-9 max-w-[640px]">
-        <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">How this works</div>
-        <p className="text-[13.5px] text-ink-2 leading-[1.65]">{BROWSE_CONTRACT}</p>
+      <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-5 py-4 mb-9 max-w-[640px] flex items-start gap-3.5">
+        <PinnedCardArt width={26} className="text-accent flex-shrink-0 mt-0.5" />
+        <div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-accent mb-1.5">How this works</div>
+          <p className="text-[13.5px] text-ink-2 leading-[1.65]">{BROWSE_CONTRACT}</p>
+        </div>
       </div>
 
       {/* City filter tabs */}
@@ -224,22 +252,28 @@ export default function FeedContent() {
         ))}
       </div>
 
-      {/* Quiet category filter */}
+      {/* Quiet category filter. The drawing repeats what the word already says,
+          so it stays decorative and the button keeps its plain accessible name. */}
       <div role="group" aria-label="Filter by category" className="flex items-center gap-1 flex-wrap py-3 mb-2">
         <button type="button" onClick={() => setCategory(null)} aria-pressed={!cat}
-          className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2 py-1 rounded ${
+          className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2.5 py-1.5 rounded ${
           !cat ? 'text-ink bg-cream-2' : 'text-muted hover:text-ink-2'
         }`}>All</button>
         {CATEGORIES.map(c => (
           <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={cat === c}
-            className={`text-[11px] font-mono uppercase tracking-[0.1em] px-2 py-1 rounded ${
+            className={`text-[11px] font-mono uppercase tracking-[0.1em] pl-1.5 pr-2.5 py-1 rounded inline-flex items-center gap-1.5 ${
             cat === c ? 'text-accent bg-[rgba(47,107,63,0.08)]' : 'text-muted hover:text-ink-2'
-          }`}>{c}</button>
+          }`}>
+            <CategoryArt category={c} size={20} tile={false} />
+            {c}
+          </button>
         ))}
       </div>
 
       {/* Plan list - itinerary view */}
       {loading ? (
+        // The skeleton is the shape of a row, so nothing jumps when the real
+        // rows replace it: same stamp column, same rule, same three lines.
         <div className="flex flex-col" role="status" aria-label="Loading plans">
           {[0, 1, 2].map(i => (
             <div key={i} className="flex items-start gap-4 sm:gap-5 py-5 border-b border-[var(--border)] animate-pulse">
@@ -248,6 +282,7 @@ export default function FeedContent() {
                 <div className="h-7 w-9 rounded-lg bg-cream-2"></div>
               </div>
               <div className="w-px self-stretch bg-[var(--border)] flex-shrink-0"></div>
+              <div className="h-9 w-9 rounded-xl bg-cream-2 flex-shrink-0 mt-0.5"></div>
               <div className="flex-1 min-w-0 pt-1">
                 <div className="h-2.5 w-20 rounded bg-cream-2 mb-3"></div>
                 <div className="h-4 w-3/4 max-w-[420px] rounded bg-cream-2 mb-3"></div>
@@ -257,27 +292,18 @@ export default function FeedContent() {
           ))}
         </div>
       ) : failed ? (
-        // No count, no samples, no server detail. Wraps at 320 px because the
-        // block is a single column with no fixed widths.
-        <div role="alert" className="py-8">
-          <div className="bg-cream-2 border-l-[3px] border-danger rounded-r-lg px-5 py-4 max-w-[560px]">
-            <p className="text-[13.5px] text-ink-2 leading-[1.65] mb-4">{FEED_ERROR_BODY}</p>
-            <button type="button" onClick={() => setAttempt(n => n + 1)} className="btn btn-accent btn-sm">
-              {FEED_ERROR_RETRY}
-            </button>
-          </div>
-          <p className="text-[12.5px] text-muted mt-4 max-w-[560px] leading-relaxed">
-            You can still <Link href="/post" className="text-accent font-medium hover:underline">post a plan</Link>{' '}
-            while this is happening.
-          </p>
-        </div>
+        // The whole outage state is one alert, up where the headline goes.
+        // Nothing is repeated down here: a second region would be announced
+        // separately, which is the problem this state was fixing.
+        null
       ) : plans.length === 0 ? (
         <div className="py-10">
           <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-3">What plans here look like</div>
           <div className="grid sm:grid-cols-3 gap-3 mb-12">
             {SAMPLE_PLANS.map(s => (
               <div key={s.cat} className="border border-dashed border-[var(--border2)] rounded-2xl px-4 py-4">
-                <div className="flex items-center gap-1.5 mb-2">
+                <div className="flex items-center gap-1.5 mb-2.5">
+                  <CategoryArt category={s.cat} size={30} />
                   <span className={`tag tag-${s.cat}`}>{s.cat}</span>
                   <span className="text-[10px] font-mono uppercase tracking-wide text-muted">Sample</span>
                 </div>
@@ -287,7 +313,9 @@ export default function FeedContent() {
             ))}
           </div>
           <div className="text-center">
-          <h3 className="font-serif text-[22px] font-bold mb-2">Be the first.</h3>
+          {/* The board is up and bare. Nothing here says anything is broken. */}
+          <EmptyBoardArt width={132} className="text-muted mx-auto mb-4" />
+          <h2 className="font-serif text-[22px] font-bold mb-2">Be the first.</h2>
           <p className="text-[13.5px] text-muted leading-relaxed mb-5 max-w-[400px] mx-auto">
             {emptyNeighborhoodCopy(cityLabel)} The first 50 hosts become Founding members, badge and all.
           </p>
@@ -320,9 +348,11 @@ export default function FeedContent() {
                   {/* Divider */}
                   <div className="w-px self-stretch bg-[var(--border)] flex-shrink-0"></div>
 
-                  {/* Plan content */}
+                  {/* Plan content. The drawing is a second reading of the
+                      category word beside it, so it stays decorative. */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center flex-wrap mb-1.5 text-[10.5px] font-mono uppercase tracking-[0.1em]">
+                      <CategoryArt category={plan.category} size={22} tile={false} className="mr-1.5" />
                       <span className="text-accent">{plan.category}</span>
                       {tags.slice(0, 2).map((t: string) => (
                         <span key={t} className="text-muted">
@@ -330,10 +360,10 @@ export default function FeedContent() {
                         </span>
                       ))}
                     </div>
-                    <h3 className="font-serif text-[17px] sm:text-[18px] font-bold text-ink leading-snug mb-1 tracking-[-0.2px]">
+                    <h2 className="font-serif text-[17px] sm:text-[18px] font-bold text-ink leading-snug mb-1.5 tracking-[-0.2px]">
                       {plan.text.length > 100 ? plan.text.substring(0, 100) + '…' : plan.text}
-                    </h3>
-                    <div className="text-[12px] text-muted flex items-center flex-wrap">
+                    </h2>
+                    <div className="text-[12px] text-muted flex items-center flex-wrap gap-y-1">
                       <Avatar
                         userId={plan.user_id}
                         name={firstNameOf(plan.poster?.name)}
@@ -350,12 +380,14 @@ export default function FeedContent() {
                       {plan.neighborhood?.name && (
                         <>
                           <span className="opacity-40 mx-1.5">·</span>
+                          <PinIcon size={12} className="mr-1" />
                           {plan.neighborhood.name}
                         </>
                       )}
                       {costExpectationLabel(plan.cost_expectation) && (
                         <>
                           <span className="opacity-40 mx-1.5">·</span>
+                          <CoinIcon size={12} className="mr-1" />
                           {costExpectationLabel(plan.cost_expectation)}
                         </>
                       )}
@@ -366,10 +398,16 @@ export default function FeedContent() {
                     </div>
                   </div>
 
-                  {/* Right action column */}
+                  {/* Right action column: the segments draw the same number the
+                      line under them writes out. */}
                   <div className="flex-shrink-0 text-right pt-1 hidden sm:block">
-                    <div className="text-[11px] font-mono text-sage flex items-center gap-1.5 justify-end">
-                      <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block"></span>
+                    <CapacitySegments
+                      spotsLeft={plan.spots_left}
+                      spotsTotal={plan.spots_total}
+                      compact
+                      className="justify-end mb-1.5"
+                    />
+                    <div className="text-[11px] font-mono text-sage">
                       {plan.spots_left} open
                     </div>
                   </div>

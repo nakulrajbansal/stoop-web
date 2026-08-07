@@ -74,6 +74,84 @@ Full technical reference for Stoop. The root `CLAUDE.md` is the quick brief; thi
   message send (`/api/messages` POST), and the plan detail server fetch (`/plan/[slug]`).
   Both directions matter; `getBlockedIds()` returns both. A missed filter is a safety hole.
 
+## Visual system (Aug 2026 storytelling pass)
+The palette, the fonts and the copy rules are unchanged; what was added is a drawing
+vocabulary, three photographs and a small amount of motion. Provenance and the rules
+photography lives under are in `docs/VISUAL_ASSETS.md`.
+
+- **`src/components/CategoryArt.tsx`**: one hand-authored SVG per category (all seven),
+  `currentColor`, no icon runtime. Colour comes from `.cat-{category}` in `globals.css`,
+  which sits next to the matching `.tag-{category}` pill so a drawing and its label
+  cannot disagree. **Decorative by default** (`aria-hidden`), because most surfaces that
+  use it already write the category out; pass `label` only where the art is the only
+  thing carrying the meaning. Two surfaces do: the homepage's featured rows and the
+  composer's pre-publish summary, both of which get their word from `categoryLabelOf`.
+  That helper answers `null` for a stored category we no longer draw, so a legacy row
+  still gets the fallback picture but is never named out loud as something it is not.
+  Sized in **px**, never in percentages: a percentage collapses to zero inside a flex
+  row, which is exactly how the drawings once vanished on the homepage while still
+  rendering in a column.
+- **`src/components/StoopArt.tsx`**: the noticeboard vocabulary (a pinned card, a
+  conversation, a host deciding, a table for four, an empty board, an unplugged line).
+  Each drawing carries `data-art="..."`, which is how tests hold the feed's three states
+  apart. The empty board and the outage plug are deliberately different pictures: an
+  outage must never look like zero supply. The whole outage state (headline, drawing,
+  explanation, retry, and the link to post anyway) is **one** `role="alert"` in the
+  headline slot, with nothing rendered in the list below it. Splitting the headline from
+  the body meant a screen reader heard "that is a problem with Stoop" without ever
+  hearing what had gone wrong; a second region would announce twice.
+- **`src/components/CapacityMeter.tsx`**: segments plus the sentence. The segments are
+  always `aria-hidden`; the sentence (`capacityLabel`) is the fact, and it is the wording
+  the plan page already used. Both readings clamp the total to `GROUP_SPOTS_MAX` (3), so
+  a corrupt row cannot print "9 of 9 spots open" beside three drawn segments.
+- **`src/components/Photograph.tsx`**: the only way a photograph reaches a page. Takes a
+  record from `src/lib/photos.ts` (local file, intrinsic size, alt, caption, blur, credit)
+  and renders `next/image` in **`fill`** mode with real `sizes` and an aspect-ratio box.
+  It is the box, not the intrinsic size, that reserves the layout: `fill` takes no width
+  or height, and the recorded dimensions document the file and pick an honest ratio.
+  The caption "Photograph, not a plan" is **mandatory and has no prop to disable it**;
+  a dark panel restyles it with `captionClassName`. Photography is homepage-only;
+  `src/lib/photos.test.ts` scans the tree (including `src/app/[city]/[hood]/`) and fails
+  if a photo appears on a plan, feed, inbox or profile surface, or if alt text starts
+  implying a member, and `Photograph.test.tsx` renders the component to prove the caption
+  is in the document rather than only in the data.
+- **`src/components/JsonLd.tsx` + `src/lib/json-ld.ts`**: the one authority for structured
+  data, and the only way a block reaches a page. `serializeJsonLd` rewrites `<` and `>` as
+  the JSON escapes `\u003c` and `\u003e` (plus U+2028 and U+2029) **after**
+  `JSON.stringify`, because plan text is user-authored and a plan containing `</script>`
+  would otherwise close the element it is embedded in. Every replacement is a legal JSON string escape, so the payload parses
+  back to the original object and a crawler still reads exactly what the host wrote.
+  **Every JSON-LD block in the app now goes through it**: the three on the homepage, the
+  `SocialEvent` on `src/app/plan/[slug]/page.tsx`, the `BreadcrumbList` on
+  `src/app/[city]/page.tsx`, the `BreadcrumbList` and plan `ItemList` on
+  `src/app/[city]/[hood]/page.tsx`, and the `Article` on `src/app/guides/[slug]/page.tsx`.
+  The plan block was the exploitable one: `name` is raw plan text, `location.name` is the
+  raw meeting spot, and neither is filtered anywhere on the way in. The neighborhood
+  `ItemList` carries plan slugs, which are built from plan text; `slugify` happens to strip
+  everything outside `[a-z0-9-]` on write, but that is a second layer and not the reason the
+  block is safe. `src/app/structured-data.test.tsx` renders the component through
+  `renderToStaticMarkup`, hands the markup to a real HTML parser, and also walks every file
+  under `src/app`, failing on a hand-written `ld+json` script or a `JSON.stringify` fed to
+  `dangerouslySetInnerHTML`. The only hand-written inline script left in the tree is the
+  referrer shim in `layout.tsx`, which inlines a compile-time constant and carries no
+  runtime value.
+- **`src/components/FaqList.tsx`**: native `details`/`summary`. Answers stay in the DOM
+  while closed, so the visible FAQ and the FAQPage structured data still describe the
+  same page. The question is an `h3` **inside** the summary. A summary maps to a button
+  and some browsers present a button's children, so whether that `h3` reaches the heading
+  outline is browser-dependent; the accessible name and the keyboard behaviour are not.
+  The alternatives (wrapping `details` in the heading, or a visually hidden duplicate)
+  are worse, and the reasoning is written out in the component.
+- **Motion** lives in `globals.css`: `stoop-rise` and `stoop-rise-art`, entrance only,
+  `both` fill, opacity and transform only (nothing that reflows), plus `.lift` for
+  hover/focus. The `prefers-reduced-motion` block names `.rise`, `.rise-art`,
+  `.lift:hover`, `.lift:focus-within` and `.meter-seg` explicitly and sets them to their
+  finished state; only `.spinner` is allowed to loop. The two `.lift` selectors must stay
+  identical to the live rule (they drifted once, and pointing at a tile still moved it).
+  `src/lib/visual-system.test.ts` parses the stylesheet and enforces all of that: that no
+  keyframe animates a layout property, that every state the lift moves on is cancelled,
+  and that no entrance delay class is defined without an element wearing it.
+
 ## Supabase query-builder pattern (avoid the orphaned-chain bug)
 Build the base query ending in `.order().limit()`, then apply conditional filters as
 separate reassignments. Do NOT insert an `if` block in the middle of a chain — it strands
