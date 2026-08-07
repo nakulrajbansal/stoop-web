@@ -35,7 +35,9 @@ export type Database = {
       };
       profiles: {
         Row: {
-          id: string; name: string; phone_e164: string;
+          // NULL for a Google or Apple account: the three-path signup release
+          // dropped the NOT NULL, so anything reading this has to guard it.
+          id: string; name: string; phone_e164: string | null;
           phone_verified_at: string | null; city_id: string;
           neighborhood_id: string | null; about: string | null;
           avatar_bg: string; avatar_fg: string; initials: string | null;
@@ -47,7 +49,7 @@ export type Database = {
           digest_opt_out_at: string | null; // 0004
         };
         Insert: {
-          id: string; name: string; phone_e164: string;
+          id: string; name: string; phone_e164?: string | null;
           phone_verified_at?: string | null; city_id: string;
           neighborhood_id?: string | null; about?: string | null;
           avatar_bg?: string; avatar_fg?: string; initials?: string | null;
@@ -57,7 +59,7 @@ export type Database = {
           digest_opt_out_at?: string | null;
         };
         Update: {
-          name?: string; phone_e164?: string;
+          name?: string; phone_e164?: string | null;
           phone_verified_at?: string | null; city_id?: string;
           neighborhood_id?: string | null; about?: string | null;
           avatar_bg?: string; avatar_fg?: string; initials?: string | null;
@@ -199,7 +201,41 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      /**
+       * The only way a profiles row is created, added by
+       * 20260807120000_three_path_signup_expand.sql. Service role only.
+       *
+       * There is no actor id the browser could choose: POST /api/profile takes
+       * p_actor from the verified session and nothing else. Places are named by
+       * SLUG rather than by id, because an id straight off a form is an id
+       * nobody checked. p_notify_email is for phone signups, which have no
+       * provider address; for Google and Apple the function reads the
+       * authoritative one out of auth and refuses a competing one.
+       */
+      create_profile_for_verified_identity: {
+        Args: {
+          p_actor: string;
+          p_provider: 'phone' | 'google' | 'apple';
+          p_name: string;
+          p_city_slug: string;
+          p_neighborhood_slug: string;
+          p_about?: string | null;
+          p_notify_email?: string | null;
+          p_phone?: string | null;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          display_name: string | null;
+          initials: string | null;
+          /** Server side only. Never put in an HTTP response. */
+          notify_email: string | null;
+          /** False on a repeat submit, so exactly one welcome email is sent. */
+          created: boolean;
+        };
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

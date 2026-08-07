@@ -272,6 +272,68 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     is ONE role="alert" holding the headline, the drawing, the explanation, the
     retry and the way out, in the headline slot with nothing in the list below;
     split in two, a screen reader heard the body without the headline.
+- THREE-PATH SIGNUP (Aug 7 2026) is code complete on feature/visual-staging-v2,
+  NOT deployed, NOT staged and NOT committed. Nothing was run against any remote
+  database. Signup now has three independent avenues: Continue with Google,
+  Continue with Apple, or verify a phone. A Google or Apple member is NEVER
+  asked for a phone number, before or after. Phone signup is unchanged.
+  - THE ROW MOVED SERVER SIDE. The browser used to insert its own profiles row
+    and chose the id, the phone number, the timestamp claiming that number was
+    verified, and the notification address. That is gone. POST /api/profile
+    takes the actor from getUser() only (no actor id in the request contract
+    anywhere) and calls create_profile_for_verified_identity, which queries
+    auth.users and auth.identities and NEVER reads user_metadata, because the
+    user can write that. Provider, verified time and social notification address
+    all come from auth. Fixed bounded errors, private/no-store, no SQL internals.
+  - TWO MIGRATIONS, NOT ORDER INDEPENDENT, with the deploy BETWEEN them:
+    20260807120000_three_path_signup_expand.sql runs BEFORE the deploy (drops
+    the NOT NULL on phone_e164, keeps uniqueness for non-null, adds the
+    service-role-only function; the old browser insert still works, proved by
+    probe E9); then deploy; then
+    20260807123000_postdeploy_profile_insert_contract.sql, which drops the 0001
+    insert policy AND revokes INSERT on profiles from anon/authenticated. The
+    revoke is the part that matters: a policy drop leaves a legacy table grant
+    intact. Running the contract file early is an outage on the signup screen.
+    Both are idempotent. Order and rollback boundaries in RUNBOOK "Three-path
+    signup rollout".
+  - PROVIDER SETUP IS AN EXTERNAL BLOCKER and is not done: Supabase Google and
+    Apple providers, a Google OAuth client, an Apple Services ID + Team ID + Key
+    ID + .p8 key. The provider redirect URI is the SUPABASE callback
+    (https://<ref>.supabase.co/auth/v1/callback), NOT a stoop.house URL. The
+    stoop.house/auth/callback origins go in Supabase's redirect allowlist, and
+    NO broad preview wildcard: *.vercel.app there is an account takeover path.
+    Checklist in RUNBOOK. No credential is in the repo or in any NEXT_PUBLIC_ var.
+  - NO APP-SIDE ACCOUNT MERGING, deliberately. Stoop offers Google, Apple and
+    phone as three avenues and implements no manual linking of its own; linking
+    on a matching email is an account takeover path. A phone identity stays
+    separate from the social ones. Supabase itself may link Google and Apple to
+    one account when both carry the same verified, non-relay email, so pressing
+    a different social button does not always produce a second account. The app
+    handles either outcome safely: /api/profile takes the actor from getUser()
+    and create_profile_for_verified_identity is idempotent, so an existing
+    member lands back on their own profile and a genuinely new identity gets a
+    new one. The auth screen asks people to come back the way they joined.
+  - /auth/callback is a server route: it exchanges the code, redirects an
+    existing member to the safe destination and a new one to /auth?step=profile,
+    and answers denial / missing code / failed exchange / anything else with four
+    fixed codes from src/lib/auth-errors.ts. It never repeats what the provider
+    said. Redirect targets go through src/lib/safe-redirect.ts (allowlist: /post,
+    /plan/[slug], else /feed), which both the page and the route share, and the
+    origin is the one the request arrived on, never NEXT_PUBLIC_APP_URL, so a
+    preview tester is not sent to production.
+  - THE WELCOME EMAIL moved behind the boundary. It used to be a browser fetch
+    carrying an address and a name of its choosing, so any session could send a
+    Stoop-branded welcome to anybody. POST /api/profile now sends it from the
+    address Postgres stored, once (a repeat submit returns created:false).
+    /api/welcome is kept but narrowed: it reads no request body at all.
+  - BRAND MARKS: src/components/ProviderMarks.tsx, the official Google G (four
+    brand colors, square viewBox) and Apple logo (one flat black path), inline,
+    no dependency, no request. The ONLY drawings in the app that do not use
+    currentColor: a green Google G is not the Google G. Both are aria-hidden and
+    unfocusable; the accessible name is on the button. Provenance, licence
+    basis and the seven rules are in docs/VISUAL_ASSETS.md "Provider marks".
+  - Analytics is untouched: /auth, /auth/callback and /api/profile are NOT on
+    the allowlist and must not be added. The token count is pinned at 28.
 - CHECKS: `npm test` (vitest) and `npm run typecheck` are the only checks. The
   suite covers analytics-policy, referrer-shim, ops, plan-contract,
   conversation-lifecycle, participants, product-copy, public-plan, metrics,
@@ -290,8 +352,22 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   same 55, none of them new; the "90" recorded here before was stale, and a
   stale ceiling is worse than none). That is why ignoreBuildErrors stays on.
   Do not let it grow.
-  The database is NOT covered by `npm test`: db-migrations.test.ts reads the SQL
-  as text. The executable database proof is the rehearsal in supabase/rehearsal.
+  Three-path signup added: safe-redirect, auth-errors, signup-migrations,
+  database types (nullable phone_e164 and the RPC types), ProviderMarks, the
+  /auth/callback route, POST /api/profile (create.test.ts) and the narrowed
+  /api/welcome. The auth screen's test lost its "no door that is not there"
+  block, which asserted no provider button existed, and gained the three
+  avenues, the OAuth round trip and the rule that a social signup never sees a
+  phone or OTP field.
+  The database is NOT covered by `npm test`: db-migrations.test.ts and
+  signup-migrations.test.ts read the SQL as text. The executable database proof
+  is the rehearsal in supabase/rehearsal, now including
+  06_signup_expand_probes.sql (three accepted identities, ten refusals,
+  idempotency, nullable-but-unique phone, service-role-only execute, and the
+  legacy insert still working) and 07_signup_contract_probes.sql (the browser
+  insert gone by grant and by policy, all three ways in still working). Run each
+  probe file ONCE per container: they are SQL against a real database, not
+  idempotent test cases. races.py needs `--database stoop`.
 
 KEEP THIS SECTION CURRENT: at the end of a working session, update the status here and
 in docs/SAFETY_SPEC.md so the next session starts accurate.

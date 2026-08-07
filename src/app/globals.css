@@ -511,6 +511,28 @@ html:has(.has-sticky-action) {
 .btn-lg { padding: 14px 28px; font-size: 15px; }
 .btn-full { width: 100%; }
 
+/* The two provider buttons on /auth, and the only surface in the app that is
+   deliberately white rather than cream. Google's and Apple's guidelines each
+   specify a white or a black button, and white is the one that lets both marks
+   keep their own color on a light page: the four-color G needs it, and Apple
+   permits a black logo on white. Sized so the tap target holds at 44px and the
+   pair stack rather than compete for one row at 320px. */
+.btn-provider {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--border2);
+  font-size: 14px;
+  font-weight: 600;
+  gap: 10px;
+  min-height: 44px;
+}
+.btn-provider:hover { border-color: rgba(20, 17, 13, 0.4); }
+/* Disabled controls are exempt from the contrast rule, and this is the only
+   place in the app that dims text, precisely because it is a disabled state and
+   not a muted one. */
+.btn-provider:disabled { opacity: 0.55; cursor: default; }
+.btn-provider:disabled:hover { border-color: var(--border2); }
+
 /* Input */
 .input {
   background: var(--card);

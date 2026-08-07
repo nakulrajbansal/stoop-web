@@ -54,8 +54,18 @@ export const MESSAGING_NOT_A_RESERVATION =
 
 export const HOST_REVIEWS_REQUESTS = 'The host reviews each requester before confirming.';
 
+/**
+ * Why signup exists, and what it costs.
+ *
+ * This used to say we ask for a phone number, full stop, because a phone number
+ * was the only way in. There are three now, so the old line would contradict
+ * the two buttons directly above it, on the one screen where somebody is
+ * deciding whether to trust us. It also cannot say "neither is ever shown" any
+ * more: an account may have a phone, an email, or both, and the promise has to
+ * cover whichever it is.
+ */
 export const SIGNUP_REASON =
-  'You only need an account to post or message. We ask for a phone number because it keeps this to real neighbors, and an email so you find out when someone replies. Neither is ever shown on the site.';
+  'You only need an account to post or message. Continue with Google or Apple, or verify a phone number if you would rather not use either. We always need an email so you find out when someone replies. Your email and your phone number are never shown on the site.';
 
 /** The six questions from the product contract, answered in the product. */
 export const CONTRACT_QUESTIONS: { q: string; a: string }[] = [

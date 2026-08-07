@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { sendWelcome } from '@/lib/resend';
 import { NAME_MAX, deriveInitials, normalizeFullName, publicDisplayName } from '@/lib/profile-identity';
 
 /**
@@ -32,8 +33,22 @@ const COPY = {
   place: 'Pick your city and neighborhood.',
   body: 'Could not read that request.',
   read: 'Could not load your profile right now. Try again in a moment.',
-  write: 'Could not save your profile right now. Try again in a moment.'
+  write: 'Could not save your profile right now. Try again in a moment.',
+  // POST only. Each one is fixed copy: a database error must not describe the
+  // schema, and an identity refusal must not describe the identity.
+  provider: 'Pick a way to sign up.',
+  email: 'A valid email is required for notifications.',
+  rejected: 'Some of that could not be saved. Check your details and try again.',
+  identity: 'We could not verify that sign in. Try again, or use your phone number.',
+  duplicate: 'That phone number is already on Stoop. Sign in with it instead.',
+  create: 'Could not create your account right now. Try again in a moment.'
 } as const;
+
+/** The three ways in. A claim, not a fact: the database re-checks it. */
+const PROVIDERS = ['phone', 'google', 'apple'] as const;
+type Provider = (typeof PROVIDERS)[number];
+
+const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
 
@@ -95,6 +110,142 @@ export async function GET(_req: NextRequest) {
         is_founding_member: profile.is_founding_member,
         city: profile.city,
         neighborhood: profile.neighborhood
+      }
+    },
+    { headers: PRIVATE_HEADERS }
+  );
+}
+
+/**
+ * Making an account.
+ *
+ * Until this release the browser inserted its own profiles row: it chose the
+ * id, the phone number, the timestamp claiming that number was verified, and
+ * the address every notification would go to. An RLS policy pinned the id to
+ * auth.uid(), which made the id honest and nothing else.
+ *
+ * That was survivable while a verified phone was the only door. It stops being
+ * survivable the moment a Google session exists, because there is no verified
+ * number in the row to anchor anything to, and "which provider is this" would
+ * become a string the client sends about itself.
+ *
+ * So this route is deliberately thin, and none of the thinking happens here. It
+ * proves who is asking (from the session, never from the body), bounds what
+ * they typed, and hands it to create_profile_for_verified_identity, which goes
+ * and asks auth.users and auth.identities what actually happened. This route
+ * cannot decide that an identity is verified. It only sees a form.
+ *
+ * Two things it refuses to carry. There is no actor id in the request contract,
+ * anywhere. And a Google or Apple signup's notification address is not
+ * forwarded even if the body contains one: the provider owns that address, and
+ * the function would refuse a competing one anyway.
+ */
+export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: COPY.unauthorized }, { status: 401, headers: PRIVATE_HEADERS });
+  }
+
+  const fail = (message: string, status: number) =>
+    NextResponse.json({ error: message }, { status, headers: PRIVATE_HEADERS });
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return fail(COPY.body, 400);
+  }
+
+  const claimed = body?.provider;
+  if (typeof claimed !== 'string' || !PROVIDERS.includes(claimed as Provider)) {
+    return fail(COPY.provider, 400);
+  }
+  const provider = claimed as Provider;
+
+  // The same normalizer the editor and the database use, so the generated
+  // public name really is a first name whichever door somebody came through.
+  const name = normalizeFullName(body?.name);
+  if (!name) return fail(COPY.name, 400);
+  if (name.length > NAME_MAX) return fail(COPY.nameLong, 400);
+
+  const citySlug = typeof body?.city === 'string' ? body.city : '';
+  const hoodSlug = typeof body?.neighborhood === 'string' ? body.neighborhood : '';
+  if (!citySlug || !hoodSlug) return fail(COPY.place, 400);
+
+  const about = typeof body?.about === 'string' ? body.about.trim().slice(0, 140) : '';
+
+  // Only a phone signup carries an email, because only a phone signup has no
+  // provider address to use instead. For Google and Apple this stays null and
+  // the function reads the authoritative one out of auth.
+  let notifyEmail: string | null = null;
+  if (provider === 'phone') {
+    const typed = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    if (!EMAIL_SHAPE.test(typed) || typed.length > 254) return fail(COPY.email, 400);
+    notifyEmail = typed;
+  }
+
+  // Not how the number is chosen. The function takes that from auth.users; this
+  // is a second chance to notice that a session and a form have come apart.
+  const phone = provider === 'phone' && typeof body?.phone === 'string' ? body.phone : null;
+
+  const { data, error } = await supabaseAdmin.rpc('create_profile_for_verified_identity', {
+    p_actor: user.id,
+    p_provider: provider,
+    p_name: name,
+    p_city_slug: citySlug,
+    p_neighborhood_slug: hoodSlug,
+    p_about: about || null,
+    p_notify_email: notifyEmail,
+    p_phone: phone
+  });
+
+  if (error) {
+    const code = (error as { code?: string }).code ?? '';
+    // Two numbers on one account is the one failure worth naming, because the
+    // person can act on it and the action is "sign in instead".
+    if (code === '23505') return fail(COPY.duplicate, 409);
+    if (code === '42501') return fail(COPY.identity, 403);
+    if (code === '22023') return fail(COPY.rejected, 400);
+    console.error('profile create failed:', code);
+    return fail(COPY.create, 503);
+  }
+
+  const created = data as {
+    id: string;
+    name: string;
+    display_name: string | null;
+    initials: string | null;
+    notify_email: string | null;
+    created: boolean;
+  } | null;
+
+  if (!created?.id) {
+    console.error('profile create returned no row');
+    return fail(COPY.create, 503);
+  }
+
+  // The welcome email moved behind this boundary. It used to be a fetch from
+  // the browser carrying an address and a name of its own choosing, which meant
+  // anyone with a session could send a Stoop-branded welcome to anybody. The
+  // recipient is now what Postgres actually stored, and it is sent once: a
+  // repeat submit returns created: false and no second email.
+  if (created.created && created.notify_email) {
+    try {
+      await sendWelcome(created.notify_email, created.name);
+    } catch (err) {
+      // A quiet mailer is not a reason to fail an account that exists.
+      console.error('welcome email failed after signup');
+    }
+  }
+
+  return NextResponse.json(
+    {
+      ok: true,
+      created: created.created,
+      profile: {
+        displayName: created.display_name ?? publicDisplayName(created.name),
+        initials: created.initials
       }
     },
     { headers: PRIVATE_HEADERS }

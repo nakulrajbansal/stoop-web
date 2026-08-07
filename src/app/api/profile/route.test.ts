@@ -49,6 +49,12 @@ vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: (table: string) => builder(table) }
 }));
 
+// POST (account creation, tested in ./create.test.ts) sends the welcome email
+// from this module, so importing the route now constructs a Resend client. Same
+// mock as the conversations and messages routes use, for the same reason: these
+// tests are about GET and PATCH and must not need a mail key.
+vi.mock('@/lib/resend', () => ({ sendWelcome: vi.fn() }));
+
 const ME = {
   id: 'user-me',
   name: 'Ada Lovelace',

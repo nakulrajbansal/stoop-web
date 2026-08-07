@@ -212,6 +212,169 @@ If Supabase tooling ever re-runs `GRANT ALL ON ALL TABLES IN SCHEMA public`, the
 INSERT and UPDATE privileges come back. That is not urgent: the guard trigger
 still refuses a client status change, and re-running step 3 restores the revokes.
 
+## Three-path signup rollout (August 2026, NOT YET RUN)
+
+Google, Apple or phone, each an independent way to make an account. A Google or
+Apple member is never asked for a phone number, so `profiles.phone_e164` stops
+being mandatory and the browser stops writing the row at all.
+
+Two migrations, with the deploy between them. Same expand / deploy / contract
+shape as the uncertainty rollout above, and it runs AFTER that one is finished:
+the contract file here assumes the function from the expand file here, and both
+sort after `20260806090000`.
+
+**Never let a tool run both files back to back.** While these two are pending,
+production is not touched with `supabase db push`, with a bulk "apply all
+migrations" action, or with any auto-applier or CI step that walks the
+migrations directory. Every one of those runs the expand file and the contract
+file consecutively, which revokes the browser's INSERT while the deployed code
+still depends on it, and that is an immediate outage on the signup screen. The
+authoritative sequence is manual expand, deploy the reviewed app, manual
+contract: three steps, run by hand, each confirmed before the next is started.
+
+**Do the provider setup below BEFORE step 2.** The buttons appear the moment the
+code is live, and a button for a provider that is not enabled is a dead control
+on the one screen that has to work.
+
+### Step 1, predeploy (expand)
+
+`supabase/migrations/20260807120000_three_path_signup_expand.sql`
+
+Drops the NOT NULL on `profiles.phone_e164`, asserts the UNIQUE index is still
+there (Postgres treats NULLs as distinct, so social accounts share NULL and two
+people still cannot claim one number), and creates
+`create_profile_for_verified_identity`: SECURITY DEFINER, pinned search_path,
+revoked from PUBLIC/anon/authenticated, granted to service_role only.
+
+Additive. The currently deployed signup screen still inserts its own profiles
+row and still works, which is proved by PROBE E9 in
+`supabase/rehearsal/06_signup_expand_probes.sql`. Safe to re-run.
+
+### Step 2, deploy the reviewed commit
+
+Push the reviewed SHA and wait for Vercel. The new code creates accounts through
+`POST /api/profile`, which calls the function created in step 1, so it is correct
+the moment it is live.
+
+### Step 3, postdeploy (contract). Run after the deploy is serving:
+
+`supabase/migrations/20260807123000_postdeploy_profile_insert_contract.sql`
+
+Drops the 0001 `"Users insert own profile"` policy and revokes INSERT on
+`public.profiles` from anon and authenticated. The revoke is the part that
+matters: a policy drop leaves a legacy table-level grant completely intact. The
+file verifies its own effect and raises if the privilege survived. SELECT, the
+owner UPDATE and every service_role path are deliberately untouched. Safe to
+re-run.
+
+Do not run step 3 before step 2. It breaks the previous release on purpose.
+
+### Verification, after step 3
+
+```sql
+SELECT attnotnull FROM pg_attribute
+ WHERE attrelid = 'public.profiles'::regclass AND attname = 'phone_e164';        -- false
+SELECT has_table_privilege('authenticated','public.profiles','INSERT');          -- false
+SELECT has_table_privilege('anon','public.profiles','INSERT');                   -- false
+SELECT has_table_privilege('authenticated','public.profiles','UPDATE');          -- true, the editor
+SELECT has_function_privilege('service_role',
+  'public.create_profile_for_verified_identity(uuid,text,text,text,text,text,text,text)','EXECUTE');   -- true
+SELECT has_function_privilege('authenticated',
+  'public.create_profile_for_verified_identity(uuid,text,text,text,text,text,text,text)','EXECUTE');   -- false
+```
+
+Then make one real account each way (Google, Apple, phone) and check the row:
+a social account has `phone_e164 IS NULL` and `notify_email` equal to the
+provider address; a phone account has both, and `phone_verified_at` equal to
+`auth.users.phone_confirmed_at`.
+
+### Rollback boundaries
+
+- Between step 1 and step 2: nothing to roll back. Re-running step 1 is safe.
+- Between step 2 and step 3: redeploy the previous SHA. The old code still
+  inserts profiles directly and the grant is still there, which is the point of
+  the order. Anyone who signed up with Google in the meantime keeps their
+  account; the old code just cannot create new social ones.
+- After step 3: rolling the CODE back alone breaks signup, because the browser
+  insert it relies on is gone. Roll back by re-granting in a deliberate
+  follow-up migration, not by redeploying and hoping. In practice, fix forward.
+- Turning a provider off in Supabase is instant and reversible, and it is the
+  right lever if one provider misbehaves. The other two doors keep working.
+
+### Provider enablement checklist (no credentials in this file, ever)
+
+Everything below is configured in the Supabase and provider dashboards. Nothing
+here goes in the repo, in `.env.local`, or in a `NEXT_PUBLIC_` variable. A
+provider client secret in a `NEXT_PUBLIC_` variable is published to every
+visitor's browser.
+
+1. **Supabase, Authentication > Providers > Google.** Enable it. Paste the
+   client ID and client secret from the Google OAuth client. Supabase stores
+   them; the app never sees them.
+2. **Google Cloud Console, APIs & Services > Credentials.** Create an OAuth 2.0
+   Client ID of type "Web application". Its **Authorized redirect URI** is the
+   SUPABASE project auth callback, not a stoop.house URL:
+   `https://<project-ref>.supabase.co/auth/v1/callback`. This is the single most
+   common setup mistake: our `/auth/callback` route is where Supabase sends the
+   person afterwards, and Google never sees it.
+3. **Supabase, Authentication > Providers > Apple.** Enable it. Apple needs
+   four things, all created in the Apple Developer account: a **Services ID**
+   (the client id), the **Team ID**, a **Key ID**, and the **private key** (.p8)
+   for a Sign in with Apple key. Supabase turns those into the client secret
+   itself. The Services ID's Return URL is again the Supabase callback above.
+   Apple also requires the domain to be verified against the same Services ID.
+4. **Supabase, Authentication > URL Configuration.** Add the exact app callback
+   origins to the redirect allowlist:
+   - `https://stoop.house/auth/callback`
+   - `https://www.stoop.house/auth/callback`
+   - one specific protected staging origin if one is used, written out in full.
+   Do NOT add a broad preview wildcard such as
+   `https://*.vercel.app/auth/callback`. Every preview deployment of every fork
+   becomes an accepted redirect target, and that is an account takeover path,
+   not a convenience. Preview testing of the provider buttons needs a named
+   origin added deliberately and removed afterwards.
+5. **Local development.** `http://localhost:3000/auth/callback` is added the
+   same deliberate way. The app builds its redirect from the origin it is
+   actually running on, so nothing else needs changing between environments.
+
+### What to tell somebody who asks
+
+- **Account linking.** Stoop implements no manual account linking and does no
+  merging of its own. A phone account stays separate whatever happens: the phone
+  identity carries no provider email in auth, so there is nothing for anything
+  to match it against, and somebody who joined by phone comes back by phone.
+  Google and Apple are not guaranteed to stay separate from each other. Supabase
+  GoTrue can attach a second social identity to an existing user by itself when
+  the new provider presents the SAME verified, non-relay email address, so a
+  Google member who later presses Continue with Apple may land back in the
+  account they already had. An Apple private relay address usually breaks that
+  match, so in practice the two social doors usually do stay apart. Do not
+  promise anybody that Google and Apple always make separate accounts. Either
+  outcome is safe in the staged code: `create_profile_for_verified_identity`
+  reads `auth.identities` for the provider actually being claimed rather than
+  for whichever identity happens to be there, and `/auth/callback` sends
+  somebody who already has a profile straight to their destination instead of
+  building a second one. What is deliberately absent is app-side linking on a
+  matching email address, because linking two identities on the strength of an
+  address is how accounts get taken over by whoever controls that address.
+- **Apple private relay.** An Apple member's email may be
+  `something@privaterelay.appleid.com`. That is a real, working address and
+  Stoop stores it as the notification address. It keeps working as long as the
+  member does not turn off forwarding in their Apple ID settings.
+- **Apple sends a name once.** Apple shares the person's name on the FIRST
+  authorization only, and never again. The profile form works with no name
+  prefilled, which is the normal case for anyone who has authorized before.
+- **A duplicate phone number** is refused with fixed copy telling them to sign
+  in with it instead. That is the only signup failure that names a cause.
+
+### If an auth-provider readiness check is ever added
+
+It may expose booleans and nothing else: whether Google is on, whether Apple is
+on. Never a client id, never a redirect URI, never a settings object. And it
+must not become a request on every render of the auth screen; the buttons are
+static and a failed provider is already handled by fixed copy on the way back.
+Nothing in this release adds one.
+
 ## Local migration rehearsal (no credentials, no production)
 
 Runs the whole migration chain against a throwaway Postgres and probes the lifecycle.
@@ -226,12 +389,43 @@ psql < supabase/rehearsal/01_live_drift.sql         # columns production has, th
 for f in supabase/migrations/000[2-6]*.sql supabase/migrations/20260803*.sql supabase/migrations/202608052*.sql; do psql < "$f"; done
 # Expand state: the deployed release still works, the new functions are ready.
 docker exec -i stoop-rehearsal psql -U postgres -d stoop -v ON_ERROR_STOP=1 < supabase/rehearsal/04_expand_state_probes.sql
-# Then the postdeploy migration, and the contract-state probes.
+# Three-path signup, expand half: the function accepts phone, Google and Apple,
+# refuses everything else, and the OLD browser insert still works (probe E9).
+psql < supabase/migrations/20260807120000_three_path_signup_expand.sql
+docker exec -i stoop-rehearsal psql -U postgres -d stoop -v ON_ERROR_STOP=1 < supabase/rehearsal/06_signup_expand_probes.sql
+# Then the postdeploy migrations, and the contract-state probes.
 psql < supabase/migrations/20260806090000_postdeploy_boundary_hardening.sql
 docker exec -i stoop-rehearsal psql -U postgres -d stoop -v ON_ERROR_STOP=1 < supabase/rehearsal/02_probes.sql
 docker exec -i stoop-rehearsal psql -U postgres -d stoop -v ON_ERROR_STOP=1 < supabase/rehearsal/03_api_role_probes.sql
+psql < supabase/migrations/20260807123000_postdeploy_profile_insert_contract.sql
+docker exec -i stoop-rehearsal psql -U postgres -d stoop -v ON_ERROR_STOP=1 < supabase/rehearsal/07_signup_contract_probes.sql
+# Two-session races, last, against the fully migrated database. Note the
+# database flag: the script defaults to `postgres` and this container is `stoop`.
+python supabase/rehearsal/races.py --container stoop-rehearsal --database stoop
 docker rm -f stoop-rehearsal
 ```
+
+Run each probe file ONCE per container. They are ordinary SQL against a real
+database, not idempotent test cases: a second run of `02_probes.sql` fails on
+state the first run left behind, which looks exactly like a regression and is
+not one.
+
+`06_signup_expand_probes.sql` covers the creation function: a verified phone
+signup taking its number and its verified time from auth, a Google signup with
+no phone and the provider address, an Apple signup with a private relay address,
+and ten refusals (an email/password identity, an unknown provider, a provider
+claimed only in user metadata, an unconfirmed phone, a mismatched phone, an
+actor id that is not an auth user, a neighborhood in the other city, a social
+caller naming its own notification address, a malformed email, an over-long name
+and about line). Then a double submit returning the existing row untouched,
+NULL phones coexisting while a real number stays unique, service-role-only
+execute, and the legacy insert still working. It ends with
+`ALL EXPAND-STATE SIGNUP PROBES PASSED`.
+
+`07_signup_contract_probes.sql` acts as `anon` and `authenticated` and proves
+the browser insert is gone by grant and by policy, that all three ways in still
+work through the function, and that reads and the owner edit are untouched. It
+ends with `ALL CONTRACT-STATE SIGNUP PROBES PASSED`.
 
 `02_probes.sql` runs as the owner and covers the lifecycle: service-role-only execute,
 pinned search paths, the old trigger being replaced, confirm taking the last spot, a

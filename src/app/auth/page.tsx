@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -8,46 +8,73 @@ import { toE164 } from '@/lib/utils';
 import { toAvatarJpeg } from '@/lib/avatar-image';
 import { neighborhoodsForCity } from '@/lib/neighborhoods';
 import { SIGNUP_REASON } from '@/lib/product-copy';
-import { NAME_MAX, deriveInitials, normalizeFullName } from '@/lib/profile-identity';
+import { NAME_MAX, normalizeFullName } from '@/lib/profile-identity';
+import { authErrorCopy } from '@/lib/auth-errors';
+import { carriedNext, safeDestination, safeMode } from '@/lib/safe-redirect';
+import { AppleMark, GoogleMark } from '@/components/ProviderMarks';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 
-type Step = 'phone' | 'otp' | 'profile' | 'photo';
+/**
+ * `resuming` is the moment after an OAuth round trip, while the session is
+ * being read. It exists so a Google member never sees the phone field flash up
+ * before the profile form replaces it.
+ */
+type Step = 'resuming' | 'phone' | 'otp' | 'profile' | 'photo';
+
+type Provider = 'phone' | 'google' | 'apple';
+
+const PROVIDER_UNAVAILABLE =
+  'That way in is not available right now. Try the other one, or use your phone number.';
+
+/**
+ * The first name a provider shared, if it shared one. Only ever a prefill in a
+ * field the person can edit, and the server normalizes and bounds whatever is
+ * finally submitted. Apple sends a name on the FIRST authorization and never
+ * again, so absent is the normal case, not an error.
+ */
+function givenNameFrom(metadata: unknown): string {
+  const meta = (metadata ?? {}) as Record<string, unknown>;
+  const candidate = [meta.given_name, meta.name, meta.full_name].find(
+    value => typeof value === 'string' && value.trim()
+  );
+  return normalizeFullName(candidate).split(' ')[0]?.slice(0, NAME_MAX) ?? '';
+}
 
 function AuthContent() {
   const router = useRouter();
   const supabase = createClient();
   const searchParams = useSearchParams();
-  // Where to land after auth: back to a half-written plan, or back to the
-  // plan they wanted to join. Only known-safe internal paths are honored.
+
+  // Where to land after auth: back to a half-written plan, or back to the plan
+  // they wanted to join. The rule lives in src/lib/safe-redirect.ts because the
+  // server callback route has to apply exactly the same one.
   const rawNext = searchParams.get('next') ?? '';
-  const destination =
-    rawNext === 'post' ? '/post'
-    : /^\/plan\/[a-z0-9-]+$/i.test(rawNext) ? rawNext
-    : '/feed';
-  // Someone arriving mid-plan needs a different first line than someone
-  // arriving cold: they already know what Stoop is, they want to know why they
-  // are being asked for a number and whether their draft survived.
-  const fromDraft = rawNext === 'post';
+  const destination = safeDestination(rawNext);
+  const fromDraft = destination === '/post';
   const fromPlan = destination.startsWith('/plan/');
 
-  // Which door they came through. The header offers Sign up and Sign in as
-  // separate actions because that is what people look for, but there is one
-  // screen behind both and one way to authenticate: the phone verification
-  // below. So `mode` labels this page and does nothing else. It is read here,
-  // in the render, and never inside sendOtp or verifyOtp, because the moment it
-  // reaches those the label has become a second flow to keep correct.
+  // Which door they came through. There are three ways to authenticate now, but
+  // still one screen behind Sign up and Sign in, so `mode` labels this page and
+  // does nothing else. It is read here, in the render, and never inside sendOtp
+  // or verifyOtp, because the moment it reaches those the label has become a
+  // second flow to keep correct.
   //
   // The label is only allowed to be accurate. Somebody who arrives on the
   // sign-in door with a number Stoop has never seen is going to be asked for a
   // name and an email, and the panel below says so before they type anything.
-  const mode = searchParams.get('mode') === 'signin' ? 'signin' : 'signup';
-  // Swapping doors must not lose where they were headed. Only a destination
-  // that already survived the sanitizer above is put back into a URL.
-  const carriedNext = fromDraft ? 'post' : fromPlan ? destination : '';
-  const carry = carriedNext ? `&next=${encodeURIComponent(carriedNext)}` : '';
+  const mode = safeMode(searchParams.get('mode'));
+  const carried = carriedNext(rawNext);
+  const carry = carried ? `&next=${encodeURIComponent(carried)}` : '';
 
-  const [step, setStep] = useState<Step>('phone');
+  // Set by the server callback route when somebody came back from a provider
+  // with a session and no profile yet.
+  const resuming = searchParams.get('step') === 'profile';
+
+  const [step, setStep] = useState<Step>(resuming ? 'resuming' : 'phone');
+  const [provider, setProvider] = useState<Provider>('phone');
+  const [identityEmail, setIdentityEmail] = useState('');
+  const [oauthBusy, setOauthBusy] = useState<'google' | 'apple' | null>(null);
   const [phone, setPhone] = useState('');
   const [phoneE164, setPhoneE164] = useState('');
   const [email, setEmail] = useState('');
@@ -56,13 +83,83 @@ function AuthContent() {
   const [city, setCity] = useState('nyc');
   const [neighborhood, setNeighborhood] = useState('');
   const [about, setAbout] = useState('');
-  const [error, setError] = useState('');
+  // A failure coming back from the callback arrives as a fixed code. Whatever
+  // is actually in the parameter, only fixed copy is ever shown.
+  const [error, setError] = useState(searchParams.get('err') ? authErrorCopy(searchParams.get('err')) : '');
   const [loading, setLoading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const hoods = neighborhoodsForCity(city);
+  const isSocial = provider !== 'phone';
+
+  // Coming back from Google or Apple. The session is the authority on who this
+  // is; app_metadata.provider is read only to decide what to show, and the
+  // database re-checks the identity against auth.identities before it writes
+  // anything, so a wrong guess here cannot become a wrong row.
+  useEffect(() => {
+    if (!resuming) return;
+    let cancelled = false;
+
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (!user) {
+        setError('That sign in did not finish. Try again.');
+        setStep('phone');
+        return;
+      }
+
+      const claimed = (user.app_metadata as { provider?: string } | undefined)?.provider;
+      const resolved: Provider = claimed === 'google' ? 'google' : claimed === 'apple' ? 'apple' : 'phone';
+      setProvider(resolved);
+      setIdentityEmail(typeof user.email === 'string' ? user.email : '');
+      if (resolved !== 'phone') {
+        const given = givenNameFrom(user.user_metadata);
+        if (given) setName(given);
+      }
+      setStep('profile');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resuming]);
+
+  async function continueWith(chosen: 'google' | 'apple') {
+    if (oauthBusy) return;
+    setError('');
+    setOauthBusy(chosen);
+
+    try {
+      // Built from the origin this page is actually on, never from a configured
+      // production URL: a preview tester bounced to production authenticates
+      // against the wrong database and will not find their account afterwards.
+      const back = new URL('/auth/callback', window.location.origin);
+      if (carried) back.searchParams.set('next', carried);
+      if (mode === 'signin') back.searchParams.set('mode', mode);
+
+      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider: chosen,
+        options: { redirectTo: back.toString() }
+      });
+
+      if (oauthErr) {
+        // Never the provider's own words, and never a claim that it worked.
+        setError(PROVIDER_UNAVAILABLE);
+        setOauthBusy(null);
+        return;
+      }
+      // On success the browser is already navigating away. The buttons stay
+      // disabled so a second tap cannot start a second round trip.
+    } catch {
+      setError(PROVIDER_UNAVAILABLE);
+      setOauthBusy(null);
+    }
+  }
 
   async function sendOtp() {
     setError('');
@@ -124,6 +221,7 @@ function AuthContent() {
       if (profile) {
         router.push(destination);
       } else {
+        setProvider('phone');
         setStep('profile');
       }
     } catch (e) {
@@ -135,47 +233,52 @@ function AuthContent() {
 
   async function completeProfile() {
     setError('');
-    // The same normalizer the profile editor and /api/profile use. profiles.name
-    // is what Postgres generates display_name from, so a name joined by a pasted
-    // no-break space has to be stored the same way here as anywhere else, or the
-    // initials next to it would describe a different name than the one on show.
+    // The same normalizer the profile editor, /api/profile and the database
+    // use. profiles.name is what Postgres generates display_name from, so a
+    // name joined by a pasted no-break space has to be stored the same way here
+    // as anywhere else, or the initials next to it would describe a different
+    // name than the one on show.
     const fullName = normalizeFullName(name);
     if (!fullName) { setError('Name required'); return; }
     if (fullName.length > NAME_MAX) { setError(`Name has to be ${NAME_MAX} characters or fewer`); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) { setError('A valid email is required for notifications'); return; }
+    // A Google or Apple account has a provider address and does not type one.
+    if (!isSocial && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      setError('A valid email is required for notifications');
+      return;
+    }
     if (!neighborhood) { setError('Pick your neighborhood'); return; }
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError('Session expired. Sign in again.'); setLoading(false); return; }
-
-      const { data: cityRow } = await supabase.from('cities').select('id').eq('slug', city).single();
-      if (!cityRow) throw new Error('City not found');
-      const { data: nb } = await supabase.from('neighborhoods')
-        .select('id').eq('city_id', cityRow.id).eq('slug', neighborhood).single();
-
-      // display_name is not written here, and cannot be: Postgres generates it
-      // from the column below, so signup and the editor cannot drift apart.
-      const { error: insErr } = await supabase.from('profiles').insert({
-        id: user.id,
-        name: fullName,
-        phone_e164: phoneE164,
-        phone_verified_at: new Date().toISOString(),
-        city_id: cityRow.id,
-        neighborhood_id: nb?.id ?? null,
-        about: about.trim() || null,
-        notify_email: email.trim().toLowerCase(),
-        initials: deriveInitials(fullName)
+      // The browser no longer writes this row. It cannot: it has no way to
+      // prove which identity it holds, and the provider, the verified time and
+      // the notification address all have to come from auth rather than from
+      // this form. The server verifies the session and the database verifies
+      // the identity.
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          name: fullName,
+          city,
+          neighborhood,
+          about: about.trim() || undefined,
+          ...(isSocial
+            ? {}
+            : {
+                email: email.trim().toLowerCase(),
+                ...(phoneE164 ? { phone: phoneE164 } : {})
+              })
+        })
       });
 
-      if (insErr) { setError(insErr.message); setLoading(false); return; }
-
-      // Fire welcome email (non-blocking)
-      fetch('/api/welcome', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), name: fullName })
-      }).catch(() => {});
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (!res.ok) {
+        setError(data?.error || 'Could not save profile');
+        setLoading(false);
+        return;
+      }
 
       setStep('photo');
     } catch (e) {
@@ -218,30 +321,14 @@ function AuthContent() {
         </h2>
         <p className="text-sm text-muted">
           {fromDraft
-            ? 'Your plan is saved. Verify a number and it goes live.'
+            ? 'Your plan is saved. One way in and it goes live.'
             : fromPlan
-              ? 'Verify a number, then send your message.'
+              ? 'Pick a way in, then send your message.'
               : mode === 'signin'
-                ? 'Sign in with the number you used before.'
+                ? 'Come back in the same way you signed up.'
                 : 'Real plans from people in your neighborhood.'}
         </p>
       </div>
-
-      {/* What happens next, and why we are asking, before the first field. */}
-      {step === 'phone' && (
-        <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-6">
-          <p className="text-[13px] text-ink-2 leading-relaxed mb-2">
-            {fromDraft
-              ? 'Next: verify a number, add your name and email, then your saved plan goes live.'
-              : fromPlan
-                ? 'Next: verify a number, add your name and email, then you land back on that plan and can message the host. Messaging does not reserve a spot; the host confirms it.'
-                : mode === 'signin'
-                  ? 'Next: verify your number and you are back in. If this number is new to Stoop, you will be asked for a name and email, and that signs you up.'
-                  : 'Next: verify a number, add your name and email. Browsing never needed an account; posting and messaging do.'}
-          </p>
-          <p className="text-[12px] text-muted leading-relaxed">{SIGNUP_REASON}</p>
-        </div>
-      )}
 
       {error && (
         <div role="alert" className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4">
@@ -249,43 +336,93 @@ function AuthContent() {
         </div>
       )}
 
+      {step === 'resuming' && (
+        <p className="py-16 text-center text-muted text-sm">Signing you in…</p>
+      )}
+
       {step === 'phone' && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="auth-phone" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your phone number</label>
-            <input id="auth-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" value={phone}
-              onChange={e => setPhone(e.target.value)} className="input" />
-            <p className="text-[11px] text-muted mt-1.5">Real mobile only. Google Voice and Burner numbers won&apos;t work.</p>
-            <p className="text-[11px] text-muted mt-1">
-              Your number just proves you&apos;re a real person. It&apos;s never shown to anyone, and we don&apos;t text you beyond the code.
+        <>
+          {/* Three ways in, and the two that need no typing come first. */}
+          <div className="flex flex-col gap-3 mb-1">
+            <button type="button" onClick={() => continueWith('google')} disabled={!!oauthBusy}
+              className="btn btn-provider btn-full">
+              {oauthBusy === 'google' ? <span className="spinner" /> : <GoogleMark size={18} />}
+              Continue with Google
+            </button>
+            <button type="button" onClick={() => continueWith('apple')} disabled={!!oauthBusy}
+              className="btn btn-provider btn-full">
+              {oauthBusy === 'apple' ? <span className="spinner" /> : <AppleMark size={18} />}
+              Continue with Apple
+            </button>
+          </div>
+          <p className="text-[11px] text-muted text-center mt-2.5 leading-relaxed">
+            Any Google account works, including a Gmail address. Neither one is asked for a phone number.
+          </p>
+
+          <div className="flex items-center gap-3 my-6">
+            <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
+            <span className="text-[11px] font-mono uppercase tracking-wider text-muted">or use your phone</span>
+            <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+
+          {/* What happens next, and why we are asking, before the first field. */}
+          <div className="bg-cream-2 border-l-[3px] border-accent rounded-r-lg px-4 py-3 mb-6">
+            <p className="text-[13px] text-ink-2 leading-relaxed mb-2">
+              {fromDraft
+                ? 'Next: verify a number, add your name and email, then your saved plan goes live.'
+                : fromPlan
+                  ? 'Next: verify a number, add your name and email, then you land back on that plan and can message the host. Messaging does not reserve a spot; the host confirms it.'
+                  : mode === 'signin'
+                    ? 'Next: verify your number and you are back in. If this number is new to Stoop, you will be asked for a name and email, and that signs you up.'
+                    : 'Next: verify a number, add your name and email. Browsing never needed an account; posting and messaging do.'}
+            </p>
+            <p className="text-[12px] text-muted leading-relaxed">{SIGNUP_REASON}</p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <label htmlFor="auth-phone" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your phone number</label>
+              <input id="auth-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" value={phone}
+                onChange={e => setPhone(e.target.value)} className="input" />
+              <p className="text-[11px] text-muted mt-1.5">Real mobile only. Google Voice and Burner numbers won&apos;t work.</p>
+              <p className="text-[11px] text-muted mt-1">
+                Your number just proves you&apos;re a real person. It&apos;s never shown to anyone, and we don&apos;t text you beyond the code.
+              </p>
+            </div>
+            <button type="button" onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
+              {loading ? <span className="spinner" /> : 'Send code →'}
+            </button>
+
+            {/* People come back through whichever door they used, so that is
+                what this line asks for. Saying it costs one line; not saying it
+                costs a support conversation about a plan somebody cannot find. */}
+            <p className="text-[12px] text-muted text-center leading-[1.6]">
+              Come back the same way you joined and your plans will be where you left them. If you signed up with your phone number, sign in with it.
+            </p>
+
+            {/* The way across to the other door. It matters most on a phone,
+                where the header has room for Browse, Post a plan and Sign up but
+                not for Sign in as well, so this is where an existing member finds
+                their footing. Both links land on this same screen. */}
+            <p className="text-[12.5px] text-muted text-center leading-[1.6]">
+              {mode === 'signin' ? (
+                <>
+                  New to Stoop?{' '}
+                  <Link href={`/auth?mode=signup${carry}`} className="underline underline-offset-2 hover:text-ink">
+                    Sign up
+                  </Link>
+                </>
+              ) : (
+                <>
+                  Already have an account?{' '}
+                  <Link href={`/auth?mode=signin${carry}`} className="underline underline-offset-2 hover:text-ink">
+                    Sign in
+                  </Link>
+                </>
+              )}
             </p>
           </div>
-          <button type="button" onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
-            {loading ? <span className="spinner" /> : 'Send code →'}
-          </button>
-          {/* The way across to the other door. It matters most on a phone,
-              where the header has room for Browse, Post a plan and Sign up but
-              not for Sign in as well, so this is where an existing member finds
-              their footing. Both links land on this same screen and this same
-              phone step; all that changes is what it is called. */}
-          <p className="text-[12.5px] text-muted text-center leading-[1.6]">
-            {mode === 'signin' ? (
-              <>
-                New to Stoop?{' '}
-                <Link href={`/auth?mode=signup${carry}`} className="underline underline-offset-2 hover:text-ink">
-                  Sign up
-                </Link>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <Link href={`/auth?mode=signin${carry}`} className="underline underline-offset-2 hover:text-ink">
-                  Sign in
-                </Link>
-              </>
-            )}
-          </p>
-        </div>
+        </>
       )}
 
       {step === 'otp' && (
@@ -329,10 +466,15 @@ function AuthContent() {
           </div>
           <div>
             <label htmlFor="auth-email" className="text-[11px] font-mono uppercase tracking-wider text-muted block mb-1.5">Your email</label>
-            <input id="auth-email" type="email" inputMode="email" autoComplete="email" placeholder="e.g. you@example.com" value={email}
-              onChange={e => setEmail(e.target.value)} className="input" maxLength={254} aria-describedby="auth-email-why" />
+            <input id="auth-email" type="email" inputMode="email" autoComplete="email" placeholder="e.g. you@example.com"
+              value={isSocial ? identityEmail : email}
+              onChange={e => setEmail(e.target.value)}
+              readOnly={isSocial}
+              className="input" maxLength={254} aria-describedby="auth-email-why" />
             <p id="auth-email-why" className="text-[11px] text-muted mt-1.5">
-              This is how you hear that someone joined. There is no app to check.
+              {isSocial
+                ? 'This came from the account you just used, so there is nothing to type. It is how you hear that someone joined, and it is never shown on the site.'
+                : 'This is how you hear that someone joined. There is no app to check.'}
             </p>
           </div>
           <div>

@@ -63,8 +63,28 @@ describe('the contract a visitor reads before signing up', () => {
 
   it('explains what signup is for, and what stays private', () => {
     expect(SIGNUP_REASON).toMatch(/post or message/i);
-    expect(SIGNUP_REASON).toMatch(/phone/i);
     expect(SIGNUP_REASON).toMatch(/email/i);
+  });
+
+  it('no longer says a phone number is the price of an account', () => {
+    // Three doors now. A line that still reads "we ask for a phone number"
+    // contradicts the two buttons directly above it, and the contradiction is
+    // on the one screen where a visitor is deciding whether to trust us.
+    expect(SIGNUP_REASON).not.toMatch(/we ask for a phone/i);
+    expect(SIGNUP_REASON).not.toMatch(/(need|require|requires|must have)[^.]{0,30}phone/i);
+  });
+
+  it('names all three ways in, so the copy matches the buttons', () => {
+    expect(SIGNUP_REASON).toMatch(/google/i);
+    expect(SIGNUP_REASON).toMatch(/apple/i);
+    expect(SIGNUP_REASON).toMatch(/phone/i);
+  });
+
+  it('still states the privacy fact, and states it accurately', () => {
+    // "Neither is ever shown" was true when there were exactly two things. It
+    // has to stay true now that an account may have a phone, an email, or both.
+    expect(SIGNUP_REASON).toMatch(/never shown|not shown|never shows/i);
+    expect(SIGNUP_REASON).not.toMatch(/\bneither\b/i);
   });
 });
 

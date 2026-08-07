@@ -183,3 +183,42 @@ filter and not an upscale.
    `public/photos`, if the alt text implies a member, if a caption reappears in
    the data or in the markup, if the provenance is not written down here, or if
    the photograph has been used anywhere other than the marketing surface.
+
+## Provider marks (Google and Apple)
+
+Added by the three-path signup release. These are the only drawings in the app
+that are not ours, and the only ones that do not use `currentColor`. They live
+in `src/components/ProviderMarks.tsx`, inline, with no runtime dependency and no
+network request.
+
+| Mark | Where it came from | Licence / permission | Colors | Geometry |
+|---|---|---|---|---|
+| Google "G" | Google Identity branding guidelines for "Sign in with Google" (developers.google.com/identity/branding-guidelines). Retrieved 7 August 2026. | Google trademark, used under the branding guidelines for a sign-in button that starts a Google OAuth flow. Not licensed to us; used as permitted, not owned. | `#4285F4`, `#34A853`, `#FBBC05`, `#EA4335` | Four paths on a square `0 0 18 18` canvas |
+| Apple logo | Apple "Sign in with Apple" Human Interface Guidelines button specification (developer.apple.com/design/human-interface-guidelines/sign-in-with-apple). Retrieved 7 August 2026. | Apple trademark, used under the Sign in with Apple button guidance. Not licensed to us. | `#000000`, one flat fill | One path on `0 0 814 1000`, taller than wide |
+
+### The rules that come with them
+
+1. **They are the real marks, not lookalikes.** A redrawn Google G or a
+   stand-in shape for the Apple logo is not a smaller version of the right
+   thing; it is a wrong trademark. To somebody deciding whether to hand over an
+   identity, a wrong logo reads as a phishing page. `provider-marks.test.tsx`
+   pins the four Google hex values, the single Apple path, and both viewBoxes.
+2. **Proportions are preserved.** Both are drawn with a viewBox and a
+   `preserveAspectRatio` default, so a square box letterboxes the Apple mark
+   rather than stretching it. Squashing a trademark is a misuse.
+3. **No recoloring.** The house rule everywhere else is `currentColor`. Here it
+   is banned: a green Google G is not the Google G. Apple asks for one flat
+   color, and black is the one for a light background. Stoop has no dark mode,
+   so there is no second case to handle.
+4. **They are decoration.** `aria-hidden="true"`, `focusable="false"`, no
+   `<title>`, no `role="img"`. The accessible name is on the parent button
+   ("Continue with Google"), which is where a screen reader should hear it once.
+5. **No endorsement.** Nothing on the screen or in the file says partner,
+   official, approved or endorsed. The buttons say what they do: they start a
+   sign-in with that provider.
+6. **The label is the provider's name.** "Continue with Google", not "Continue
+   with Gmail". A Gmail address signs in through Google; that is said in a
+   separate line of body copy, never on the button.
+7. **If either company changes its mark or its guidance**, replace the path data
+   and update the retrieval date in the table above. Do not tidy, simplify or
+   re-trace the geometry.

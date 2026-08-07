@@ -20,7 +20,10 @@ describe('migration numbering', () => {
     expect(files).toContain(CLARITY);
     expect(files).toContain(WITHDRAWAL);
     expect(files).toContain(HARDENING);
-    const previous = files.filter(f => ![CLARITY, WITHDRAWAL, HARDENING].includes(f));
+    // Only the files that predate this trio. Later releases add later
+    // timestamps of their own, and they have their own ordering tests
+    // (src/lib/signup-migrations.test.ts); they are not "previous".
+    const previous = files.filter(f => f < CLARITY);
     for (const file of previous) {
       // The repo numbers old migrations 000N and new ones by timestamp, so a
       // timestamped name has to sort last either way.
