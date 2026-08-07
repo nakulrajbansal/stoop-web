@@ -3,6 +3,13 @@ import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
+import Photograph from '@/components/Photograph';
+import FaqList from '@/components/FaqList';
+import JsonLd from '@/components/JsonLd';
+import CategoryArt, { CATEGORIES, CATEGORY_LABELS, categoryLabelOf } from '@/components/CategoryArt';
+import { BrowseArt, MessageArt, HostChoosesArt, TableArt, EmptyBoardArt } from '@/components/StoopArt';
+import { CalendarIcon, MessageIcon, CheckCircleIcon, UsersIcon, UndoIcon, NoteIcon } from '@/components/icons';
+import { PHOTOS } from '@/lib/photos';
 import { createClient } from '@/lib/supabase/server';
 import { firstNameOf } from '@/lib/participants';
 import {
@@ -25,7 +32,8 @@ export const metadata: Metadata = {
 };
 
 // Visible on the page AND mirrored into FAQPage structured data below, so
-// Google can show these as rich results. Keep the two in sync.
+// Google can show these as rich results. Every answer is in the DOM even when
+// its disclosure is closed, which is why the two can still be in sync.
 const FAQ = [
   {
     q: 'What is Stoop?',
@@ -49,6 +57,25 @@ const FAQ = [
     a: 'Every member verifies a real phone number, groups are capped at four people, plans happen in public places, and blocking and reporting are built in. Blocking is instant and mutual, and every report is read.'
   }
 ];
+
+// One drawing per step, in the step's own order. Kept next to the copy it
+// illustrates so a fifth step cannot quietly arrive without a picture.
+const STEP_ART = [BrowseArt, MessageArt, HostChoosesArt, TableArt];
+
+// A mark per contract question, chosen by what the question is about rather
+// than by position, so re-ordering the six cannot silently mismatch them.
+const QUESTION_ICON: { match: RegExp; Icon: typeof CalendarIcon }[] = [
+  { match: /what is this/i, Icon: NoteIcon },
+  { match: /what will i see/i, Icon: CalendarIcon },
+  { match: /when i message/i, Icon: MessageIcon },
+  { match: /who decides/i, Icon: CheckCircleIcon },
+  { match: /see the group/i, Icon: UsersIcon },
+  { match: /change my mind/i, Icon: UndoIcon }
+];
+
+function iconFor(question: string) {
+  return QUESTION_ICON.find(entry => entry.match.test(question))?.Icon ?? NoteIcon;
+}
 
 function weekOfLabel(): string {
   const now = new Date();
@@ -89,7 +116,9 @@ export default async function HomePage() {
   const week = weekOfLabel();
 
   // ItemList structured data: lets Google read the featured plans as a
-  // ranked list on the homepage (carousel-eligible rich result).
+  // ranked list on the homepage (carousel-eligible rich result). The names
+  // here are plan text a neighbor typed, which is why every block on this page
+  // goes out through JsonLd rather than straight into a script element.
   const itemListJsonLd = plans && plans.length > 0 ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -104,9 +133,7 @@ export default async function HomePage() {
 
   return (
     <>
-      {itemListJsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
-      )}
+      {itemListJsonLd && <JsonLd data={itemListJsonLd} />}
       <Nav />
 
       <PageMain>
@@ -126,9 +153,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Hero with featured plans index */}
+      {/* Hero: proposition on the left, a photograph and the board on the right */}
       <section className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-2 pb-12 sm:pb-16">
-        <div className="grid sm:grid-cols-[1.1fr,1fr] gap-10 sm:gap-16 items-start">
+        <div className="grid sm:grid-cols-[1.02fr,1fr] gap-10 sm:gap-14 items-start">
           {/* Left column: headline + CTA */}
           <div>
             {/* Fluid from 320px up: the old 56px floor overflowed the line on a
@@ -161,188 +188,265 @@ export default async function HomePage() {
             </p>
           </div>
 
-          {/* Right column: featured plans index */}
-          <div className="pt-2">
-            <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-ink/15">
-              <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-ink-2">Featured this week</div>
-              {planCount > 0 && totalSpots > 0 && (
-                <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted">{totalSpots} open</div>
-              )}
-            </div>
+          {/* Right column: a photograph, then the board itself. The picture is
+              atmosphere and says so; the plans under it are the real thing. */}
+          <div className="rise rise-1">
+            <Photograph
+              photo={PHOTOS.sidewalkTable}
+              priority
+              aspect="3 / 2"
+              sizes="(max-width: 640px) 92vw, 46vw"
+              frameClassName="photo-frame-organic"
+            />
 
-            {!plans || plans.length === 0 ? (
-              <div className="py-2">
-                {/* Empty week: show what a plan looks like instead of a void */}
-                <div className="border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-4">
-                  {/* Labelled Sample for the same reason the feed's are: it is
-                      an illustration, and it is not in any count on this page. */}
-                  <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">
-                    Sample · what a plan looks like
-                  </div>
-                  <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
-                    going to the farmers market saturday morning, making coffee after…
-                  </div>
-                  <div className="text-[11.5px] text-muted">
-                    Saturday, 9am
-                    <span className="opacity-40 mx-1">·</span>
-                    2 spots
-                    <span className="opacity-40 mx-1">·</span>
-                    your neighborhood
-                  </div>
-                </div>
-                <p className="text-[13px] text-muted leading-relaxed mb-4">
-                  {emptyNeighborhoodCopy()}{' '}
-                  <span className="text-gold-2">First 50 hosts become Founding members.</span>
-                </p>
-                <div className="text-center">
-                  <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
-                </div>
+            <div className="mt-6 sm:mt-7">
+              <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-ink/15">
+                <h2 className="text-[11px] font-mono uppercase tracking-[0.1em] text-ink-2">Featured this week</h2>
+                {planCount > 0 && totalSpots > 0 && (
+                  <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted">{totalSpots} open</div>
+                )}
               </div>
-            ) : (
-              <div className="flex flex-col">
-                {plans.map((plan: any) => (
-                  <Link key={plan.id} href={`/plan/${plan.slug}`}
-                    className="group flex items-start gap-3 py-3.5 border-b border-[var(--border)] last:border-0 hover:bg-cream-2/60 -mx-3 px-3 rounded-md transition-colors">
-                    <Avatar
-                      userId={plan.user_id}
-                      name={firstNameOf(plan.poster?.name)}
-                      initials={plan.poster?.initials}
-                      bg={plan.poster?.avatar_bg}
-                      fg={plan.poster?.avatar_fg}
-                      size={34}
-                      radius={10}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-0.5">
-                        {plan.text.length > 70 ? plan.text.substring(0, 70) + '…' : plan.text}
+
+              {!plans || plans.length === 0 ? (
+                <div className="py-1">
+                  {/* Empty week: show what a plan looks like instead of a void */}
+                  <div className="border border-dashed border-[var(--border2)] rounded-xl px-4 py-4 mb-4 flex items-start gap-3">
+                    <CategoryArt category="coffee" size={38} className="mt-0.5" />
+                    <div className="min-w-0">
+                      {/* Labelled Sample for the same reason the feed's are: it is
+                          an illustration, and it is not in any count on this page. */}
+                      <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-1.5">
+                        Sample · what a plan looks like
+                      </div>
+                      <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-1 opacity-70">
+                        going to the farmers market saturday morning, making coffee after…
                       </div>
                       <div className="text-[11.5px] text-muted">
-                        {firstNameOf(plan.poster?.name)}
+                        Saturday, 9am
                         <span className="opacity-40 mx-1">·</span>
-                        {plan.when_day}
-                        {plan.when_time_specific && `, ${plan.when_time_specific}`}
-                        {!plan.when_time_specific && plan.when_time && `, ${plan.when_time.toLowerCase()}`}
+                        2 spots
                         <span className="opacity-40 mx-1">·</span>
-                        {plan.neighborhood?.name}
+                        your neighborhood
                       </div>
                     </div>
-                    <div className="text-[11px] font-medium whitespace-nowrap mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {plan.status === 'full' || plan.spots_left === 0 ? (
-                        <span className="text-muted">Full ✓</span>
-                      ) : (
-                        <span className="text-accent">{plan.spots_left} open →</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
+                  </div>
+                  <div className="flex items-start gap-3 mb-4">
+                    <EmptyBoardArt width={58} className="text-muted flex-shrink-0 mt-0.5" />
+                    <p className="text-[13px] text-muted leading-relaxed">
+                      {emptyNeighborhoodCopy()}{' '}
+                      <span className="text-gold-2">First 50 hosts become Founding members.</span>
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <Link href="/post" className="btn btn-accent btn-sm">Post a plan →</Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {plans.map((plan: any) => (
+                    <Link key={plan.id} href={`/plan/${plan.slug}`}
+                      className="group flex items-start gap-3 py-3.5 border-b border-[var(--border)] last:border-0 hover:bg-cream-2/60 -mx-3 px-3 rounded-md transition-colors">
+                      {/* The one surface where the category is not written out:
+                          these rows have no room for the word the feed shows,
+                          so the drawing carries an accessible name instead and
+                          the link reads "Coffee, going to the farmers market…".
+                          A category we no longer draw names itself nothing, and
+                          the plan text still says what it is. */}
+                      <CategoryArt
+                        category={plan.category}
+                        size={38}
+                        className="mt-0.5"
+                        label={categoryLabelOf(plan.category) ?? undefined}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-serif text-[15px] font-bold text-ink leading-snug mb-0.5">
+                          {plan.text.length > 70 ? plan.text.substring(0, 70) + '…' : plan.text}
+                        </div>
+                        <div className="text-[11.5px] text-muted flex items-center flex-wrap gap-y-0.5">
+                          <Avatar
+                            userId={plan.user_id}
+                            name={firstNameOf(plan.poster?.name)}
+                            initials={plan.poster?.initials}
+                            bg={plan.poster?.avatar_bg}
+                            fg={plan.poster?.avatar_fg}
+                            size={18}
+                            radius={6}
+                            className="mr-1.5"
+                          />
+                          {firstNameOf(plan.poster?.name)}
+                          <span className="opacity-40 mx-1">·</span>
+                          {plan.when_day}
+                          {plan.when_time_specific && `, ${plan.when_time_specific}`}
+                          {!plan.when_time_specific && plan.when_time && `, ${plan.when_time.toLowerCase()}`}
+                          <span className="opacity-40 mx-1">·</span>
+                          {plan.neighborhood?.name}
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-medium whitespace-nowrap mt-1">
+                        {plan.status === 'full' || plan.spots_left === 0 ? (
+                          <span className="text-muted">Full ✓</span>
+                        ) : (
+                          <span className="text-accent">{plan.spots_left} open →</span>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="bg-cream-2 py-16 sm:py-20 border-y border-[var(--border)]">
+      {/* How it works: the sequence drawn, one line of copy each. Every fact the
+          short lines leave out is stated in the section below this one. */}
+      <section aria-labelledby="how-it-works-heading" className="bg-cream-2 py-14 sm:py-20 border-y border-[var(--border)]">
         <div className="max-w-[1080px] mx-auto px-5 sm:px-9">
           <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">How it works</div>
-          <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
+          <h2 id="how-it-works-heading" className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05]">
             Four steps, and <em className="italic text-gold">no guessing.</em>
           </h2>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-[2px] mt-10 rounded-2xl overflow-hidden bg-[var(--border)]">
-            {CONTRACT_STEPS.map(step => (
-              <div key={step.n} className="bg-cream p-8">
-                {/* Accent at 16% composites to 1.24:1 on cream, which is not
-                    readable. At 75% it is 3.29:1, clearing the 3:1 large-text
-                    threshold at 64px bold. Still a tint rather than solid
-                    accent, so the numeral stays quieter than the heading. */}
-                <div className="font-serif text-[64px] font-bold tracking-[-3px] leading-none text-[rgba(47,107,63,0.75)] mb-3">{step.n}</div>
-                <h3 className="font-serif text-[20px] font-bold tracking-tight mb-2">{step.title}</h3>
-                <p className="text-[13.5px] text-ink-2 leading-[1.65] font-light">{step.body}</p>
-              </div>
-            ))}
+          <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mt-9 list-none">
+            {CONTRACT_STEPS.map((step, i) => {
+              const Art = STEP_ART[i];
+              // No connector rule between the cards: this list clips its own
+              // overflow to keep the header band inside the rounded corner, so
+              // anything drawn outside the card was never painted at any
+              // viewport. The numerals carry the order.
+              return (
+                <li key={step.n} className="bg-cream border border-[var(--border)] rounded-2xl overflow-hidden">
+                  <div className="bg-[rgba(47,107,63,0.05)] border-b border-[var(--border)] py-6 flex items-center justify-center">
+                    <Art width={112} className="text-accent" />
+                  </div>
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] font-mono tracking-[0.1em] text-[rgba(47,107,63,0.9)]">{step.n}</span>
+                      <span aria-hidden="true" className="w-4 h-px bg-[var(--border2)]"></span>
+                    </div>
+                    <h3 className="font-serif text-[19px] font-bold tracking-tight mb-1.5">{step.title}</h3>
+                    <p className="text-[13.5px] text-ink-2 leading-[1.6] font-light">{step.short}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </section>
+
+      {/* What people post: the seven categories, drawn, each a way into the feed */}
+      <section aria-labelledby="categories-heading" className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-14 sm:pt-20">
+        <div className="grid sm:grid-cols-[0.85fr,1fr] gap-8 sm:gap-12 items-center">
+          <Photograph
+            photo={PHOTOS.parkPath}
+            aspect="4 / 3"
+            sizes="(max-width: 640px) 92vw, 40vw"
+            frameClassName="photo-frame-organic"
+          />
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">What people post</div>
+            <h2 id="categories-heading" className="font-serif text-[clamp(26px,4vw,40px)] font-bold tracking-[-1.2px] leading-[1.05] mb-3">
+              Seven kinds of <em className="italic text-gold">ordinary week.</em>
+            </h2>
+            <p className="text-[13.5px] text-ink-2 leading-[1.7] font-light mb-6 max-w-[460px]">
+              A plan is something you were doing anyway, with room for a few neighbors. Pick a kind to see what is
+              on the board this week.
+            </p>
+            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 list-none">
+              {CATEGORIES.map(cat => (
+                <li key={cat}>
+                  <Link href={`/feed?category=${cat}`}
+                    className="lift flex items-center gap-2.5 bg-card border border-[var(--border)] rounded-xl px-3 py-2.5 hover:border-accent/40">
+                    <CategoryArt category={cat} size={34} />
+                    <span className="text-[13px] font-medium text-ink">{CATEGORY_LABELS[cat]}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
       {/* Before you sign up: the whole contract, in the product rather than in
-          the terms. Six questions a first time visitor actually has. */}
-      <section aria-labelledby="before-signup-heading" className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-16 sm:pt-20">
+          the terms. Six questions a first time visitor actually has, as cards
+          rather than as one column of prose. */}
+      <section aria-labelledby="before-signup-heading" className="max-w-[1080px] mx-auto px-5 sm:px-9 pt-14 sm:pt-20">
         <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">Before you sign up</div>
         <h2 id="before-signup-heading" className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-4">
           What you are <em className="italic text-gold">actually agreeing to.</em>
         </h2>
-        <p className="text-[14px] text-ink-2 leading-[1.7] max-w-[620px] mb-10">{BROWSE_CONTRACT}</p>
-        <dl className="grid sm:grid-cols-2 gap-x-12 gap-y-7">
-          {CONTRACT_QUESTIONS.map(item => (
-            <div key={item.q}>
-              <dt className="font-serif text-[18px] font-bold tracking-tight mb-1.5">{item.q}</dt>
-              <dd className="text-[13.5px] text-ink-2 leading-[1.7] font-light">{item.a}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="text-[14px] text-ink-2 leading-[1.7] max-w-[620px] mb-8">{BROWSE_CONTRACT}</p>
+        <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 list-none">
+          {CONTRACT_QUESTIONS.map(item => {
+            const Icon = iconFor(item.q);
+            return (
+              <li key={item.q} className="bg-card border border-[var(--border)] rounded-2xl p-5">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(47,107,63,0.09)] text-accent mb-3">
+                  <Icon size={16} />
+                </span>
+                <h3 className="font-serif text-[17px] font-bold tracking-tight mb-1.5">{item.q}</h3>
+                <p className="text-[13px] text-ink-2 leading-[1.65] font-light">{item.a}</p>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
-      {/* Common questions: real content for visitors, FAQPage data for Google */}
-      <section className="max-w-[1080px] mx-auto px-5 sm:px-9 py-16 sm:py-20">
+      {/* Common questions: real content for visitors, FAQPage data for Google.
+          Closed by default, open one at a time, all answers still in the DOM. */}
+      <section aria-labelledby="faq-heading" className="max-w-[1080px] mx-auto px-5 sm:px-9 py-14 sm:py-20">
         <div className="text-[11px] font-mono uppercase tracking-[0.1em] text-muted mb-2">Common questions</div>
-        <h2 className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-10">
+        <h2 id="faq-heading" className="font-serif text-[clamp(28px,4vw,44px)] font-bold tracking-[-1.2px] leading-[1.05] mb-6">
           Asked and <em className="italic text-gold">answered.</em>
         </h2>
-        <div className="grid sm:grid-cols-2 gap-x-12 gap-y-8">
-          {FAQ.map(item => (
-            <div key={item.q}>
-              <h3 className="font-serif text-[18px] font-bold tracking-tight mb-1.5">{item.q}</h3>
-              <p className="text-[13.5px] text-ink-2 leading-[1.7] font-light">{item.a}</p>
-            </div>
-          ))}
-        </div>
+        <FaqList items={FAQ} />
       </section>
 
       {/* Structured data for search engines */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebSite',
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'Stoop',
+          url: 'https://www.stoop.house',
+          description: 'A neighborhood noticeboard for plans in NYC and Austin. Post what you are already doing this week; a few neighbors join you.',
+          publisher: {
+            '@type': 'Organization',
             name: 'Stoop',
-            url: 'https://www.stoop.house',
-            description: 'A neighborhood noticeboard for plans in NYC and Austin. Post what you are already doing this week; a few neighbors join you.',
-            publisher: {
-              '@type': 'Organization',
-              name: 'Stoop',
-              url: 'https://www.stoop.house'
-            }
-          })
+            url: 'https://www.stoop.house'
+          }
         }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: FAQ.map(item => ({
-              '@type': 'Question',
-              name: item.q,
-              acceptedAnswer: { '@type': 'Answer', text: item.a }
-            }))
-          })
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: FAQ.map(item => ({
+            '@type': 'Question',
+            name: item.q,
+            acceptedAnswer: { '@type': 'Answer', text: item.a }
+          }))
         }}
       />
 
       {/* CTA */}
-      <section className="px-5 sm:px-9 my-16 sm:my-20">
-        <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl px-6 sm:px-12 py-12 sm:py-20 flex items-center justify-between gap-8 flex-wrap relative overflow-hidden">
+      <section className="px-5 sm:px-9 my-14 sm:my-20">
+        <div className="max-w-[1080px] mx-auto bg-ink rounded-3xl overflow-hidden grid sm:grid-cols-[1fr,240px] items-center gap-8 sm:gap-10 px-6 sm:px-12 py-10 sm:py-14">
           <div>
             <h2 className="font-serif text-[clamp(26px,6.5vw,46px)] font-bold tracking-[-1.2px] leading-[1.05] text-cream mb-2">
               The best plans are<br /><em className="italic text-[#D4A93C]">three blocks away.</em>
             </h2>
-            <p className="text-[14px] text-cream/60 font-light leading-relaxed">Post yours this week. See which neighbors turn up.</p>
+            <p className="text-[14px] text-cream/60 font-light leading-relaxed mb-6">Post yours this week. See which neighbors turn up.</p>
+            <Link href="/post" className="btn btn-lg bg-cream text-ink hover:bg-white justify-center w-full sm:w-auto">Post your first plan →</Link>
           </div>
-          <Link href="/post" className="btn btn-lg bg-cream text-ink hover:bg-white justify-center w-full sm:w-auto">Post your first plan →</Link>
+          {/* Same caption as every other photograph on the page, in cream
+              because this panel is ink. It reads at 8.2:1 there. */}
+          <Photograph
+            photo={PHOTOS.coffeeCounter}
+            sizes="(max-width: 640px) 88vw, 240px"
+            frameClassName="photo-frame-organic aspect-[5/2] sm:aspect-square border-cream/15"
+            captionClassName="text-cream/70"
+          />
         </div>
       </section>
       </PageMain>

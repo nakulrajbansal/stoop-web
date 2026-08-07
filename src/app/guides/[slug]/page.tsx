@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
+import JsonLd from '@/components/JsonLd';
 import type { Metadata } from 'next';
 
 // Evergreen guide pages: the honest, useful version of SEO content. Each one
@@ -131,18 +132,19 @@ export default async function GuidePage({ params }: { params: Params }) {
       </PageMain>
       <Footer />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Article',
-            headline: guide.title,
-            description: guide.description,
-            author: { '@type': 'Organization', name: 'Stoop', url: 'https://www.stoop.house' },
-            publisher: { '@type': 'Organization', name: 'Stoop', url: 'https://www.stoop.house' },
-            mainEntityOfPage: `https://www.stoop.house/guides/${slug}`
-          })
+      {/* Every value here is written in this file and the slug is one of the
+          two keys of GUIDES, so nothing user-authored reaches this block. It
+          still goes out through JsonLd: structured data has exactly one way
+          onto a page, and an exception is how the next one gets missed. */}
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: guide.title,
+          description: guide.description,
+          author: { '@type': 'Organization', name: 'Stoop', url: 'https://www.stoop.house' },
+          publisher: { '@type': 'Organization', name: 'Stoop', url: 'https://www.stoop.house' },
+          mainEntityOfPage: `https://www.stoop.house/guides/${slug}`
         }}
       />
     </>

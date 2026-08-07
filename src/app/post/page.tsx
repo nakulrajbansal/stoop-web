@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import PlanSummary from '@/components/PlanSummary';
+import CategoryArt from '@/components/CategoryArt';
 import { INTENT_TAGS, getDateChips, intentTagLabel } from '@/lib/utils';
 import {
   COST_EXPECTATIONS,
@@ -292,7 +293,13 @@ export default function PostPage() {
           </div>
         )}
 
-        <div className="space-y-8">
+        {/* has-sticky-action: the publish bar below is pinned to the bottom of
+            the viewport, so a control the browser scrolls "just into view"
+            (which is what tabbing to it does) can land underneath it. The class
+            gives everything focusable in here enough scroll margin to clear the
+            bar. Measured at 320px: keyboard focus on the last category button
+            used to land it flush with the viewport bottom, under the bar. */}
+        <div className="space-y-8 has-sticky-action">
           <div>
             <label htmlFor="plan-text" className="text-[12px] font-mono uppercase tracking-wider text-muted block mb-2">
               Your plan
@@ -321,14 +328,18 @@ export default function PostPage() {
           <div role="group" aria-labelledby="plan-category-label">
             <h2 id="plan-category-label" className="text-[12px] font-mono uppercase tracking-wider text-muted mb-2">What kind of plan?</h2>
             <p className="text-[12px] text-muted mb-3">Just for the feed filter.</p>
-            <div className="flex gap-1.5 flex-wrap">
+            {/* The drawing is the one the feed and the plan page use, so a host
+                picks the picture their plan will actually carry. The word stays
+                inside the button, so the accessible name is unchanged. */}
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {CATEGORIES.map(c => (
                 <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={category === c}
-                  className={`px-4 py-2 rounded-full border text-[13px] ${
+                  className={`lift flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-2xl border text-[12.5px] ${
                     category === c
-                      ? 'bg-accent border-accent text-white font-medium'
+                      ? 'bg-[rgba(47,107,63,0.07)] border-accent text-ink font-medium'
                       : 'bg-card border-[var(--border2)] text-ink-2 hover:border-accent/40 hover:text-ink'
                   }`}>
+                  <CategoryArt category={CATEGORY_IDS[c]} size={36} />
                   {c}
                 </button>
               ))}
@@ -477,6 +488,7 @@ export default function PostPage() {
               intentTags: selectedTags.map(intentTagLabel)
             }}
             missing={needsHood ? [...issues, { field: 'hood', label: 'a neighborhood' }] : issues}
+            category={CATEGORY_IDS[category]}
             onFix={focusField}
           />
 

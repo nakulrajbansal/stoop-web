@@ -162,18 +162,79 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     conversations per plan, confirmed and withdrawn shares, repeat hosts, blocks,
     reports). Counts only. The new private routes are NOT on the analytics
     allowlist and must not be added.
+- VISUAL STORYTELLING (Aug 2026) is code complete and needs no migration, no env
+  var and no ops step: it is presentation only. Full detail in
+  docs/ARCHITECTURE.md "Visual system" and docs/VISUAL_ASSETS.md.
+  - DRAWINGS, not an icon package: src/components/CategoryArt.tsx (one authored
+    SVG per category, all seven) and src/components/StoopArt.tsx (pinned card,
+    conversation, host deciding, table for four, empty board, unplugged line).
+    currentColor throughout, sized in px, decorative (aria-hidden) wherever the
+    category or the state is already written next to them. Category ink and wash
+    live in globals.css beside the matching .tag-* pill.
+    On the two surfaces that do NOT write the category out (the homepage's
+    featured rows and the composer's pre-publish summary) the art gets an
+    accessible name from categoryLabelOf, which answers null for a stored
+    category we no longer draw rather than calling it Coffee out loud.
+  - PHOTOGRAPHY: exactly three CC0 photographs in public/photos (148,230 bytes
+    total), homepage only, always through src/components/Photograph.tsx, always
+    captioned "Photograph, not a plan". There is NO prop to switch the caption
+    off. No photograph shows an identifiable face and nobody in one may be
+    presented as a member; the hero does contain distant pedestrians, cropped
+    below the shoulder. No alt text may mention a host, member or attendee.
+    Provenance (source page, creator, licence, download date, encode recipe) is
+    in docs/VISUAL_ASSETS.md. A photograph must never appear on a plan, feed,
+    inbox or profile surface; the test scans for it, including the /[city]/[hood]
+    neighborhood routes.
+  - STRUCTURED DATA: every JSON-LD block in the app goes through
+    src/components/JsonLd.tsx, which escapes < and > (and U+2028/U+2029) after
+    JSON.stringify (src/lib/json-ld.ts). Plan text is user-authored, and a plan
+    containing "</script>" would otherwise have closed the script element.
+    That is now the ONE authority and there are no exceptions: the homepage's
+    three blocks, the SocialEvent on /plan/[slug], the BreadcrumbList on
+    /[city], the BreadcrumbList and plan ItemList on /[city]/[hood], and the
+    Article on /guides/[slug]. The plan block was the exploitable one, since
+    its name is raw plan text and its location is the raw meeting spot.
+    src/app/structured-data.test.tsx holds the line: it parses the rendered
+    component with a real HTML parser and walks every file under src/app,
+    failing on a hand-written ld+json script or a JSON.stringify handed to
+    dangerouslySetInnerHTML. The only inline script written by hand anywhere in
+    src/app is the referrer shim in layout.tsx, which inlines a compile-time
+    constant and carries no runtime value.
+  - MOTION: entrance only (.rise, .rise-art), opacity and transform, one run, no
+    loops but the spinner. prefers-reduced-motion names them explicitly and
+    leaves them in their finished state, and its .lift selectors must stay
+    identical to the live rule (:hover and :focus-within). No animation library,
+    no new dependency. The composer's form carries .has-sticky-action, which
+    gives its controls scroll-margin-bottom so tabbing to one cannot land it
+    under the pinned publish bar.
+  - THE SURFACES: homepage (image-led hero with the live board under it, drawn
+    four-step sequence, category tiles into the feed, contract cards, FAQ as
+    native details), feed (category art per row, capacity segments, distinct
+    loading/empty/outage graphics), plan detail (category header band, capacity
+    meter, logistics still directly under the title), composer (visual category
+    picker, illustrated pre-publish summary). Product facts, copy and API
+    behaviour are unchanged; CONTRACT_STEPS gained a `short` line for the drawn
+    sequence and the full `body` is still the contract. The feed's outage state
+    is ONE role="alert" holding the headline, the drawing, the explanation, the
+    retry and the way out, in the headline slot with nothing in the list below;
+    split in two, a screen reader heard the body without the headline.
 - CHECKS: `npm test` (vitest) and `npm run typecheck` are the only checks. The
   suite covers analytics-policy, referrer-shim, ops, plan-contract,
   conversation-lifecycle, participants, product-copy, public-plan, metrics,
-  blocks, db-migrations, busy-buttons, analytics-private-routes, the plans and
-  conversations and participants routes, and the three components (PlanSummary,
-  RequesterCard, ConfirmedRoster). Component tests run on jsdom with React
+  blocks, db-migrations, busy-buttons, analytics-private-routes, photos,
+  visual-system, json-ld, structured-data (the plan, city, neighborhood and
+  guide blocks), the homepage's shape, the plans and conversations and
+  participants routes, and the components (PlanSummary, RequesterCard,
+  ConfirmedRoster, CategoryArt, CapacityMeter, FaqList, Photograph). Component tests run on jsdom with React
   Testing Library, opted into per file with a `@vitest-environment jsdom`
   docblock; everything else stays on the node environment. The `lint` script was
   REMOVED: it ran `next lint`, which Next 15.5 deprecates, and with no ESLint
   installed it dropped into an interactive prompt that hangs. This project has no
   linter. Typecheck baseline was 103 inherited errors from @supabase/ssr's stale
-  types and is now 90; that is why ignoreBuildErrors stays on. Do not let it grow.
+  types and is now 55 (measured Aug 2026 on origin/main AND on this branch: the
+  same 55, none of them new; the "90" recorded here before was stale, and a
+  stale ceiling is worse than none). That is why ignoreBuildErrors stays on.
+  Do not let it grow.
   The database is NOT covered by `npm test`: db-migrations.test.ts reads the SQL
   as text. The executable database proof is the rehearsal in supabase/rehearsal.
 

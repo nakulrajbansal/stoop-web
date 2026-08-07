@@ -7,6 +7,7 @@ import { firstNameOf } from '@/lib/participants';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
+import JsonLd from '@/components/JsonLd';
 import PlanDetailClient from './PlanDetailClient';
 import type { Metadata } from 'next';
 
@@ -101,7 +102,9 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
   }
 
   // Machine-readable event data for Google. Only when the plan has a real
-  // date; a dateless plan is not a valid Event for rich results.
+  // date; a dateless plan is not a valid Event for rich results. The name,
+  // the location and the organizer's first name are all typed by a neighbor,
+  // so this block goes out through JsonLd rather than straight into a script.
   const isFullEvent = plan.status === 'full' || plan.spots_left === 0;
   const paidTag = Array.isArray(plan.intent_tags) && plan.intent_tags.includes('paid');
   // The stated cost expectation wins over the older vibe tag. A plan that never
@@ -150,9 +153,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ slu
   // link points at, rather than gaining it only after hydration.
   return (
     <>
-      {eventJsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
-      )}
+      {eventJsonLd && <JsonLd data={eventJsonLd} />}
       <Nav />
       <PageMain className="max-w-[720px] mx-auto px-6 py-10 pb-20">
         <Suspense fallback={<div className="py-10 text-center text-muted text-sm">Loading…</div>}>

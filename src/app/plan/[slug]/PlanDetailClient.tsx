@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
 import ConfirmedRoster from '@/components/ConfirmedRoster';
-import { CalendarIcon, PinIcon, ShareIcon, CheckCircleIcon, NoteIcon } from '@/components/icons';
+import CategoryArt, { isCategory } from '@/components/CategoryArt';
+import CapacityMeter from '@/components/CapacityMeter';
+import { CalendarIcon, ClockIcon, PinIcon, CoinIcon, ShareIcon, CheckCircleIcon, NoteIcon } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { intentTagLabel } from '@/lib/utils';
 import { costExpectationLabel, COST_EXPECTATION_HINTS } from '@/lib/plan-contract';
@@ -104,6 +106,9 @@ export default function PlanDetailClient({
 
   const isOwn = currentUser === plan.user_id;
   const isFull = plan.spots_left === 0 || plan.status === 'full';
+  // A plan stored with a category we no longer draw still gets a header; it
+  // falls back to the coffee tokens rather than rendering an untinted band.
+  const categoryKey = isCategory(plan.category) ? plan.category : 'coffee';
   const u = plan.poster;
   const tags = plan.intent_tags ?? [];
   const hostFirstName = firstNameOf(u?.name);
@@ -137,16 +142,23 @@ export default function PlanDetailClient({
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap mb-4">
-        <span className={`tag tag-${plan.category}`}>{plan.category}</span>
-        {tags.map((t: string) => (
-          <span key={t} className="text-[10.5px] font-medium tracking-wide text-ink-2 bg-cream-2 px-2 py-[3px] rounded-full">
-            {intentTagLabel(t)}
-          </span>
-        ))}
+      {/* Category header. The drawing is the only new thing above the plan
+          text, and the logistics chips stay exactly where they were: directly
+          under the title, above anything else. */}
+      <div className={`cat-${categoryKey} rise-art flex items-center gap-3.5 rounded-2xl border border-[var(--border)] px-4 py-3 mb-5`}
+        style={{ background: 'var(--cat-wash)' }}>
+        <CategoryArt category={plan.category} size={44} tile={false} />
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <span className={`tag tag-${plan.category}`}>{plan.category}</span>
+          {tags.map((t: string) => (
+            <span key={t} className="text-[10.5px] font-medium tracking-wide text-ink-2 bg-cream/70 px-2 py-[3px] rounded-full">
+              {intentTagLabel(t)}
+            </span>
+          ))}
+        </div>
       </div>
 
-      <h1 className="font-serif text-[clamp(22px,3.5vw,32px)] font-normal italic leading-snug mb-8">
+      <h1 className="font-serif text-[clamp(22px,3.5vw,32px)] font-normal italic leading-snug mb-7">
         {plan.text}
       </h1>
 
@@ -154,8 +166,14 @@ export default function PlanDetailClient({
         <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
           <CalendarIcon className="text-muted flex-shrink-0" />
           {plan.when_day}
-          {plan.when_time_specific ? ` · ${plan.when_time_specific}` : plan.when_time ? ` · ${plan.when_time}` : ''}
         </div>
+        {(plan.when_time_specific || plan.when_time) && (
+          <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
+            <ClockIcon className="text-muted flex-shrink-0" />
+            <span className="sr-only">Time: </span>
+            {plan.when_time_specific ? plan.when_time_specific : plan.when_time}
+          </div>
+        )}
         {plan.spot ? (
           <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
             <PinIcon className="text-muted flex-shrink-0" />{plan.spot}{plan.neighborhood && `, ${plan.neighborhood.name}`}
@@ -170,7 +188,7 @@ export default function PlanDetailClient({
         )}
         {costLabel && (
           <div className="flex items-center gap-1.5 text-[13px] text-ink-2 bg-cream-2 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-            <span aria-hidden="true" className="text-muted">$</span>
+            <CoinIcon className="text-muted flex-shrink-0" />
             <span className="sr-only">Cost: </span>{costLabel}
           </div>
         )}
@@ -188,9 +206,13 @@ export default function PlanDetailClient({
           Who is hosting
         </h2>
         <div className="flex items-start gap-3.5">
+          {/* First name only, like every other public surface. The alt text
+              this becomes is public HTML, so the full display name must not
+              reach it: the private roster below is the only place a last name
+              is ever allowed to appear. */}
           <Avatar
             userId={u.id ?? plan.user_id}
-            name={u.name}
+            name={hostFirstName}
             initials={u.initials}
             bg={u.avatar_bg}
             fg={u.avatar_fg}
@@ -216,13 +238,14 @@ export default function PlanDetailClient({
           all, since the answer is always 401. */}
       <ConfirmedRoster planId={plan.id} enabled={Boolean(currentUser)} />
 
-      <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-4 flex items-center justify-between mb-6">
-        <div>
-          <div className="text-[12px] text-muted">Spots available</div>
-          <div className={`text-[15px] font-semibold ${isFull ? 'text-muted' : 'text-accent'}`}>
-            {isFull ? 'This plan is full' : `${plan.spots_left} of ${plan.spots_total} spot${plan.spots_total > 1 ? 's' : ''} open`}
-          </div>
-        </div>
+      {/* Capacity, drawn and written. One segment per spot the host offered,
+          filled where it is still open; the sentence beside it is the fact. */}
+      <div className="bg-cream-2 border border-[var(--border)] rounded-xl px-5 py-4 mb-6">
+        <div className="text-[12px] text-muted mb-2">Spots available</div>
+        <CapacityMeter
+          spotsLeft={isFull ? 0 : plan.spots_left}
+          spotsTotal={plan.spots_total}
+        />
       </div>
 
       {error && <div className="bg-danger/10 border border-danger/25 text-danger text-[13px] rounded-xl px-4 py-3 mb-4" role="alert">{error}</div>}

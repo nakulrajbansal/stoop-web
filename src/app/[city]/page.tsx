@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
+import JsonLd from '@/components/JsonLd';
 import { supabasePublic } from '@/lib/supabase/public';
 import type { Metadata } from 'next';
 
@@ -121,17 +122,17 @@ export default async function CityPage({ params }: { params: Params }) {
       </PageMain>
       <Footer />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
-              { '@type': 'ListItem', position: 2, name: found.name, item: `https://www.stoop.house/${found.slug}` }
-            ]
-          })
+      {/* Structured data goes out through JsonLd, which is the one thing that
+          escapes it. The city name and slug are stored values rather than
+          literals here, so the block is not the page's to serialize. */}
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
+            { '@type': 'ListItem', position: 2, name: found.name, item: `https://www.stoop.house/${found.slug}` }
+          ]
         }}
       />
     </>

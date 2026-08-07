@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import PageMain from '@/components/PageMain';
 import Footer from '@/components/Footer';
+import JsonLd from '@/components/JsonLd';
 import PlanCard from '@/components/PlanCard';
 import { supabasePublic } from '@/lib/supabase/public';
 import { toPublicPlans } from '@/lib/public-plan';
@@ -188,34 +189,31 @@ export default async function NeighborhoodPage({ params }: { params: Params }) {
       </PageMain>
       <Footer />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
-              { '@type': 'ListItem', position: 2, name: found.city.name, item: `https://www.stoop.house/${found.city.slug}` },
-              { '@type': 'ListItem', position: 3, name: found.hood.name, item: `https://www.stoop.house/${found.city.slug}/${found.hood.slug}` }
-            ]
-          })
+      {/* Both blocks go out through JsonLd, which is the one thing that escapes
+          them. A plan slug is built from the plan text a neighbor typed, so the
+          list below carries user-authored characters into the document. */}
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Stoop', item: 'https://www.stoop.house/' },
+            { '@type': 'ListItem', position: 2, name: found.city.name, item: `https://www.stoop.house/${found.city.slug}` },
+            { '@type': 'ListItem', position: 3, name: found.hood.name, item: `https://www.stoop.house/${found.city.slug}/${found.hood.slug}` }
+          ]
         }}
       />
       {plans.length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'ItemList',
-              name: `Plans in ${found.hood.name} this week`,
-              itemListElement: plans.map((p, i) => ({
-                '@type': 'ListItem',
-                position: i + 1,
-                url: `https://www.stoop.house/plan/${p.slug}`
-              }))
-            })
+        <JsonLd
+          data={{
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            name: `Plans in ${found.hood.name} this week`,
+            itemListElement: plans.map((p, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              url: `https://www.stoop.house/plan/${p.slug}`
+            }))
           }}
         />
       )}
