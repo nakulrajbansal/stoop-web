@@ -319,16 +319,32 @@ describe('photographs are laid in, not framed', () => {
 
   it('fades every photograph into the page with a mask, prefixed for older WebKit', () => {
     const fades = [...CSS.matchAll(/\.(photo-fade-[a-z]+)\s*\{([^}]*)\}/g)];
-    expect(fades.length).toBeGreaterThanOrEqual(3);
+    expect(fades.length).toBeGreaterThan(0);
     for (const [, name, body] of fades) {
       expect(body, `${name} does not mask`).toMatch(/mask-image:\s*linear-gradient/);
       expect(body, `${name} has no -webkit- fallback`).toMatch(/-webkit-mask-image:/);
     }
   });
 
-  it('ties the two photographs to the same paper', () => {
-    // Two CC0 photographs by two people do not belong to each other until
-    // something makes them. Without this they read as stock dropped on cream.
+  it('defines no fade that no picture on the site wears', () => {
+    // The same rule the entrance delays live under, for the same reason. The
+    // masthead band's fade outlived the band it was written for, and
+    // .photo-fade-y outlived whatever it was drawn for before that. A
+    // stylesheet carrying masks for pictures that are not on the site describes
+    // more photography than the site has.
+    const defined = [...new Set([...CSS.matchAll(/\.(photo-fade-[a-z]+)\s*\{/g)].map(match => match[1]))];
+    expect(defined.length).toBeGreaterThan(0);
+
+    for (const name of defined) {
+      const used = MARKUP.some(source => new RegExp(`\\b${name}\\b`).test(source));
+      expect(used, `.${name} is defined but nothing wears it`).toBe(true);
+    }
+  });
+
+  it('ties the one remaining photograph to the same paper', () => {
+    // One CC0 photograph by a stranger does not belong to a page of authored
+    // drawings until something makes it. Without this it reads as stock
+    // dropped on cream.
     expect(CSS).toMatch(/\.photo img\s*\{[^}]*filter:\s*saturate\(/);
     expect(CSS).toMatch(/\.photo::after\s*\{[^}]*background:\s*linear-gradient/);
   });
@@ -339,6 +355,63 @@ describe('photographs are laid in, not framed', () => {
     const layer = CSS.match(/\.photo-layer\s*\{([^}]*)\}/);
     expect(layer, '.photo-layer is missing').not.toBeNull();
     expect(layer![1]).toMatch(/position:\s*absolute/);
+  });
+});
+
+/**
+ * The homepage's opening visual, now that the photograph is gone.
+ *
+ * A band of stock photography sat under the nameplate and was the first thing
+ * anyone saw. What stands there instead is the board: the plans themselves, on
+ * a piece of paper with a pin through it. That is a drawing plus four CSS
+ * declarations, so the things worth holding down are the ones that would make
+ * it read as a component rather than as paper: a pin printed over the heading,
+ * or a panel whose padding eats the 284px column a phone has to read plans in.
+ */
+describe('the board reads as paper pinned to the page', () => {
+  const HOME = readFileSync(join(ROOT, 'src', 'app', 'page.tsx'), 'utf8');
+  const panel = CSS.match(/\.board-panel\s*\{([^}]*)\}/);
+  const pin = CSS.match(/\.board-pin\s*\{([^}]*)\}/);
+
+  /** The numbers out of a padding shorthand, in order. */
+  function padding(body: string): number[] {
+    const declared = body.match(/padding:\s*([^;]+);/);
+    expect(declared, 'no padding shorthand on the panel').not.toBeNull();
+    return [...declared![1].matchAll(/(\d+(?:\.\d+)?)px/g)].map(match => Number(match[1]));
+  }
+
+  it('is a surface the pin can hang on', () => {
+    expect(panel, '.board-panel is missing').not.toBeNull();
+    // Absolute positioning for the pin resolves against this.
+    expect(panel![1]).toMatch(/position:\s*relative/);
+    expect(panel![1]).toMatch(/background:\s*var\(--card\)/);
+
+    expect(pin, '.board-pin is missing').not.toBeNull();
+    expect(pin![1]).toMatch(/position:\s*absolute/);
+  });
+
+  it('pays for the pin in padding instead of printing it over the heading', () => {
+    const width = HOME.match(/<BoardPinArt[^>]*width=\{(\d+)\}/);
+    expect(width, 'the pin is not rendered on the homepage').not.toBeNull();
+    const top = Number(pin![1].match(/top:\s*(\d+)px/)![1]);
+    expect(padding(panel![1])[0]).toBeGreaterThanOrEqual(top + Number(width![1]));
+  });
+
+  it('leaves a column wide enough to read a plan in at 320px', () => {
+    const gut = Number(CSS.match(/\.gut\s*\{[^}]*padding-left:\s*(\d+)px/)![1]);
+    const inner = 320 - gut * 2 - padding(panel![1])[1] * 2;
+    expect(inner).toBeGreaterThanOrEqual(240);
+  });
+
+  it('grows at the same breakpoint as the rest of the scale', () => {
+    const all = [...CSS.matchAll(/\.board-panel\s*\{([^}]*)\}/g)];
+    expect(all.length, 'the panel has no wide-screen size').toBe(2);
+    const small = padding(all[0][1]);
+    const large = padding(all[1][1]);
+    expect(large.length).toBe(small.length);
+    for (let i = 0; i < small.length; i++) {
+      expect(large[i], 'the panel is not roomier on a wide screen').toBeGreaterThan(small[i]);
+    }
   });
 });
 

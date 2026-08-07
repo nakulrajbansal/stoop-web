@@ -31,6 +31,22 @@ function AuthContent() {
   const fromDraft = rawNext === 'post';
   const fromPlan = destination.startsWith('/plan/');
 
+  // Which door they came through. The header offers Sign up and Sign in as
+  // separate actions because that is what people look for, but there is one
+  // screen behind both and one way to authenticate: the phone verification
+  // below. So `mode` labels this page and does nothing else. It is read here,
+  // in the render, and never inside sendOtp or verifyOtp, because the moment it
+  // reaches those the label has become a second flow to keep correct.
+  //
+  // The label is only allowed to be accurate. Somebody who arrives on the
+  // sign-in door with a number Stoop has never seen is going to be asked for a
+  // name and an email, and the panel below says so before they type anything.
+  const mode = searchParams.get('mode') === 'signin' ? 'signin' : 'signup';
+  // Swapping doors must not lose where they were headed. Only a destination
+  // that already survived the sanitizer above is put back into a URL.
+  const carriedNext = fromDraft ? 'post' : fromPlan ? destination : '';
+  const carry = carriedNext ? `&next=${encodeURIComponent(carriedNext)}` : '';
+
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [phoneE164, setPhoneE164] = useState('');
@@ -194,14 +210,20 @@ function AuthContent() {
     <>
       <div className="text-center mb-9">
         <h2 className="font-serif text-[clamp(28px,8vw,36px)] font-bold tracking-tight mb-1.5">
-          {fromDraft ? <>One step <em className="italic text-accent">left</em></> : <>Join <em className="italic text-accent">Stoop</em></>}
+          {fromDraft
+            ? <>One step <em className="italic text-accent">left</em></>
+            : mode === 'signin'
+              ? <>Welcome <em className="italic text-accent">back</em></>
+              : <>Join <em className="italic text-accent">Stoop</em></>}
         </h2>
         <p className="text-sm text-muted">
           {fromDraft
             ? 'Your plan is saved. Verify a number and it goes live.'
             : fromPlan
               ? 'Verify a number, then send your message.'
-              : 'Real plans from people in your neighborhood.'}
+              : mode === 'signin'
+                ? 'Sign in with the number you used before.'
+                : 'Real plans from people in your neighborhood.'}
         </p>
       </div>
 
@@ -213,7 +235,9 @@ function AuthContent() {
               ? 'Next: verify a number, add your name and email, then your saved plan goes live.'
               : fromPlan
                 ? 'Next: verify a number, add your name and email, then you land back on that plan and can message the host. Messaging does not reserve a spot; the host confirms it.'
-                : 'Next: verify a number, add your name and email. Browsing never needed an account; posting and messaging do.'}
+                : mode === 'signin'
+                  ? 'Next: verify your number and you are back in. If this number is new to Stoop, you will be asked for a name and email, and that signs you up.'
+                  : 'Next: verify a number, add your name and email. Browsing never needed an account; posting and messaging do.'}
           </p>
           <p className="text-[12px] text-muted leading-relaxed">{SIGNUP_REASON}</p>
         </div>
@@ -239,6 +263,28 @@ function AuthContent() {
           <button type="button" onClick={sendOtp} disabled={loading} className="btn btn-accent btn-full" style={{ padding: 13 }}>
             {loading ? <span className="spinner" /> : 'Send code →'}
           </button>
+          {/* The way across to the other door. It matters most on a phone,
+              where the header has room for Browse, Post a plan and Sign up but
+              not for Sign in as well, so this is where an existing member finds
+              their footing. Both links land on this same screen and this same
+              phone step; all that changes is what it is called. */}
+          <p className="text-[12.5px] text-muted text-center leading-[1.6]">
+            {mode === 'signin' ? (
+              <>
+                New to Stoop?{' '}
+                <Link href={`/auth?mode=signup${carry}`} className="underline underline-offset-2 hover:text-ink">
+                  Sign up
+                </Link>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <Link href={`/auth?mode=signin${carry}`} className="underline underline-offset-2 hover:text-ink">
+                  Sign in
+                </Link>
+              </>
+            )}
+          </p>
         </div>
       )}
 

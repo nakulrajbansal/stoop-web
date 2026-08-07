@@ -10,10 +10,19 @@ Two kinds of visual exist in this repo and they are not interchangeable:
   conversation, a host deciding, a table, an empty board, an outage). They are
   ours, they cost no request, and they are the only visual allowed on a surface
   that carries a plan or a person.
-- **Photographs.** Two of them, both CC0, both downloaded and re-encoded into
-  `public/photos`, both used on the homepage only. Every use goes through
-  `src/components/Photograph.tsx`, which renders them decoratively: empty alt,
-  no caption, laid into the page as a masked band or as a layer inside a panel.
+- **Photographs.** One of them, CC0, downloaded and re-encoded into
+  `public/photos`, used on the homepage only. The use goes through
+  `src/components/Photograph.tsx`, which renders it decoratively: empty alt,
+  no caption, laid into the page as a layer inside the closing panel.
+
+The balance between those two shifted in this pass, and it is worth stating why
+rather than leaving it to be read off a diff. A photograph of somewhere else
+cannot explain a page about plans in your neighborhood. The masthead band tried,
+and the founder's reading of it was that it did not look good and did not make
+any sense. What opens the homepage now is the board itself: real plans, or the
+labelled sample when there are none, on a drawn sheet of paper with a drawn pin
+through it. Photography is down to the one frame that is arguing rather than
+decorating.
 
 ## Rules
 
@@ -25,9 +34,11 @@ Two kinds of visual exist in this repo and they are not interchangeable:
    whose source page could not be loaded and read was dropped rather than used.
 3. **Never a member.** The enforceable rule is this: no photograph may show an
    identifiable face, and nobody appearing in one may be presented as a member,
-   a host or an attendee. A frame may contain people (the hero has distant,
-   blurred pedestrians on the pavement); what it may not contain is a person a
-   reader could recognise, or a person the page implies is on Stoop. No alt text
+   a host or an attendee. A frame may contain people (the masthead band that has
+   since been removed had distant, out of focus pedestrians cropped below the
+   shoulder); what it may not contain is a person a reader could recognise, or a
+   person the page implies is on Stoop. Nobody is in the one frame that ships
+   today. No alt text
    mentions a host, a member, an attendee or a neighbor, and a photograph is
    never placed inside a plan card, a roster, an inbox or a host card.
    `src/lib/photos.test.ts` enforces the alt-text and placement halves of this
@@ -46,24 +57,23 @@ Two kinds of visual exist in this repo and they are not interchangeable:
    `src/lib/photos.ts`, spoken only where a call site passes `informative`, and
    scanned there for language that would imply a member. Nothing passes
    `informative` today.
-6. **Budget.** The two files are 134,376 bytes on disk (131.2 KiB), against the
+6. **Budget.** The one file is 83,062 bytes on disk (81.1 KiB), against the
    800 KB ceiling this pass was given, and under the 148,230 bytes the previous
    release shipped. `photos.test.ts` asserts both, and also that nothing sits in
    `public/photos` that no record references. Exact per-file sizes are in the
    encode table.
 
-## The photographs
+## The photograph
 
-Both are from StockSnap.io, whose photographs are released under
+It is from StockSnap.io, whose photographs are released under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): free for
 commercial use, no attribution required. Attribution is recorded here anyway,
-because knowing who took a picture is part of knowing you may use it. Each
+because knowing who took a picture is part of knowing you may use it. The
 source page was loaded and checked to state the CC0 licence and the creator
 named below.
 
 | Local file | Source page | Creator | Licence | Downloaded | Where it appears |
 | --- | --- | --- | --- | --- | --- |
-| `public/photos/sidewalk-table.webp` | https://stocksnap.io/photo/tables-chairs-WUM7VBAPS8 | Alisa Anton | CC0 1.0 | 2026-08-06 | Homepage masthead band |
 | `public/photos/park-path.webp` | https://stocksnap.io/photo/park-trees-1POHVCH6RG | Johannes Plenio | CC0 1.0 | 2026-08-06 | Homepage closing panel |
 
 Discovery was via the Openverse index (https://api.openverse.org/v1/images/,
@@ -71,30 +81,39 @@ filtered to `license=cc0,pdm` and `category=photograph`), then each candidate's
 own source page was fetched directly and read for the licence line and the
 creator before anything was downloaded.
 
-### What each one is, and why it is that one
+### What it is, and why it is that one
 
-- **sidewalk-table.webp**: folding bistro chairs and a small table outside a
-  shopfront. It is the storefront detail the brief asked for, and it says "sit
-  down with someone" through the furniture rather than through people. It is
-  not an empty street: there are pedestrians on the pavement behind the table.
-  The crop cuts them off below the shoulder, so no head and no face is in the
-  frame at all, and they are out of focus besides. The subject is the empty
-  table, and nobody in the frame is presented as being on Stoop.
 - **park-path.webp**: a dirt path between two rows of trees. Nobody is in the
   frame. It sits inside the closing panel, fading sideways into the ink beside
   the line "The best plans are three blocks away", which is the one place on the
   page where a path going somewhere is the argument rather than the decoration.
 
-A third photograph, `coffee-counter.webp` (a latte on a wooden counter, Carli
-Jean, https://stocksnap.io/photo/coffee-cafelatte-F9A95133A1, CC0 1.0,
-downloaded 2026-08-06, 560 x 560, 13,854 bytes), shipped in the visual release
-and was removed here. It was not a licensing or a content problem, it was a
-composition one. Once the captioned figure blocks went, the placements left were
-a full-bleed band and a panel layer: a 560px source is soft in any band that runs
-the width of a desktop, and dark on the ink panel it went to mud beside a 960px
-alternative that was both sharp and on the point. Its provenance is kept here
-rather than silently dropped, so that putting it back is a decision and not a
-rediscovery.
+### The two that were removed, and why
+
+Provenance for both is kept here rather than silently dropped, so that putting
+one back is a decision and not a rediscovery.
+
+- **sidewalk-table.webp** (folding bistro chairs and a small table outside a
+  shopfront, Alisa Anton, https://stocksnap.io/photo/tables-chairs-WUM7VBAPS8,
+  CC0 1.0, downloaded 2026-08-06, 960 x 640, 51,314 bytes). It ran as a masked
+  band under the nameplate and was the first thing on the site. It was not a
+  licensing or a content problem either: there were pedestrians on the pavement
+  behind the table, the crop cut them off below the shoulder so no face was in
+  the frame, and nobody in it was presented as being on Stoop. It was a
+  relevance problem. The homepage's job in its first screen is to say what a
+  Stoop plan is, and a photograph of furniture outside a shopfront somewhere
+  else cannot; it read as an unrelated picture, and on a 320px screen it spent
+  104px reading that way before a visitor got to the promise. The band is gone
+  and nothing decorative took its place: the drawn board panel that opens the
+  page now holds real plans, or the labelled sample.
+- **coffee-counter.webp** (a latte on a wooden counter, Carli Jean,
+  https://stocksnap.io/photo/coffee-cafelatte-F9A95133A1, CC0 1.0, downloaded
+  2026-08-06, 560 x 560, 13,854 bytes) shipped in the visual release and went a
+  pass earlier, for a composition reason. Once the captioned figure blocks went,
+  the placements left were a full-bleed band and a panel layer: a 560px source
+  is soft in any band that runs the width of a desktop, and dark on the ink
+  panel it went to mud beside a 960px alternative that was both sharp and on the
+  point.
 
 Candidates that were rejected, and why, so the next person does not re-litigate
 them: a posed model at a food truck (a recognisable person, reads as a member),
@@ -114,13 +133,12 @@ Sizes are the exact bytes on disk, so a re-encode that drifts is visible here.
 
 | File | Crop | Output | WebP quality | Size on disk |
 | --- | --- | --- | --- | --- |
-| `sidewalk-table.webp` | none (3:2 as shot) | 960 x 640 | 72 | 51,314 bytes |
 | `park-path.webp` | none (3:2 as shot) | 960 x 640 | 72 | 83,062 bytes |
 
-The 12px blur placeholders inlined in `src/lib/photos.ts` were produced from the
-same crops at WebP quality 35. They decode to 88 bytes each, and they exist so a
-slow connection shows the shape of the picture rather than an empty box. They are
-not a second copy of the asset.
+The 12px blur placeholder inlined in `src/lib/photos.ts` was produced from the
+same crop at WebP quality 35. It decodes to 88 bytes, and it exists so a slow
+connection shows the shape of the picture rather than an empty box. It is not a
+second copy of the asset.
 
 Responsive delivery is Next's: `Photograph` renders `next/image` with `fill`,
 real `sizes` per breakpoint, and a box whose shape is set either by an
@@ -135,16 +153,17 @@ figures stated here are the ones that can be checked against the repository.
 
 ### The resolution ceiling, stated plainly
 
-Both originals are 960px wide, which was the largest rendition the StockSnap CDN
-offered. The masthead band runs full bleed, so on a 1440px desktop it is painted
-about 1.5x larger than the pixels behind it, and more than that on a high density
-display. Measured in Chrome at 1440 x 900: the optimizer serves the 960px file
-(w=1920 is requested and capped at the source width) painted across 1440 CSS px.
-It is soft, and the role tolerates it, because the band is desaturated, masked at
-both edges and 188px tall. If that stops being acceptable the fix is a larger CC0
-original, not a sharpen filter and not an upscale. The closing panel has no such
-problem: it paints 423 CSS px from a 640px rendition, so it is downscaled and
-sharp.
+The original is 960px wide, which was the largest rendition the StockSnap CDN
+offered. That ceiling used to bind: the masthead band ran full bleed, so on a
+1440px desktop it was painted about 1.5x larger than the pixels behind it, and
+more than that on a high density display. With the band gone, nothing on the
+site paints a photograph across a full desktop width. The closing panel takes
+423 CSS px from a 640px rendition, so it is downscaled and sharp with room to
+spare.
+
+The rule survives the case that made it: if a photograph is ever put back on a
+surface wider than its source, the fix is a larger CC0 original, not a sharpen
+filter and not an upscale.
 
 ## Re-encoding, or adding one
 

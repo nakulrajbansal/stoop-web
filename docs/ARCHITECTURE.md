@@ -76,8 +76,10 @@ Full technical reference for Stoop. The root `CLAUDE.md` is the quick brief; thi
 
 ## Visual system (Aug 2026 storytelling pass)
 The palette, the fonts and the copy rules are unchanged; what was added is a drawing
-vocabulary, three photographs and a small amount of motion. Provenance and the rules
-photography lives under are in `docs/VISUAL_ASSETS.md`.
+vocabulary (one authored SVG per category, the logistics and the feed's states, and the
+pinned board that now opens the homepage), one retained CC0 photograph layered into the
+closing panel, and a small amount of motion. Provenance and the rules photography lives
+under are in `docs/VISUAL_ASSETS.md`.
 
 - **`src/components/CategoryArt.tsx`**: one hand-authored SVG per category (all seven),
   `currentColor`, no icon runtime. Colour comes from `.cat-{category}` in `globals.css`,
@@ -161,9 +163,11 @@ photography lives under are in `docs/VISUAL_ASSETS.md`.
   the stylesheet and fails if a size stops growing at `sm`, and `home-page.test.ts` fails
   if a section heading sets its own `clamp()` instead of wearing `.h-sec`.
 - **Photograph placement** is CSS too: `.photo` (a positioned, clipped box with no border
-  and no radius, plus a shared desaturation and warm veil so two CC0 photographs read as
-  one system), `.photo-fade-b` / `.photo-fade-y` / `.photo-fade-panel` (masks, so a band
-  melts into whatever is behind it without knowing what that is), and `.photo-layer`
+  and no radius, plus a desaturation and warm veil that keep the one remaining CC0
+  photograph, the closing panel's, on the same paper as the drawings),
+  `.photo-fade-panel` (the only mask left, so the picture melts into whatever is behind it
+  without knowing what that is; `.photo-fade-b` and `.photo-fade-y` went with the masthead
+  band they dressed), and `.photo-layer`
   (the closing panel's geometry, kept in CSS because this file is emitted after Tailwind's
   utilities and `.photo`'s own `position` would beat an `absolute` typed at the call site).
 - **Motion** lives in `globals.css`: `stoop-rise` and `stoop-rise-art`, entrance only,

@@ -1,15 +1,19 @@
 /**
  * The photographs, in one place.
  *
- * Two of them, all local under public/photos, all CC0, all editorial
- * atmosphere. Provenance for each (source page, creator, licence, the crop and
- * encode recipe, the day it was downloaded) is recorded in docs/VISUAL_ASSETS.md.
+ * One of them now, local under public/photos, CC0, editorial atmosphere.
+ * Provenance (source page, creator, licence, the crop and encode recipe, the
+ * day it was downloaded) is recorded in docs/VISUAL_ASSETS.md.
  *
- * There were three. The third (a latte on a cafe counter, 560px square, and
- * dark) had no placement left where it was both sharp and doing work: a
- * 560px source is soft anywhere a band runs the width of a desktop, and dark
- * on the ink panel it turned to mud. An asset with no good home is not
- * restraint, it is 13,854 bytes of hedging, so it went.
+ * There were three. A latte on a cafe counter (560px square, and dark) had no
+ * placement left where it was both sharp and doing work: a 560px source is soft
+ * anywhere a band runs the width of a desktop, and dark on the ink panel it
+ * turned to mud. A table and chairs on a sidewalk went with the masthead band
+ * it was bought for, which the founder read, correctly, as a picture that did
+ * not look good and did not mean anything on a page about neighborhood plans.
+ * An asset with no good home is not restraint, it is bytes of hedging, so both
+ * went, records and files together. Their provenance stays in the doc, so that
+ * putting one back is a decision rather than a rediscovery.
  *
  * Two rules govern where these may appear, and they are the reason this file
  * exists rather than a string in a component:
@@ -49,19 +53,6 @@ export type Photo = {
 const CC0 = 'CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)';
 
 export const PHOTOS = {
-  sidewalkTable: {
-    src: '/photos/sidewalk-table.webp',
-    width: 960,
-    height: 640,
-    alt: 'Folding bistro chairs and a small table set out on a sidewalk beside a shopfront window.',
-    blurDataURL:
-      'data:image/webp;base64,UklGRlQAAABXRUJQVlA4IEgAAADQAQCdASoMAAgAA8BgJYwCdADZoRp/AAD8FS36OOjK7et3G3quuI+lqu+FW9Xh96Do1nrbhs0DeVLg7kUxF9fwghkSp4frgAA=',
-    credit: {
-      creator: 'Alisa Anton',
-      source: 'https://stocksnap.io/photo/tables-chairs-WUM7VBAPS8',
-      license: CC0
-    }
-  },
   parkPath: {
     src: '/photos/park-path.webp',
     width: 960,

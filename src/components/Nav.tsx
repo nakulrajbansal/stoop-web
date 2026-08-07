@@ -51,7 +51,7 @@ export default function Nav() {
   }, []);
 
   return (
-    <nav aria-label="Main" className="sticky top-0 z-50 flex items-center gap-3 px-5 sm:px-9 h-[58px] bg-cream/90 backdrop-blur border-b border-[var(--border)]">
+    <nav aria-label="Main" className="sticky top-0 z-50 flex items-center gap-2 sm:gap-3 px-4 sm:px-9 h-[58px] bg-cream/90 backdrop-blur border-b border-[var(--border)]">
       <Link href="/" className="font-serif text-[20px] font-bold tracking-tight">
         St<em className="not-italic text-accent italic">oo</em>p
       </Link>
@@ -88,9 +88,33 @@ export default function Nav() {
           </Link>
         </>
       ) : (
+        /* Four ways in, where there used to be two.
+           Browse and Sign in were the whole signed-out header, on a site whose
+           argument is "post a plan": somebody who had decided to post had to
+           work out that Sign in also made accounts, and somebody who just
+           wanted an account had no button at all.
+
+           Post a plan points at /post and not at /auth on purpose. The composer
+           lets anyone write the plan first, then saves the draft and sends them
+           to /auth?next=post itself, so the half-written plan survives the
+           detour. Sending them to sign up first would lose it.
+
+           Four actions and a wordmark do not fit across 320px, so Sign in steps
+           out of the row below the sm breakpoint. It is the one an existing
+           member needs least urgently from here, because both auth doors carry
+           the way across to the other, and the two things a first-time visitor
+           came to do stay visible at every width. */
         <>
-          <Link href="/feed" className="btn btn-ghost btn-sm">Browse</Link>
-          <Link href="/auth" className="btn btn-primary btn-sm">Sign in</Link>
+          <Link href="/feed"
+            className="inline-flex items-center min-h-[40px] px-1 text-[13px] sm:text-sm text-ink-2 hover:text-ink">
+            Browse
+          </Link>
+          <Link href="/auth?mode=signin"
+            className="hidden sm:inline-flex items-center min-h-[40px] px-1 text-sm text-ink-2 hover:text-ink">
+            Sign in
+          </Link>
+          <Link href="/post" className="btn btn-ghost btn-sm btn-nav min-h-[40px]">Post a plan</Link>
+          <Link href="/auth?mode=signup" className="btn btn-accent btn-sm btn-nav min-h-[40px]">Sign up</Link>
         </>
       )}
     </nav>

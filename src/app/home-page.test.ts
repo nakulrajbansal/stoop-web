@@ -100,7 +100,8 @@ describe('photography', () => {
 
   it('gives every photograph a sizes hint and a reserved box, so none of them shifts the page', () => {
     const photographs = [...SOURCE.matchAll(/<Photograph[\s\S]*?\/>/g)].map(m => m[0]);
-    expect(photographs.length).toBeGreaterThan(1);
+    // One, and only one: the layer inside the closing panel.
+    expect(photographs).toHaveLength(1);
     for (const photograph of photographs) {
       expect(photograph).toMatch(/sizes=/);
       // A ratio or a stated height. Both settle the layout before the bytes
@@ -109,12 +110,12 @@ describe('photography', () => {
     }
   });
 
-  it('loads the one above the fold eagerly and leaves the rest lazy', () => {
-    expect([...SOURCE.matchAll(/\bpriority\b/g)]).toHaveLength(1);
-    // The masthead band is the eager one: it is the only picture a visitor
-    // sees before scrolling.
-    const masthead = SOURCE.slice(SOURCE.indexOf('<Photograph'));
-    expect(masthead.slice(0, masthead.indexOf('/>'))).toMatch(/priority/);
+  it('loads none of them eagerly, because none of them is above the fold any more', () => {
+    // The masthead band was the one picture that blocked the first paint. It is
+    // gone, so nothing on this page may claim priority: the remaining
+    // photograph is a layer inside the last panel and a visitor scrolls the
+    // whole page before meeting it.
+    expect([...SOURCE.matchAll(/\bpriority\b/g)]).toHaveLength(0);
   });
 
   it('is laid in as atmosphere, never as a captioned exhibit', () => {
@@ -126,6 +127,82 @@ describe('photography', () => {
     for (const use of [...SOURCE.matchAll(/<Photograph[\s\S]*?\/>/g)].map(m => m[0])) {
       expect(use).toMatch(/photo-fade-|photo-layer/);
     }
+  });
+});
+
+/**
+ * What the top of the page leads with.
+ *
+ * It led with a photograph of empty bistro chairs, laid in as a band under the
+ * nameplate. The founder's reading of it: it does not look good and it does not
+ * make any sense. It was right on both counts, because a stock photograph is
+ * the one thing on a page about concrete neighborhood plans that is not one:
+ * it says nothing about what you get, and it spent the first 104px of a 320px
+ * screen saying it.
+ *
+ * What replaced it is not another picture. It is the board itself, drawn as
+ * paper pinned to the page, holding whatever is genuinely on it: real plans
+ * when there are real plans, and the labelled sample when there are none.
+ */
+describe('the top of the page', () => {
+  /** Everything above the first explanatory section. */
+  const hero = SOURCE.slice(0, SOURCE.indexOf('how-it-works-heading'));
+
+  it('carries no masthead photograph', () => {
+    expect(SOURCE).not.toMatch(/sidewalkTable/);
+    // The band's own mask. Gone with it, rather than left styling nothing.
+    expect(SOURCE).not.toMatch(/photo-fade-b\b/);
+    expect(hero).not.toMatch(/<Photograph/);
+  });
+
+  it('left no empty band behind where it used to be', () => {
+    // A picture removed by deleting the <Image> and keeping its 104px box is
+    // the same hole with nothing in it. Nothing may stand between the page
+    // wrapper and the hero but comments.
+    const between = SOURCE.slice(
+      SOURCE.indexOf('<PageMain>') + '<PageMain>'.length,
+      SOURCE.indexOf('<section', SOURCE.indexOf('<PageMain>'))
+    );
+    expect(between.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trim()).toBe('');
+    expect(SOURCE).not.toMatch(/h-\[104px\]/);
+  });
+
+  it('replaces it with the board itself, drawn as paper on a noticeboard', () => {
+    // Authored drawing, from the noticeboard vocabulary we already speak,
+    // rather than a second stock photograph in a smaller box.
+    expect(hero).toMatch(/board-panel/);
+    expect(SOURCE).toMatch(/BoardPinArt/);
+    expect(SOURCE).toMatch(/from '@\/components\/StoopArt'/);
+
+    const pin = hero.match(/<BoardPinArt[\s\S]*?\/>/);
+    expect(pin, 'the drawn pin is not in the hero').not.toBeNull();
+    // Decorative. The heading beside it already says "On the board", and a
+    // drawing that repeats a heading only makes a screen reader say it twice.
+    expect(pin![0]).not.toMatch(/label=/);
+    expect(pin![0]).not.toMatch(/aria-label=/);
+  });
+
+  it('puts nothing on that board that neighbors did not', () => {
+    // The failure mode of drawing a board: filling it with plausible-looking
+    // plans. The rows come from the query, and the one hand-written note is
+    // labelled Sample and counted nowhere.
+    // Stripped of its own commentary first: the note explaining what a featured
+    // row reads like quotes the sample text, and a comment is not a plan.
+    const board = hero.slice(hero.indexOf('board-panel')).replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '');
+    expect(board).toMatch(/plans\.map\(\(plan: any\) =>/);
+    expect(board).toMatch(/emptyNeighborhoodCopy\(\)/);
+
+    // Exactly one hand-written plan on the board, and it is inside the block
+    // that calls itself Sample. The rows that come from the query carry none.
+    const sample = board.slice(
+      board.indexOf('Sample · what a plan looks like'),
+      board.indexOf('EmptyBoardArt')
+    );
+    expect(sample).toMatch(/farmers market/);
+    expect(board.slice(board.indexOf('plans.map'))).not.toMatch(/farmers market/);
+
+    // No urgency, no borrowed proof, no invented headcount.
+    expect(board).not.toMatch(/almost full|filling up|hurry|only \d+ left|\d+ (people|neighbors) /i);
   });
 });
 

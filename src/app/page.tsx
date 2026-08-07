@@ -7,7 +7,7 @@ import Photograph from '@/components/Photograph';
 import FaqList from '@/components/FaqList';
 import JsonLd from '@/components/JsonLd';
 import CategoryArt, { CATEGORIES, CATEGORY_LABELS, categoryLabelOf } from '@/components/CategoryArt';
-import { BrowseArt, MessageArt, HostChoosesArt, TableArt, EmptyBoardArt } from '@/components/StoopArt';
+import { BrowseArt, MessageArt, HostChoosesArt, TableArt, EmptyBoardArt, BoardPinArt } from '@/components/StoopArt';
 import { CalendarIcon, MessageIcon, CheckCircleIcon, UsersIcon, UndoIcon, NoteIcon } from '@/components/icons';
 import { PHOTOS } from '@/lib/photos';
 import { createClient } from '@/lib/supabase/server';
@@ -150,24 +150,19 @@ export default async function HomePage() {
       <Nav />
 
       <PageMain>
-      {/* ── Masthead ──────────────────────────────────────────────────────
-          A band of photograph under the nameplate, the way a local paper
-          carries one, fading into the paper instead of sitting in a frame.
-          Decorative: everything it could say, the headline under it says
-          better. Short on a phone on purpose, so the promise and the action
-          below it are both inside the first screen at 320 x 568. */}
-      <Photograph
-        photo={PHOTOS.sidewalkTable}
-        priority
-        sizes="100vw"
-        className="photo-fade-b h-[104px] sm:h-[188px]"
-      />
-
       {/* ── Hero ──────────────────────────────────────────────────────────
           The promise, then one action, then the board itself. On a phone this
           is the whole page's argument in two screens; from sm the board moves
-          alongside. */}
-      <section className="gut max-w-[1080px] mx-auto pt-4 sm:pt-9 pb-7 sm:pb-14">
+          alongside.
+
+          A band of photograph used to run above this, under the nameplate: a
+          table outside a shopfront somewhere, laid in as atmosphere. It is
+          gone, and nothing decorative took its place. It did not look like
+          anything and it did not mean anything, and it spent the first 104px of
+          a 320px screen not meaning it. The page now opens on the words and the
+          board, which is the only thing at the top of a page about neighborhood
+          plans that can honestly explain one. */}
+      <section className="gut max-w-[1080px] mx-auto pt-6 sm:pt-12 pb-7 sm:pb-14">
         <div className="grid sm:grid-cols-[1.05fr,1fr] gap-8 sm:gap-14 items-start">
           <div>
             <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 text-[10.5px] font-mono uppercase tracking-[0.1em] text-accent mb-3">
@@ -204,9 +199,14 @@ export default async function HomePage() {
             </p>
           </div>
 
-          {/* The board. The plans are the product, so they are the second thing
-              on the page rather than the fifth. */}
-          <div className="rise rise-1">
+          {/* The board, and the page's opening visual now that the photograph
+              is gone. The plans are the product, so they are the second thing
+              on the page rather than the fifth, and they are presented as what
+              they are: paper on a neighborhood board. The pin is a drawing, and
+              it is decorative, because the heading half an inch below it
+              already says On the board. */}
+          <div className="rise rise-1 board-panel">
+            <BoardPinArt width={22} className="board-pin text-accent" />
             <div className="flex items-baseline justify-between gap-3 pb-2 mb-1 border-b border-ink/15">
               <h2 className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-ink-2">On the board</h2>
               {planCount > 0 && totalSpots > 0 && (

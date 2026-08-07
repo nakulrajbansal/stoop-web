@@ -152,6 +152,26 @@ export function OutageArt(props: ArtProps) {
   );
 }
 
+/**
+ * A pushpin, head on.
+ *
+ * The mark that turns a panel of plans into a sheet of paper someone put up.
+ * It stands where the homepage's photograph used to, and it is drawn rather
+ * than photographed for the reason the photograph came down: what the top of
+ * this page has to say is "these are real plans on a neighborhood board", and a
+ * picture of somewhere else cannot say it.
+ */
+export function BoardPinArt(props: ArtProps) {
+  return (
+    <Frame {...props} name="board-pin" viewBox="0 0 24 24" height={24}>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+      {/* The catch of light that makes a flat ring read as a domed head. */}
+      <path d="M8.4 8.8a5.1 5.1 0 0 1 2.4-1.6" opacity="0.55" />
+    </Frame>
+  );
+}
+
 /** A single pinned card, used as a small mark next to headings and captions. */
 export function PinnedCardArt(props: ArtProps) {
   return (

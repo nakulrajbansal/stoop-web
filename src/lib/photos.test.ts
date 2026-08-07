@@ -75,11 +75,14 @@ function importsFrom(source: string, specifier: string): boolean {
 const VISUAL_ASSETS = readFileSync(join(ROOT, 'docs', 'VISUAL_ASSETS.md'), 'utf8');
 
 describe('every photograph is real, local and accounted for', () => {
-  it('ships two, and they both live under public/photos', () => {
-    // Three shipped in the visual release. The third (a latte on a counter,
-    // 560px square) had no placement left where it was both sharp and doing
-    // work once the captioned figure blocks went, so it went with them.
-    expect(ALL_PHOTOS.length).toBe(2);
+  it('ships one, and it lives under public/photos', () => {
+    // Three shipped in the visual release. The latte on a counter went when the
+    // captioned figure blocks did, for want of a placement where it was both
+    // sharp and doing work. The sidewalk table went with the masthead band it
+    // was bought for: the founder's reading of that band was that it did not
+    // look good and did not make any sense, and a photograph with no placement
+    // is not a photograph we own, it is one we are storing.
+    expect(ALL_PHOTOS.length).toBe(1);
     for (const photo of ALL_PHOTOS) {
       expect(photo.src.startsWith('/photos/')).toBe(true);
       expect(photo.src.endsWith('.webp')).toBe(true);
@@ -147,7 +150,7 @@ describe('every photograph is real, local and accounted for', () => {
       expect(VISUAL_ASSETS, `${photo.src} is ${bytes} bytes, not what the docs say`)
         .toContain(bytes.toLocaleString('en-US'));
     }
-    expect(VISUAL_ASSETS, `the three add up to ${total} bytes`).toContain(total.toLocaleString('en-US'));
+    expect(VISUAL_ASSETS, `the set adds up to ${total} bytes`).toContain(total.toLocaleString('en-US'));
   });
 });
 
@@ -177,8 +180,19 @@ describe('a photograph never says anything about a member', () => {
   });
 
   it('names a scene, not a person', () => {
-    expect(PHOTOS.sidewalkTable.alt).toMatch(/chairs|table/i);
     expect(PHOTOS.parkPath.alt).toMatch(/path|trees/i);
+  });
+
+  it('has no record left for a picture that no longer has a placement', () => {
+    // The record and the file go together. A record kept "for later" is how a
+    // dropped photograph comes back onto a page as a rediscovery rather than as
+    // a decision; its provenance stays in docs/VISUAL_ASSETS.md, which is where
+    // putting it back would start.
+    expect(PHOTOS).not.toHaveProperty('sidewalkTable');
+    const lib = readFileSync(join(SRC, 'lib', 'photos.ts'), 'utf8');
+    // The record and the path, not the word: the file's own comment says which
+    // picture went and why, and that sentence is the point of keeping it.
+    expect(lib).not.toMatch(/sidewalkTable|sidewalk-table\.webp/);
   });
 });
 

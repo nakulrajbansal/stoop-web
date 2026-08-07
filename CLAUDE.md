@@ -174,9 +174,21 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   feature/visual-staging-v2 and NOT deployed: preview only until reviewed. It is
   presentation and copy-placement only; no API, database, migration, analytics
   or lifecycle behaviour was touched.
+  THIRD REVISION (Aug 7 2026), on the same branch, still NOT deployed, from two
+  pieces of founder feedback on the staged build. One: the masthead photograph
+  "doesn't look good and doesn't make any sense", so it is GONE, record and file
+  and its two orphaned CSS fades with it, and nothing decorative replaced it.
+  The page now opens on the words and on the board, which is drawn as paper with
+  a pin through it (StoopArt BoardPinArt plus .board-panel/.board-pin). Two: the
+  signed-out header was Browse and Sign in only, "no post plan or sign up", so
+  it is now Browse, Post a plan, Sign in and Sign up. OAuth was deliberately NOT
+  added: whether Google or Apple replaces phone verification, precedes it, or
+  waits until someone posts is an unmade decision, and a provider button before
+  that decision is a dead control on the one screen that must work.
   - DRAWINGS, not an icon package: src/components/CategoryArt.tsx (one authored
     SVG per category, all seven) and src/components/StoopArt.tsx (pinned card,
-    conversation, host deciding, table for four, empty board, unplugged line).
+    conversation, host deciding, table for four, empty board, unplugged line,
+    and the pushpin that heads the homepage board).
     currentColor throughout, sized in px, decorative (aria-hidden) wherever the
     category or the state is already written next to them. Category ink and wash
     live in globals.css beside the matching .tag-* pill.
@@ -184,24 +196,35 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     featured rows and the composer's pre-publish summary) the art gets an
     accessible name from categoryLabelOf, which answers null for a stored
     category we no longer draw rather than calling it Coffee out loud.
-  - PHOTOGRAPHY: exactly two CC0 photographs in public/photos (134,376 bytes
-    total, down from three and 148,230), homepage only, always through
-    src/components/Photograph.tsx. They are DECORATIVE: empty alt, NO caption,
-    and no free-text alt prop, so the only wording a photograph can ever be
-    given is the alt on its record in src/lib/photos.ts (spoken only if a call
-    site passes `informative`, and nothing does). Placement is what keeps them
-    apart from plan data: a masked band under the nameplate, and a layer inside
-    the closing panel. No photograph shows an identifiable face and nobody in
-    one may be presented as a member; the masthead does contain distant
-    pedestrians, cropped below the shoulder. No alt text may mention a host,
-    member or attendee. Provenance (source page, creator, licence, download
-    date, encode recipe) is in docs/VISUAL_ASSETS.md, including for the one that
-    was dropped. A photograph must never appear on a plan, feed, inbox or
+  - PHOTOGRAPHY: exactly ONE CC0 photograph in public/photos (park-path.webp,
+    83,062 bytes, down from three and 148,230), homepage only, always through
+    src/components/Photograph.tsx. It is DECORATIVE: empty alt, NO caption, and
+    no free-text alt prop, so the only wording a photograph can ever be given is
+    the alt on its record in src/lib/photos.ts (spoken only if a call site
+    passes `informative`, and nothing does). Placement is what keeps it apart
+    from plan data: one layer inside the closing panel, and that is the only
+    photograph on the site. Nobody is in the frame. No alt text may mention a
+    host, member or attendee. Provenance (source page, creator, licence,
+    download date, encode recipe) is in docs/VISUAL_ASSETS.md, INCLUDING for
+    both that were removed, so putting one back is a decision and not a
+    rediscovery. A photograph must never appear on a plan, feed, inbox or
     profile surface; the test scans for it, including the /[city]/[hood]
     neighborhood routes, and also fails on an unreferenced file left in
-    public/photos. Both originals are 960px wide, so a full-bleed band on a
-    1440px desktop is painted ~1.5x up; that ceiling is written down in
-    VISUAL_ASSETS.md and the fix is a larger CC0 original, never an upscale.
+    public/photos, on a record with no file, and on a .photo-fade-* class that
+    nothing wears. Nothing now paints a photograph across a full desktop width,
+    so the 960px source ceiling no longer binds; if that changes the fix is a
+    larger CC0 original, never an upscale.
+  - THE HEADER: signed out it is Browse, Post a plan, Sign in and Sign up.
+    Post a plan points at /post, NOT at /auth, because the composer lets anyone
+    write the plan first and then parks the draft and sends them to
+    /auth?next=post itself. Sign up is /auth?mode=signup and Sign in is
+    /auth?mode=signin; `mode` is read in the render only and labels the screen,
+    it never reaches sendOtp or verifyOtp, and the sign-in wording says up front
+    that an unknown number will be asked for a name and email. Four actions and
+    a wordmark do not fit across 320px, so Sign in alone steps out of the row
+    below sm and both auth doors carry the way across to the other. Measured in
+    Chrome at 320px: no overflow, 40px tap targets, and the signed-in row (which
+    shares the bar) went from a 2px overflow to none.
   - STRUCTURED DATA: every JSON-LD block in the app goes through
     src/components/JsonLd.tsx, which escapes < and > (and U+2028/U+2029) after
     JSON.stringify (src/lib/json-ld.ts). Plan text is user-authored, and a plan
@@ -236,11 +259,11 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
     section must not type its own clamp(); home-page.test.ts fails if a
     section heading does, and visual-system.test.ts reads the numbers out of
     the stylesheet and fails if one stops growing at sm.
-  - THE SURFACES: homepage (masthead photo band, promise and primary action
-    above the fold at 320px, the live board second, the four steps as a
-    scannable list, category tiles into the feed, the six contract answers as
-    hairline rows, FAQ as native details, closing panel with the second
-    photograph layered into it), feed (category art per row, capacity segments,
+  - THE SURFACES: homepage (no photograph at the top at all: promise and primary
+    action above the fold at 320px, the live board second and drawn as pinned
+    paper, the four steps as a scannable list, category tiles into the feed, the
+    six contract answers as hairline rows, FAQ as native details, closing panel
+    with the one remaining photograph layered into it), feed (category art per row, capacity segments,
     distinct loading/empty/outage graphics), plan detail (category header band,
     capacity meter, logistics still directly under the title), composer (visual
     category picker, illustrated pre-publish summary). Product facts, copy and
@@ -254,8 +277,9 @@ See docs/ROADMAP.md and docs/SAFETY_SPEC.md STATUS sections. At time of writing 
   conversation-lifecycle, participants, product-copy, public-plan, metrics,
   blocks, db-migrations, busy-buttons, analytics-private-routes, photos,
   visual-system, json-ld, structured-data (the plan, city, neighborhood and
-  guide blocks), the homepage's shape, the plans and conversations and
-  participants routes, and the components (PlanSummary, RequesterCard,
+  guide blocks), the homepage's shape, the auth screen's two doors, the plans
+  and conversations and participants routes, and the components (Nav signed in
+  and signed out, PlanSummary, RequesterCard,
   ConfirmedRoster, CategoryArt, CapacityMeter, FaqList, Photograph). Component tests run on jsdom with React
   Testing Library, opted into per file with a `@vitest-environment jsdom`
   docblock; everything else stays on the node environment. The `lint` script was

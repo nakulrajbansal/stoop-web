@@ -322,17 +322,14 @@ html:has(.has-sticky-action) {
   pointer-events: none;
 }
 
-/* The fades. A mask is alpha, so a band melts into whatever is behind it: the
-   same class works on cream, on cream-2 and on the ink panel without knowing
-   which one it landed on. Prefixed as well as plain for older WebKit. */
-.photo-fade-b {
-  -webkit-mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
-}
-.photo-fade-y {
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 34%, #000 66%, transparent 100%);
-}
+/* The fade. A mask is alpha, so a picture melts into whatever is behind it:
+   the same class works on cream, on cream-2 and on the ink panel without
+   knowing which one it landed on. Prefixed as well as plain for older WebKit.
+
+   There were three of these. Two went with the masthead band: .photo-fade-b
+   dressed it, and .photo-fade-y had already outlived whatever it was drawn for.
+   A stylesheet holding masks for pictures the site does not have describes a
+   page that does not exist, so they are deleted rather than kept warm. */
 /* The closing panel's layer: a picture inside the panel, bleeding to its edges
    rather than sitting on it as a tile. The geometry is here and not in Tailwind
    because `.photo` sets position and this file is emitted after the utilities,
@@ -361,6 +358,41 @@ html:has(.has-sticky-action) {
   .photo-fade-panel {
     -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 46%);
     mask-image: linear-gradient(to right, transparent 0%, #000 46%);
+  }
+}
+
+/* ── The board ─────────────────────────────────────────────────────────────
+   The homepage's opening visual, and the thing that replaced the photograph
+   that used to run under the nameplate. That band was atmosphere: a picture of
+   a table outside somewhere, saying nothing about what a visitor gets. What
+   stands there now is the product's own content, presented as what it is, a
+   sheet of paper somebody pinned to a neighborhood board.
+
+   Everything here is presentation. The plans on this paper are the ones the
+   query returned, and when there are none it holds the sample note that is
+   labelled Sample and counted nowhere.
+
+   The top padding is not decoration: the pin is positioned absolutely inside
+   the panel, so the panel has to reserve the space it occupies or the heading
+   runs underneath it. src/lib/visual-system.test.ts reads both numbers and
+   checks they still clear each other. */
+.board-panel {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04);
+  padding: 30px 14px 14px;
+}
+.board-pin {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+@media (min-width: 640px) {
+  .board-panel {
+    padding: 36px 20px 18px;
   }
 }
 
@@ -467,6 +499,15 @@ html:has(.has-sticky-action) {
 }
 .btn-ghost:hover { background: var(--card); border-color: rgba(20, 17, 13, 0.35); }
 .btn-sm { padding: 7px 14px; font-size: 12px; }
+/* The header's own button width. A signed-out visitor is offered four actions
+   and there are 320px to put them in, so the buttons give back four pixels a
+   side on a phone and take them again at the breakpoint where the width is
+   free. Height is untouched: the tap target is set at the call site and does
+   not shrink. */
+.btn-nav { padding-left: 10px; padding-right: 10px; }
+@media (min-width: 640px) {
+  .btn-nav { padding-left: 14px; padding-right: 14px; }
+}
 .btn-lg { padding: 14px 28px; font-size: 15px; }
 .btn-full { width: 100%; }
 

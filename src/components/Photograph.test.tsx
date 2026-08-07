@@ -59,20 +59,24 @@ describe('a rendered photograph is decorative', () => {
   });
 
   it('reserves its box before the bytes land, so nothing shifts', () => {
-    const { container } = render(<Photograph photo={PHOTOS.sidewalkTable} sizes="100vw" aspect="3 / 2" />);
+    const { container } = render(<Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" />);
     const box = container.querySelector('.photo') as HTMLElement;
     expect(box).not.toBeNull();
     expect(box.style.aspectRatio).toBe('3 / 2');
-    expect(container.querySelector('img')!.getAttribute('src')).toContain('sidewalk-table');
+    expect(container.querySelector('img')!.getAttribute('src')).toContain('park-path');
   });
 
-  it('lets the one picture above the fold load eagerly and lazies the rest', () => {
+  it('is lazy unless a call site asks otherwise, and none does any more', () => {
     const { container: lazy } = render(<Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" />);
     expect(lazy.querySelector('img')!.getAttribute('loading')).toBe('lazy');
 
+    // The prop survives its last call site on purpose: the next photograph that
+    // lands above a fold will need it, and the alternative is next/image's
+    // undocumented default. src/app/home-page.test.ts is what holds down that
+    // nothing on the marketing page claims it today.
     cleanup();
     const { container: eager } = render(
-      <Photograph photo={PHOTOS.sidewalkTable} sizes="100vw" aspect="3 / 2" priority />
+      <Photograph photo={PHOTOS.parkPath} sizes="100vw" aspect="3 / 2" priority />
     );
     expect(eager.querySelector('img')!.getAttribute('loading')).not.toBe('lazy');
   });
